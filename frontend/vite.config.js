@@ -9,7 +9,7 @@ const API_TARGET = process.env.DASHBOARD_API_TARGET || 'http://localhost:8000'
 // `/login` + `/logout` are also client routes — the bypass returns the SPA
 // shell for browser navigations (Accept: text/html) and only proxies
 // XHR/fetch (Accept: */*) through to the backend.
-const API_PATHS = ['/login', '/logout', '/me', '/auth', '/ping', '/containers', '/stats']
+const API_PATHS = ['/login', '/logout', '/me', '/auth', '/ping', '/containers', '/stats', '/services']
 
 function apiProxy() {
   const proxy = {}
