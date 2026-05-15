@@ -140,6 +140,20 @@ def test_logout_clears_cookie_with_path(client, make_user):
     assert "Max-Age=0" in set_cookie or 'expires=Thu, 01 Jan 1970' in set_cookie.lower()
 
 
+def test_session_cookie_secure_when_env_set(client, make_user, monkeypatch):
+    monkeypatch.setenv("SESSION_COOKIE_SECURE", "1")
+    make_user(username="alice", password="hunter2-pass")
+    r = client.post("/login", data={"username": "alice", "password": "hunter2-pass"})
+    assert "Secure" in r.headers.get("set-cookie", "")
+
+
+def test_session_cookie_not_secure_by_default(client, make_user, monkeypatch):
+    monkeypatch.delenv("SESSION_COOKIE_SECURE", raising=False)
+    make_user(username="alice", password="hunter2-pass")
+    r = client.post("/login", data={"username": "alice", "password": "hunter2-pass"})
+    assert "Secure" not in r.headers.get("set-cookie", "")
+
+
 # ---------- session sweeping ----------
 
 

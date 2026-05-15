@@ -5,6 +5,7 @@ via DELETE. ``/auth/verify`` reuses ``current_user_optional`` so an indexed
 SELECT covers each nginx auth_request subrequest.
 """
 
+import os
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -20,9 +21,11 @@ from .models import User, UserSession
 SESSION_COOKIE = "session"
 SESSION_TTL = timedelta(days=14)
 
-# Flip to True once nginx-TLS is in front. Cookie-set in main; checked here so
-# the cookie attributes are owned by one module.
-SESSION_COOKIE_SECURE = False
+
+def _cookie_secure() -> bool:
+    """Whether to mark the session cookie ``Secure``. Set ``SESSION_COOKIE_SECURE=1``
+    once nginx-TLS is in front so browsers refuse to send the cookie over HTTP."""
+    return os.environ.get("SESSION_COOKIE_SECURE", "").lower() in ("1", "true", "yes")
 
 
 def hash_password(plain: str) -> str:
@@ -82,7 +85,7 @@ def set_session_cookie(response: Response, token: str) -> None:
         token,
         max_age=int(SESSION_TTL.total_seconds()),
         httponly=True,
-        secure=SESSION_COOKIE_SECURE,
+        secure=_cookie_secure(),
         samesite="lax",
         path="/",
     )

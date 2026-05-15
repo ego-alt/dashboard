@@ -1,0 +1,45 @@
+# Local home-stack compose: nginx (TLS termination, reverse-proxy) +
+# dashboard (FastAPI auth provider + Docker monitor).
+#
+# Bootstrap:
+#   1) scripts/dev-certs.sh             # write tls/home.crt + tls/home.key
+#   2) docker compose up -d
+#   3) docker compose exec dashboard python -m app.cli create-admin <username>
+#   4) Open https://localhost (or https://home.local with a hosts entry)
+
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: home-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./tls:/etc/nginx/tls:ro
+    depends_on:
+      dashboard:
+        condition: service_healthy
+
+  dashboard:
+    build: .
+    image: dashboard:dev
+    container_name: dashboard
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: sqlite:////data/dashboard.db
+      SESSION_COOKIE_SECURE: "1"
+      CORS_ORIGINS: ""
+    # Match the host's docker.sock GID so the non-root app user can read it.
+    # Find with: stat -c '%g' /var/run/docker.sock   (Pi/Debian usually 999.)
+    group_add:
+      - "${DOCKER_GID:-999}"
+    volumes:
+      - dashboard_data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    expose:
+      - "8000"
+
+volumes:
+  dashboard_data:
