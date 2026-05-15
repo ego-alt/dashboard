@@ -30,6 +30,7 @@ from app.docker_control import (
     stop_container,
 )
 from app.models import User
+from app.spa import register_spa
 from app.system_stats import get_system_stats
 
 
@@ -166,3 +167,8 @@ def system_stats_endpoint(_: User = Depends(current_user)):
 @app.get("/stats/containers/{container_id}", response_model=Dict[str, Any])
 def container_stats_endpoint(container_id: str, _: User = Depends(current_user)):
     return _unwrap(get_container_stats(container_id))
+
+
+# ---------- React SPA (built into app/static by Docker / manual npm run build) ----------
+
+register_spa(app)

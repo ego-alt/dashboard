@@ -1,5 +1,15 @@
 ARG PYTHON_VERSION=3.11
 
+# ---- frontend: Vite production build ----
+FROM node:22-alpine AS frontend
+
+WORKDIR /build
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+
+COPY frontend/ ./
+RUN npm run build
+
 # ---- builder: resolve deps into a venv with uv ----
 FROM python:${PYTHON_VERSION}-slim AS builder
 
@@ -29,6 +39,7 @@ ENV PATH="/app/.venv/bin:${PATH}" \
     PYTHONDONTWRITEBYTECODE=1 \
     DATABASE_URL=sqlite:////data/dashboard.db
 
+COPY --from=frontend /build/dist /app/app/static
 COPY --chown=app:app app /app/app
 
 USER app
