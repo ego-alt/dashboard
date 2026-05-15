@@ -11,8 +11,9 @@ This is a plan, not a spec — fixed decisions are flagged; open ones live in §
 **Status (2026-05-15)** — Steps 1–7 of §8 complete: dashboard auth + nginx
 compose; library and calendar wired at `/library/` and `/calendar/` with
 `auth_request` + `AUTH_PROXY_HEADER` proxy auth. §3.4/§3.5 also done: the
-service-registry hub (`/services` + `register-service` CLI + tile home),
-admin-gated monitor, and a protected-container guard against self-lockout.
+hub home (`/services` discovered from Docker `homehub.*` labels — no DB/CLI
+registration — with a monogram icon fallback), admin-gated monitor, and a
+protected-container guard against self-lockout.
 Up next: §8.8–9 tighten / multi-user smoke test; future: unify per-app
 SQLite users tables via SQL.
 

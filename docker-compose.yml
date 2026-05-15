@@ -60,6 +60,12 @@ services:
       - ${LIBRARY_BOOK_DIR:-../library/books}:/data/books
     expose:
       - "5001"
+    labels:
+      homehub.enable: "true"
+      homehub.name: "Library"
+      homehub.route: "/library/"
+      homehub.icon: "📚"
+      homehub.description: "EPUB library + reader"
     command:
       - uv
       - run
@@ -95,6 +101,12 @@ services:
       - ../calendar/instance:/app/instance
     expose:
       - "5002"
+    labels:
+      homehub.enable: "true"
+      homehub.name: "Calendar"
+      homehub.route: "/calendar/"
+      homehub.icon: "📅"
+      homehub.description: "Mood tracker + events"
     command:
       - sh
       - -c

@@ -23,15 +23,15 @@ scripts/dev-certs.sh                                       # one-time TLS for ho
 docker compose up -d --build
 docker compose exec dashboard python -m app.cli create-admin <username>
 uv run python scripts/sync_household_users.py                # mirror users → library + calendar
-# Register the service tiles shown on the hub home page:
-docker compose exec dashboard python -m app.cli register-service library \
-  --display-name Library --container library --route-prefix /library/ --icon 📚
-docker compose exec dashboard python -m app.cli register-service calendar \
-  --display-name Calendar --container calendar --route-prefix /calendar/ --icon 📅
-open https://localhost                                     # hub: tiles for each registered service
+open https://localhost                                     # hub: a tile per labeled service
 open https://localhost/library/                            # EPUB library (dashboard login required)
 open https://localhost/calendar/                           # calendar (dashboard login required)
 ```
+
+The hub auto-discovers services from Docker labels — no registration step.
+Any container with `homehub.enable=true` + `homehub.route` (see the
+`labels:` blocks on `library`/`calendar` in `docker-compose.yml`) appears as
+a tile. Add a service = add labels where you already define the container.
 
 Set `LIBRARY_BOOK_DIR` in `.env` to your existing books path (e.g.
 `/mnt/backup/books`). The compose file mounts `../library/instance` for the
@@ -98,7 +98,7 @@ npm run dev                                                # vite on http://loca
 | `/logout`                            | POST   | public   | Revoke current session |
 | `/me`                                | GET    | user     | Current-user info |
 | `/auth/verify`                       | GET    | internal | nginx `auth_request`; returns `X-User` on 200 |
-| `/services`                          | GET    | user     | Registered service tiles + live status (running/stopped/absent/unknown) |
+| `/services`                          | GET    | user     | Hub tiles discovered from `homehub.*` Docker labels + status (running/stopped) |
 | `/containers`                        | GET    | user     | List containers + live stats |
 | `/containers/{id}/start\|stop\|restart` | POST | admin   | Container lifecycle (refuses protected gateway containers, 409) |
 | `/containers/{id}/logs`              | GET    | user     | Recent logs |
@@ -115,14 +115,10 @@ uv run python -m app.cli create-admin <user> [--display-name "Name"]
 uv run python -m app.cli passwd        <user>
 uv run python -m app.cli list-users
 uv run python -m app.cli purge-sessions
-
-# Hub service tiles (idempotent upsert by slug):
-uv run python -m app.cli register-service <slug> \
-  --display-name "Library" --container library --route-prefix /library/ \
-  [--icon 📚] [--description "..."] [--disabled]
-uv run python -m app.cli list-services
-uv run python -m app.cli unregister-service <slug>
 ```
+
+Service tiles aren't a CLI concern — they're discovered from Docker
+`homehub.*` labels (see Quickstart).
 
 Inside compose: `docker compose exec dashboard python -m app.cli <cmd>`.
 
@@ -141,10 +137,10 @@ stop/restart — default `dashboard,home-nginx`), and `DASHBOARD_API_TARGET`
 uv run pytest
 ```
 
-33 tests cover the auth surface (login lifecycle, session expiry, cookie
-attributes, authorization gates), the service registry (status derivation,
-daemon-down resilience, CLI upsert), the protected-container anti-lockout
-guard, and a mocked-daemon layer for `app/docker_control.py`.
+34 tests cover the auth surface (login lifecycle, session expiry, cookie
+attributes, authorization gates), label-based service discovery (filtering,
+status, daemon-down resilience, sort order), the protected-container
+anti-lockout guard, and a mocked-daemon layer for `app/docker_control.py`.
 
 ## Layout
 
@@ -154,10 +150,10 @@ app/                FastAPI application
   db.py             SQLAlchemy engine, get_db, session_scope
   models.py         User, UserSession, Service ORM
   docker_control.py docker-py wrappers, parallelized stats
-  services.py       service-registry view (Service table ⨯ live Docker)
+  services.py       service discovery from Docker homehub.* labels
   system_stats.py   psutil-only host stats
   main.py           routes + lifespan + protected-container guard
-  cli.py            operator CLI (users, sessions, services)
+  cli.py            operator CLI (users, sessions)
 frontend/           React 19 + Vite SPA: login, service-tile home, admin monitor
 nginx/conf.d/       Reverse-proxy + auth_request config
 scripts/            dev-certs.sh, sync_household_users.py
