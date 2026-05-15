@@ -21,8 +21,8 @@ The architecture rationale lives in [`PLAN.md`](PLAN.md).
 ```sh
 scripts/dev-certs.sh                                       # one-time TLS for home.local + localhost
 docker compose up -d --build
-uv run python scripts/household_sql_pass.py                # once (or after adding users)
-docker compose up -d --build
+docker compose exec dashboard python -m app.cli create-admin <username>
+uv run python scripts/sync_household_users.py                # mirror users → library + calendar
 open https://localhost                                     # accept self-signed if no mkcert
 open https://localhost/library/                            # EPUB library (dashboard login required)
 open https://localhost/calendar/                           # calendar (dashboard login required)
@@ -37,23 +37,19 @@ SQLite DB — point that at your existing `instance/` if migrating a live deploy
 | Script | Purpose |
 |--------|---------|
 | `dev-certs.sh` | TLS certs for nginx (`./tls/home.crt` + `.key`) |
-| `household_sql_pass.py` | One-time bootstrap: backups, dashboard users, sync |
-| `sync_household_users.py` | **Ongoing:** copy dashboard roster → library/calendar shadow `users` |
+| `sync_household_users.py` | Copy dashboard roster → library/calendar shadow `users` |
 
 Dashboard DB is bind-mounted like library/calendar: **`./data/dashboard.db`** →
 `/data/dashboard.db` in the container (same file on host and in Docker).
 
-**First-time / reset:**
+The container runs as uid **10001**. If you create users or touch the DB on the
+host with `uv run python -m app.cli …`, fix ownership before logging in via
+compose: `sudo chown -R 10001:10001 data/` then `docker compose restart dashboard`.
 
-```sh
-uv run python scripts/household_sql_pass.py
-```
+See [`docs/MIGRATION.md`](docs/MIGRATION.md) for notes on the one-time May 2026
+consolidation (already applied on this Pi).
 
-Creates `data/dashboard.db`, household users `admin` + `natalieha`, syncs library
-and calendar. Passwords go to `.bootstrap-credentials` unless
-`DASHBOARD_ADMIN_PASSWORD` / `DASHBOARD_NATALIE_PASSWORD` are set.
-
-**After adding a dashboard user** (`python -m app.cli create-user …`):
+**After adding a dashboard user** (`python -m app.cli create-admin …`):
 
 ```sh
 uv run python scripts/sync_household_users.py
@@ -145,7 +141,8 @@ app/                FastAPI application
   cli.py            operator CLI
 frontend/           React 19 + Vite SPA (login + dashboard shell + router)
 nginx/conf.d/       Reverse-proxy + auth_request config
-scripts/            dev-certs.sh, household_sql_pass.py, sync_household_users.py
+scripts/            dev-certs.sh, sync_household_users.py
+docs/               MIGRATION.md (one-time stack consolidation notes)
 tests/              pytest
 Dockerfile          Multi-stage (Vite build + uv) for the FastAPI service
 docker-compose.yml  nginx + dashboard + library + calendar

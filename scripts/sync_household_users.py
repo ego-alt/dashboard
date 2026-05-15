@@ -128,7 +128,7 @@ def main() -> int:
     if not DASHBOARD_DB.exists():
         raise SystemExit(
             f"dashboard DB missing: {DASHBOARD_DB}\n"
-            "  run: uv run python scripts/household_sql_pass.py"
+            "  create the DB first: docker compose exec dashboard python -m app.cli create-admin <user>"
         )
     if not LIBRARY_DB.exists():
         raise SystemExit(f"library DB missing: {LIBRARY_DB}")

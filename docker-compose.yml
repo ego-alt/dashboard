@@ -4,8 +4,9 @@
 # Bootstrap:
 #   1) scripts/dev-certs.sh             # write tls/home.crt + tls/home.key
 #   2) docker compose up -d
-#   3) uv run python scripts/household_sql_pass.py   # once: users + sync
-#   4) Open https://localhost (or https://home.local with a hosts entry)
+#   3) docker compose exec dashboard python -m app.cli create-admin <user>
+#   4) uv run python scripts/sync_household_users.py
+#   5) Open https://localhost (or https://home.local with a hosts entry)
 
 services:
   nginx:
