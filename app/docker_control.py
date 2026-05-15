@@ -1,15 +1,19 @@
 import docker
-import os
-import subprocess
+from functools import cache
 from typing import Dict, List, Any
 from .system_stats import get_container_stats
 
-# Initialize Docker client
-client = docker.from_env()
+
+@cache
+def _get_client():
+    """Lazy Docker client. Imported before the daemon is reachable should not
+    crash the FastAPI worker — let endpoints surface the error per-request."""
+    return docker.from_env()
+
 
 def get_containers() -> List[Dict[str, Any]]:
     """Get all running and stopped containers with their details."""
-    containers = client.containers.list(all=True)
+    containers = _get_client().containers.list(all=True)
     result = []
     
     for container in containers:
@@ -32,7 +36,7 @@ def get_containers() -> List[Dict[str, Any]]:
 def start_container(container_id: str) -> Dict[str, str]:
     """Start a container by ID."""
     try:
-        container = client.containers.get(container_id)
+        container = _get_client().containers.get(container_id)
         container.start()
         return {"status": "success", "message": f"Container {container.name} started successfully"}
     except Exception as e:
@@ -41,7 +45,7 @@ def start_container(container_id: str) -> Dict[str, str]:
 def stop_container(container_id: str) -> Dict[str, str]:
     """Stop a container by ID."""
     try:
-        container = client.containers.get(container_id)
+        container = _get_client().containers.get(container_id)
         container.stop()
         return {"status": "success", "message": f"Container {container.name} stopped successfully"}
     except Exception as e:
@@ -50,7 +54,7 @@ def stop_container(container_id: str) -> Dict[str, str]:
 def restart_container(container_id: str) -> Dict[str, str]:
     """Restart a container by ID."""
     try:
-        container = client.containers.get(container_id)
+        container = _get_client().containers.get(container_id)
         container.restart()
         return {"status": "success", "message": f"Container {container.name} restarted successfully"}
     except Exception as e:
@@ -59,7 +63,7 @@ def restart_container(container_id: str) -> Dict[str, str]:
 def get_container_logs(container_id: str, tail: int = 100) -> Dict[str, Any]:
     """Get logs from a container."""
     try:
-        container = client.containers.get(container_id)
+        container = _get_client().containers.get(container_id)
         logs = container.logs(tail=tail, timestamps=True).decode('utf-8')
         return {"status": "success", "logs": logs}
     except Exception as e:

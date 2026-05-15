@@ -1,10 +1,13 @@
 import psutil
 import docker
-import datetime
-from typing import Dict, List, Any
+from functools import cache
+from typing import Dict, Any
 
-# Initialize Docker client
-client = docker.from_env()
+
+@cache
+def _get_client():
+    """Lazy Docker client — see docker_control._get_client."""
+    return docker.from_env()
 
 def get_system_stats() -> Dict[str, Any]:
     """Get overall system statistics."""
@@ -21,7 +24,7 @@ def get_system_stats() -> Dict[str, Any]:
 def get_container_stats(container_id: str) -> Dict[str, Any]:
     """Get statistics for a specific container."""
     try:
-        container = client.containers.get(container_id)
+        container = _get_client().containers.get(container_id)
         stats = container.stats(stream=False)
         
         # Calculate CPU usage percentage
