@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 
-const API_TARGET = 'http://localhost:8000'
+const API_TARGET = process.env.DASHBOARD_API_TARGET || 'http://localhost:8000'
 
 // Backend paths the SPA calls same-origin. Proxied in dev so `npm run dev`
 // behaves like production (served behind nginx) without needing CORS.
