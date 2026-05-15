@@ -11,16 +11,25 @@ export default function MonitorPage() {
   const isAdmin = !!user?.is_admin;
   const [containers, setContainers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(false);
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
+    setLoading(true);
+    setStatsLoading(true);
     try {
-      setContainers(await apiJson('/containers'));
+      const rows = await apiJson('/containers');
+      setContainers(rows);
       setError('');
+      setLoading(false);
+
+      const withStats = await apiJson('/containers?stats=1');
+      setContainers(withStats);
     } catch (err) {
       setError(err.body?.detail || err.message || 'Failed to load containers');
     } finally {
       setLoading(false);
+      setStatsLoading(false);
     }
   }, []);
 
@@ -88,10 +97,26 @@ export default function MonitorPage() {
                       {c.status}
                     </span>
                   </td>
-                  <td className="px-4 py-2 text-slate-700">{c.cpu_percent ?? '—'}</td>
-                  <td className="px-4 py-2 text-slate-700">{c.network_rx_kb ?? '—'}</td>
-                  <td className="px-4 py-2 text-slate-700">{c.network_tx_kb ?? '—'}</td>
-                  <td className="px-4 py-2 text-slate-700">{c.runtime_seconds ?? '—'}</td>
+                  <td className="px-4 py-2 text-slate-700">
+                    {statsLoading && c.status === 'running' && c.cpu_percent == null
+                      ? '…'
+                      : (c.cpu_percent ?? '—')}
+                  </td>
+                  <td className="px-4 py-2 text-slate-700">
+                    {statsLoading && c.status === 'running' && c.network_rx_kb == null
+                      ? '…'
+                      : (c.network_rx_kb ?? '—')}
+                  </td>
+                  <td className="px-4 py-2 text-slate-700">
+                    {statsLoading && c.status === 'running' && c.network_tx_kb == null
+                      ? '…'
+                      : (c.network_tx_kb ?? '—')}
+                  </td>
+                  <td className="px-4 py-2 text-slate-700">
+                    {statsLoading && c.status === 'running' && c.runtime_seconds == null
+                      ? '…'
+                      : (c.runtime_seconds ?? '—')}
+                  </td>
                   <td className="px-4 py-2 text-right whitespace-nowrap">
                     {!isAdmin ? null : protectedC ? (
                       <span className="text-xs text-slate-400">protected</span>

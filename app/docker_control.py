@@ -79,34 +79,47 @@ def list_service_candidates() -> List[Dict[str, Any]]:
     ]
 
 
-def get_containers() -> List[Dict[str, Any]]:
-    """List every container with its per-container live stats.
+def _metadata_row(container) -> Dict[str, Any]:
+    """Fields from ``containers.list`` only — no extra inspect/image API calls."""
+    attrs = container.attrs or {}
+    return {
+        "id": container.id,
+        "short_id": container.short_id,
+        "name": container.name,
+        "status": container.status,
+        "image": attrs.get("Image", ""),
+        "ports": container.ports,
+        "created": attrs.get("Created"),
+        "command": attrs.get("Command"),
+    }
 
-    Each ``container.stats(stream=False)`` call blocks ~1s sampling CPU, so we
-    fan them out across a thread pool — the SDK releases the GIL on socket I/O.
+
+def get_containers(*, include_stats: bool = False) -> List[Dict[str, Any]]:
+    """List containers. Live CPU/network stats are optional and slow.
+
+    Each ``container.stats(stream=False)`` blocks ~1s while Docker samples CPU,
+    so stats are fetched in parallel and only for running containers.
     """
     containers = _get_client().containers.list(all=True)
     if not containers:
         return []
+
+    rows = [_metadata_row(c) for c in containers]
+    if not include_stats:
+        return rows
+
+    running = [c for c in containers if c.status == "running"]
+    if not running:
+        return rows
+
     with ThreadPoolExecutor(max_workers=_STATS_FAN_OUT) as ex:
-        stats_results = list(ex.map(_stats_for, containers))
-    result = []
-    for container, stats_result in zip(containers, stats_results):
-        stats = stats_result.get("stats") or {}
-        result.append(
-            {
-                "id": container.id,
-                "short_id": container.short_id,
-                "name": container.name,
-                "status": container.status,
-                "image": container.image.tags[0] if container.image.tags else container.image.id,
-                "ports": container.ports,
-                "created": container.attrs["Created"],
-                "command": container.attrs["Config"]["Cmd"],
-                **stats,
-            }
-        )
-    return result
+        stats_pairs = list(zip(running, ex.map(_stats_for, running)))
+
+    stats_by_id = {c.id: r.get("stats") or {} for c, r in stats_pairs}
+    for row in rows:
+        if extra := stats_by_id.get(row["id"]):
+            row.update(extra)
+    return rows
 
 
 def start_container(container_id: str) -> Dict[str, str]:

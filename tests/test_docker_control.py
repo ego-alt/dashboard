@@ -24,7 +24,12 @@ def _fake_container(*, cid="abc123", name="library", status="running", with_stat
     c.status = status
     c.image = SimpleNamespace(tags=["library:latest"], id="sha256:deadbeef")
     c.ports = {}
-    c.attrs = {"Created": "2026-01-01T00:00:00Z", "Config": {"Cmd": ["python"]}}
+    c.attrs = {
+        "Created": "2026-01-01T00:00:00Z",
+        "Image": "library:latest",
+        "Command": "python",
+        "Config": {"Cmd": ["python"]},
+    }
     if with_stats:
         c.stats.return_value = {
             "cpu_stats": {
@@ -43,9 +48,18 @@ def _fake_container(*, cid="abc123", name="library", status="running", with_stat
     return c
 
 
+def test_get_containers_fast_skips_stats(mock_client):
+    c = _fake_container()
+    mock_client.containers.list.return_value = [c]
+    rows = docker_control.get_containers()
+    assert len(rows) == 1
+    assert rows[0]["name"] == "library"
+    c.stats.assert_not_called()
+
+
 def test_get_containers_returns_metadata_plus_live_stats(mock_client):
     mock_client.containers.list.return_value = [_fake_container()]
-    rows = docker_control.get_containers()
+    rows = docker_control.get_containers(include_stats=True)
     assert len(rows) == 1
     row = rows[0]
     assert row["id"] == "abc123"
@@ -63,11 +77,19 @@ def test_get_containers_isolates_per_container_stats_failures(mock_client):
     good = _fake_container(cid="good")
     bad = _fake_container(cid="bad", with_stats=False)
     mock_client.containers.list.return_value = [good, bad]
-    rows = docker_control.get_containers()
+    rows = docker_control.get_containers(include_stats=True)
     assert len(rows) == 2
     by_id = {r["id"]: r for r in rows}
     assert "cpu_percent" in by_id["good"]
     assert "cpu_percent" not in by_id["bad"]
+
+
+def test_get_containers_skips_stats_for_stopped(mock_client):
+    stopped = _fake_container(cid="down", status="exited")
+    mock_client.containers.list.return_value = [stopped]
+    rows = docker_control.get_containers(include_stats=True)
+    assert rows[0]["status"] == "exited"
+    stopped.stats.assert_not_called()
 
 
 def test_get_containers_empty_list_short_circuits(mock_client):

@@ -140,8 +140,8 @@ def list_services_endpoint(_: User = Depends(current_user)):
 
 
 @app.get("/containers", response_model=List[Dict[str, Any]])
-def list_containers(_: User = Depends(current_user)):
-    return get_containers()
+def list_containers(stats: bool = False, _: User = Depends(current_user)):
+    return get_containers(include_stats=stats)
 
 
 @app.post("/containers/{container_id}/start", response_model=Dict[str, str])

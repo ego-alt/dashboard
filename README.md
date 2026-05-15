@@ -99,7 +99,7 @@ npm run dev                                                # vite on http://loca
 | `/me`                                | GET    | user     | Current-user info |
 | `/auth/verify`                       | GET    | internal | nginx `auth_request`; returns `X-User` on 200 |
 | `/services`                          | GET    | user     | Hub tiles discovered from `homehub.*` Docker labels + status (running/stopped) |
-| `/containers`                        | GET    | user     | List containers + live stats |
+| `/containers`                        | GET    | user     | List containers (`?stats=1` adds live CPU/network, ~1s per running container) |
 | `/containers/{id}/start\|stop\|restart` | POST | admin   | Container lifecycle (refuses protected gateway containers, 409) |
 | `/containers/{id}/logs`              | GET    | user     | Recent logs |
 | `/stats/system`                      | GET    | user     | psutil CPU / mem / disk |
