@@ -57,6 +57,18 @@ def get_container_stats(container_id: str) -> Dict[str, Any]:
     return _stats_for(container)
 
 
+def resolve_container_name(id_or_name: str) -> str | None:
+    """Canonical container name for an id-or-name, or None if unresolvable.
+
+    Used by the protected-container guard so passing the long Docker id can't
+    sneak past a name-based denylist.
+    """
+    try:
+        return _get_client().containers.get(id_or_name).name
+    except Exception:
+        return None
+
+
 def get_containers() -> List[Dict[str, Any]]:
     """List every container with its per-container live stats.
 

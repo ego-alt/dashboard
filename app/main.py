@@ -1,5 +1,6 @@
 """Dashboard API: Docker monitor + auth provider for the home stack."""
 
+import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -23,13 +24,33 @@ from app.docker_control import (
     get_container_logs,
     get_container_stats,
     get_containers,
+    resolve_container_name,
     restart_container,
     start_container,
     stop_container,
 )
 from app.models import User
+from app.services import list_services
 from app.spa import register_spa
 from app.system_stats import get_system_stats
+
+# Gateway containers that must never be stopped/restarted from the dashboard —
+# doing so would sever the very session/route serving this request. UI also
+# hides the controls; this is the server-side backstop.
+PROTECTED_CONTAINERS = frozenset(
+    c.strip()
+    for c in os.environ.get("PROTECTED_CONTAINERS", "dashboard,home-nginx").split(",")
+    if c.strip()
+)
+
+
+def _reject_if_protected(container_id: str, action: str) -> None:
+    name = resolve_container_name(container_id)
+    if name in PROTECTED_CONTAINERS:
+        raise HTTPException(
+            status_code=409,
+            detail=f"refusing to {action} {name!r}: protected gateway container",
+        )
 
 
 @asynccontextmanager
@@ -107,6 +128,16 @@ def auth_verify(user: Optional[User] = Depends(current_user_optional)):
     return Response(status_code=200, headers={"X-User": user.username})
 
 
+# ---------- Service registry (home hub) ----------
+
+
+@app.get("/services", response_model=List[Dict[str, Any]])
+def list_services_endpoint(
+    db: DbSession = Depends(get_db), _: User = Depends(current_user)
+):
+    return list_services(db)
+
+
 # ---------- Docker monitor (auth-gated) ----------
 
 
@@ -117,16 +148,19 @@ def list_containers(_: User = Depends(current_user)):
 
 @app.post("/containers/{container_id}/start", response_model=Dict[str, str])
 def start_container_endpoint(container_id: str, _: User = Depends(current_admin)):
+    _reject_if_protected(container_id, "start")
     return _unwrap(start_container(container_id))
 
 
 @app.post("/containers/{container_id}/stop", response_model=Dict[str, str])
 def stop_container_endpoint(container_id: str, _: User = Depends(current_admin)):
+    _reject_if_protected(container_id, "stop")
     return _unwrap(stop_container(container_id))
 
 
 @app.post("/containers/{container_id}/restart", response_model=Dict[str, str])
 def restart_container_endpoint(container_id: str, _: User = Depends(current_admin)):
+    _reject_if_protected(container_id, "restart")
     return _unwrap(restart_container(container_id))
 
 
