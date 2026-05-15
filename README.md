@@ -1,0 +1,111 @@
+# Dashboard
+
+Home-services hub for a Pi-hosted stack: FastAPI auth provider, server-side
+sessions, Docker container monitor, and a React frontend. Nginx terminates TLS
+in front; other services (library, calendar) trust an `X-Forwarded-User` header
+that nginx injects after an `auth_request` to dashboard's `/auth/verify`.
+
+The architecture rationale lives in [`PLAN.md`](PLAN.md).
+
+## Stack
+
+- **Backend**: FastAPI + uvicorn (Python 3.11+, managed by `uv`)
+- **DB**: SQLAlchemy 2.0 over SQLite (drop-in to Postgres later)
+- **Auth**: argon2id hashing, server-side `user_sessions` table, HttpOnly cookies
+- **Frontend**: React 19 + Vite + Tailwind v4
+- **Container view**: docker-py + psutil
+- **Reverse proxy**: nginx (TLS termination + `auth_request`)
+
+## Quickstart — full stack via compose
+
+```sh
+scripts/dev-certs.sh                                       # one-time TLS for home.local + localhost
+docker compose up -d --build
+docker compose exec dashboard python -m app.cli create-admin <username>
+open https://localhost                                     # accept self-signed if no mkcert
+```
+
+If your host's `docker.sock` has a non-default GID, set `DOCKER_GID` before
+`compose up`. Pi/Debian is usually `999`, macOS + colima is often `991` — check
+with `stat -c '%g' /var/run/docker.sock`.
+
+## Quickstart — backend dev (no Docker)
+
+```sh
+uv sync
+uv run uvicorn app.main:app --reload                       # http://127.0.0.1:8000
+uv run python -m app.cli create-admin <username>
+```
+
+## Quickstart — frontend dev
+
+```sh
+cd frontend
+npm install
+npm run dev                                                # vite on http://localhost:5173
+                                                           # talks to backend on :8000 via CORS
+```
+
+## Endpoints
+
+| Route                                | Method | Auth     | Purpose |
+| ------------------------------------ | ------ | -------- | --- |
+| `/ping`                              | GET    | public   | Healthcheck (Docker `HEALTHCHECK` target) |
+| `/login`                             | POST   | public   | Username + password → session cookie |
+| `/logout`                            | POST   | public   | Revoke current session |
+| `/me`                                | GET    | user     | Current-user info |
+| `/auth/verify`                       | GET    | internal | nginx `auth_request`; returns `X-User` on 200 |
+| `/containers`                        | GET    | user     | List containers + live stats |
+| `/containers/{id}/start\|stop\|restart` | POST | admin   | Container lifecycle |
+| `/containers/{id}/logs`              | GET    | user     | Recent logs |
+| `/stats/system`                      | GET    | user     | psutil CPU / mem / disk |
+| `/stats/containers/{id}`             | GET    | user     | Per-container CPU / network |
+
+`/auth/verify` is marked `internal` in nginx — external clients hit 404. Only
+nginx-internal subrequests can reach it.
+
+## CLI
+
+```sh
+uv run python -m app.cli create-admin <user> [--display-name "Name"]
+uv run python -m app.cli passwd        <user>
+uv run python -m app.cli list-users
+uv run python -m app.cli purge-sessions
+```
+
+Inside compose: `docker compose exec dashboard python -m app.cli <cmd>`.
+
+## Environment
+
+Copy [`.env.example`](.env.example) to `.env` and edit. Compose reads `.env`
+automatically; for `uv run`-based dev, `export` the vars or use `direnv`.
+
+## Tests
+
+```sh
+uv run pytest
+```
+
+23 tests cover the auth surface (login lifecycle, session expiry, cookie
+attributes, authorization gates) and a mocked-daemon layer for
+`app/docker_control.py`.
+
+## Layout
+
+```
+app/                FastAPI application
+  auth.py           argon2id hashing, sessions, FastAPI deps
+  db.py             SQLAlchemy engine, get_db, session_scope
+  models.py         User, UserSession, Service ORM
+  docker_control.py docker-py wrappers, parallelized stats
+  system_stats.py   psutil-only host stats
+  main.py           routes + lifespan
+  cli.py            operator CLI
+frontend/           React 19 + Vite SPA (early stage)
+nginx/conf.d/       Reverse-proxy + auth_request config
+scripts/            dev-certs.sh
+tests/              pytest
+Dockerfile          Multi-stage uv build for the FastAPI service
+docker-compose.yml  nginx + dashboard (library/calendar slot in later)
+PLAN.md             Full design rationale + migration roadmap
+```
