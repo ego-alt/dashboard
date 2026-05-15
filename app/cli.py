@@ -1,4 +1,4 @@
-"""Operator CLI: bootstrap the first admin, manage users, sweep sessions.
+"""Operator CLI: bootstrap admins, manage users, sweep sessions.
 
 Run via ``uv run python -m app.cli <command>`` from the dashboard repo root.
 Reads ``DATABASE_URL`` from env, same as the API.
@@ -9,7 +9,7 @@ import getpass
 import sys
 
 from app.auth import hash_password, purge_expired_sessions
-from app.db import SessionLocal, init_db
+from app.db import init_db, session_scope
 from app.models import User
 
 
@@ -28,12 +28,17 @@ def _read_new_password() -> str:
     return pw1
 
 
+def _require_user(db, username: str) -> User:
+    user = db.query(User).filter(User.username == username).one_or_none()
+    if user is None:
+        print(f"no such user: {username!r}", file=sys.stderr)
+        sys.exit(1)
+    return user
+
+
 def cmd_create_admin(args) -> None:
-    init_db()
-    db = SessionLocal()
-    try:
-        existing = db.query(User).filter(User.username == args.username).one_or_none()
-        if existing is not None:
+    with session_scope() as db:
+        if db.query(User).filter(User.username == args.username).one_or_none():
             print(f"user {args.username!r} already exists", file=sys.stderr)
             sys.exit(1)
         pw = _read_new_password()
@@ -46,29 +51,18 @@ def cmd_create_admin(args) -> None:
         db.add(user)
         db.commit()
         print(f"created admin user {args.username!r} (id={user.id})")
-    finally:
-        db.close()
 
 
 def cmd_passwd(args) -> None:
-    init_db()
-    db = SessionLocal()
-    try:
-        user = db.query(User).filter(User.username == args.username).one_or_none()
-        if user is None:
-            print(f"no such user: {args.username!r}", file=sys.stderr)
-            sys.exit(1)
+    with session_scope() as db:
+        user = _require_user(db, args.username)
         user.password_hash = hash_password(_read_new_password())
         db.commit()
         print(f"updated password for {args.username!r}")
-    finally:
-        db.close()
 
 
 def cmd_list_users(_args) -> None:
-    init_db()
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         users = db.query(User).order_by(User.id).all()
         if not users:
             print("(no users)")
@@ -77,18 +71,12 @@ def cmd_list_users(_args) -> None:
             tag = "admin" if u.is_admin else "user "
             last = u.last_login_at.isoformat() if u.last_login_at else "—"
             print(f"  {u.id:>3}  {u.username:<24}  [{tag}]  last_login={last}")
-    finally:
-        db.close()
 
 
 def cmd_purge_sessions(_args) -> None:
-    init_db()
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         n = purge_expired_sessions(db)
         print(f"purged {n} expired session(s)")
-    finally:
-        db.close()
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -114,6 +102,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv=None) -> None:
+    init_db()
     args = build_parser().parse_args(argv)
     args.func(args)
 

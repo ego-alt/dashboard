@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta, timezone
 
-from app.auth import SESSION_COOKIE
+from app.auth import SESSION_COOKIE, purge_expired_sessions
 from app.models import UserSession
 
 
@@ -105,18 +105,60 @@ def test_expired_session_is_rejected(client, make_user, TestSession):
 def test_non_admin_cannot_start_container(client, make_user):
     make_user(username="alice", password="hunter2-pass", is_admin=False)
     client.post("/login", data={"username": "alice", "password": "hunter2-pass"})
-    # Auth dependency should 403 before the Docker call is reached.
     assert client.post("/containers/abc/start").status_code == 403
 
 
-def test_non_admin_can_read_containers_endpoint_shape(client, make_user, monkeypatch):
-    """Non-admin should pass the auth gate on read endpoints; the Docker call
-    itself can fail, but the auth dependency must not be the blocker."""
+def test_non_admin_can_read_containers_endpoint(client, make_user, monkeypatch):
     make_user(username="alice", password="hunter2-pass", is_admin=False)
     client.post("/login", data={"username": "alice", "password": "hunter2-pass"})
-    # Stub the docker call so we test only the auth gate.
     from app import main
     monkeypatch.setattr(main, "get_containers", lambda: [])
     r = client.get("/containers")
     assert r.status_code == 200
     assert r.json() == []
+
+
+# ---------- cookie attributes ----------
+
+
+def test_login_cookie_has_secure_attributes(client, make_user):
+    make_user(username="alice", password="hunter2-pass")
+    r = client.post("/login", data={"username": "alice", "password": "hunter2-pass"})
+    set_cookie = r.headers.get("set-cookie", "")
+    assert "HttpOnly" in set_cookie
+    assert "SameSite=lax" in set_cookie
+    assert "Path=/" in set_cookie
+    assert SESSION_COOKIE in set_cookie
+
+
+def test_logout_clears_cookie_with_path(client, make_user):
+    make_user(username="alice", password="hunter2-pass")
+    client.post("/login", data={"username": "alice", "password": "hunter2-pass"})
+    r = client.post("/logout")
+    set_cookie = r.headers.get("set-cookie", "")
+    assert f"{SESSION_COOKIE}=" in set_cookie
+    assert "Max-Age=0" in set_cookie or 'expires=Thu, 01 Jan 1970' in set_cookie.lower()
+
+
+# ---------- session sweeping ----------
+
+
+def test_purge_expired_sessions_deletes_and_returns_count(client, make_user, TestSession):
+    make_user(username="alice", password="hunter2-pass")
+    make_user(username="bob", password="hunter2-pass")
+    client.post("/login", data={"username": "alice", "password": "hunter2-pass"})
+    client.post("/login", data={"username": "bob", "password": "hunter2-pass"})
+    db = TestSession()
+    try:
+        sessions = db.query(UserSession).all()
+        assert len(sessions) == 2
+        # Expire one of them.
+        sessions[0].expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
+        db.commit()
+        n = purge_expired_sessions(db)
+        assert n == 1
+        assert db.query(UserSession).count() == 1
+        n_again = purge_expired_sessions(db)
+        assert n_again == 0
+    finally:
+        db.close()

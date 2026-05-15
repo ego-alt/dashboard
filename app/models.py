@@ -1,9 +1,3 @@
-"""ORM models — users, sessions, services.
-
-Service rows are *metadata only* — live container state is fetched from the
-Docker daemon and joined by container_name at query time (see PLAN §3.4).
-"""
-
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -11,10 +5,6 @@ from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
-
-
-def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
 
 
 class User(Base):
@@ -30,7 +20,9 @@ class User(Base):
         Boolean, nullable=False, default=False, server_default="0"
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utc_now, nullable=False
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
     )
     last_login_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
@@ -42,8 +34,6 @@ class User(Base):
 
 
 class UserSession(Base):
-    """Server-side session row. One per active login; revoke = DELETE."""
-
     __tablename__ = "user_sessions"
 
     token: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -51,7 +41,9 @@ class UserSession(Base):
         Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utc_now, nullable=False
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
     )
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, index=True
@@ -62,15 +54,15 @@ class UserSession(Base):
     user: Mapped["User"] = relationship(back_populates="sessions")
 
     def is_expired(self) -> bool:
-        # SQLite returns naive datetimes; normalize before comparing to aware now().
+        # SQLite stores naive UTC; normalize before comparing to aware now().
         exp = self.expires_at
         if exp.tzinfo is None:
             exp = exp.replace(tzinfo=timezone.utc)
-        return exp <= _utc_now()
+        return exp <= datetime.now(timezone.utc)
 
 
 class Service(Base):
-    """Human-facing slice of the home stack. Status comes from Docker, not here."""
+    """Metadata for one home-stack service. Live status comes from Docker."""
 
     __tablename__ = "services"
 
