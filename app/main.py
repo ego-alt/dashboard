@@ -132,10 +132,8 @@ def auth_verify(user: Optional[User] = Depends(current_user_optional)):
 
 
 @app.get("/services", response_model=List[Dict[str, Any]])
-def list_services_endpoint(
-    db: DbSession = Depends(get_db), _: User = Depends(current_user)
-):
-    return list_services(db)
+def list_services_endpoint(_: User = Depends(current_user)):
+    return list_services()
 
 
 # ---------- Docker monitor (auth-gated) ----------

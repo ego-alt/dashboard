@@ -1,56 +1,62 @@
-"""Service-registry view: the ``Service`` table (human-facing metadata) married
-to live Docker state. The table never stores status — that always comes from
-the daemon, and the hub must still render if the daemon is unreachable.
+"""Service discovery from Docker labels.
+
+The home stack's compose file is the single source of truth: a container opts
+into the hub with ``homehub.enable=true`` and carries its tile metadata as
+labels. No DB, no registration step — adding a service means adding labels
+where you already define the container.
+
+Recognized labels (all under the ``homehub.`` prefix):
+  enable       "true"/"1"/"yes" — opt in (required)
+  route        nginx path to link the tile to, e.g. "/library/" (required)
+  name         display name (defaults to the container name)
+  icon         emoji/short string (optional; UI shows a monogram otherwise)
+  description  one-line blurb (optional)
 """
 
 from typing import Any, Dict, List
 
-from sqlalchemy.orm import Session as DbSession
+from app.docker_control import list_service_candidates
 
-from app.docker_control import get_containers
-from app.models import Service
+LABEL_PREFIX = "homehub."
+
+_TRUTHY = {"1", "true", "yes", "on"}
 
 
-def list_services(db: DbSession) -> List[Dict[str, Any]]:
-    rows = (
-        db.query(Service)
-        .filter(Service.is_enabled.is_(True))
-        .order_by(Service.display_name)
-        .all()
-    )
-    if not rows:
+def _label(labels: Dict[str, str], key: str) -> str | None:
+    v = labels.get(f"{LABEL_PREFIX}{key}")
+    v = v.strip() if isinstance(v, str) else v
+    return v or None
+
+
+def list_services() -> List[Dict[str, Any]]:
+    """Discovered, hub-enabled services sorted by display name.
+
+    Returns [] if the daemon is unreachable rather than failing the hub.
+    """
+    try:
+        candidates = list_service_candidates()
+    except Exception:
         return []
 
-    try:
-        by_name = {c["name"]: c for c in get_containers()}
-        docker_ok = True
-    except Exception:
-        # Daemon down / socket missing — show tiles with unknown status rather
-        # than 500 the whole hub.
-        by_name = {}
-        docker_ok = False
-
     out: List[Dict[str, Any]] = []
-    for s in rows:
-        if not docker_ok:
-            status = "unknown"
-        else:
-            container = by_name.get(s.container_name)
-            if container is None:
-                status = "absent"
-            elif container.get("status") == "running":
-                status = "running"
-            else:
-                status = "stopped"
+    for c in candidates:
+        labels = c.get("labels") or {}
+        enabled = (labels.get(f"{LABEL_PREFIX}enable") or "").strip().lower()
+        if enabled not in _TRUTHY:
+            continue
+        route = _label(labels, "route")
+        if not route:
+            continue  # nothing to link the tile to
         out.append(
             {
-                "slug": s.slug,
-                "display_name": s.display_name,
-                "route_prefix": s.route_prefix,
-                "icon": s.icon,
-                "description": s.description,
-                "container_name": s.container_name,
-                "status": status,
+                "slug": c["name"],
+                "display_name": _label(labels, "name") or c["name"],
+                "route_prefix": route,
+                "icon": _label(labels, "icon"),
+                "description": _label(labels, "description"),
+                "container_name": c["name"],
+                "status": "running" if c.get("status") == "running" else "stopped",
             }
         )
+    out.sort(key=lambda s: s["display_name"].lower())
     return out

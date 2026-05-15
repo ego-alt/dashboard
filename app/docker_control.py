@@ -69,6 +69,16 @@ def resolve_container_name(id_or_name: str) -> str | None:
         return None
 
 
+def list_service_candidates() -> List[Dict[str, Any]]:
+    """Lightweight (name, status, labels) for every container — no per-container
+    stats. Backs label-based service discovery.
+    """
+    return [
+        {"name": c.name, "status": c.status, "labels": c.labels or {}}
+        for c in _get_client().containers.list(all=True)
+    ]
+
+
 def get_containers() -> List[Dict[str, Any]]:
     """List every container with its per-container live stats.
 

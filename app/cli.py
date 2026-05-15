@@ -10,7 +10,7 @@ import sys
 
 from app.auth import hash_password, purge_expired_sessions
 from app.db import init_db, session_scope
-from app.models import Service, User
+from app.models import User
 
 
 MIN_PASSWORD_LEN = 8
@@ -120,75 +120,6 @@ def cmd_purge_sessions(_args) -> None:
         print(f"purged {n} expired session(s)")
 
 
-def _register_service(
-    db,
-    *,
-    slug: str,
-    display_name: str,
-    container_name: str,
-    route_prefix: str,
-    icon: str | None = None,
-    description: str | None = None,
-    enabled: bool = True,
-) -> tuple[Service, bool]:
-    """Idempotent upsert by slug. Returns (service, created)."""
-    svc = db.query(Service).filter(Service.slug == slug).one_or_none()
-    created = svc is None
-    if svc is None:
-        svc = Service(slug=slug)
-        db.add(svc)
-    svc.display_name = display_name
-    svc.container_name = container_name
-    svc.route_prefix = route_prefix
-    svc.icon = icon
-    svc.description = description
-    svc.is_enabled = enabled
-    db.commit()
-    db.refresh(svc)
-    return svc, created
-
-
-def cmd_register_service(args) -> None:
-    with session_scope() as db:
-        _svc, created = _register_service(
-            db,
-            slug=args.slug,
-            display_name=args.display_name,
-            container_name=args.container,
-            route_prefix=args.route_prefix,
-            icon=args.icon,
-            description=args.description,
-            enabled=not args.disabled,
-        )
-        verb = "registered" if created else "updated"
-        print(f"{verb} service {args.slug!r} → {args.route_prefix} (container={args.container})")
-
-
-def cmd_unregister_service(args) -> None:
-    with session_scope() as db:
-        svc = db.query(Service).filter(Service.slug == args.slug).one_or_none()
-        if svc is None:
-            print(f"no such service: {args.slug!r}", file=sys.stderr)
-            sys.exit(1)
-        db.delete(svc)
-        db.commit()
-        print(f"unregistered service {args.slug!r}")
-
-
-def cmd_list_services(_args) -> None:
-    with session_scope() as db:
-        rows = db.query(Service).order_by(Service.display_name).all()
-        if not rows:
-            print("(no services)")
-            return
-        for s in rows:
-            flag = " " if s.is_enabled else "x"
-            print(
-                f"  [{flag}] {s.slug:<16} {s.route_prefix:<14} "
-                f"container={s.container_name!r}  {s.display_name!r}"
-            )
-
-
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="dashboard-cli")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -223,23 +154,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_pg = sub.add_parser("purge-sessions", help="Delete expired sessions.")
     p_pg.set_defaults(func=cmd_purge_sessions)
-
-    p_rs = sub.add_parser("register-service", help="Register/update a hub service (idempotent by slug).")
-    p_rs.add_argument("slug")
-    p_rs.add_argument("--display-name", required=True)
-    p_rs.add_argument("--container", required=True, help="Docker container_name to track.")
-    p_rs.add_argument("--route-prefix", required=True, help="nginx path, e.g. /library/")
-    p_rs.add_argument("--icon", default=None, help="Emoji or short label for the tile.")
-    p_rs.add_argument("--description", default=None)
-    p_rs.add_argument("--disabled", action="store_true", help="Register but hide from the hub.")
-    p_rs.set_defaults(func=cmd_register_service)
-
-    p_us = sub.add_parser("unregister-service", help="Remove a service by slug.")
-    p_us.add_argument("slug")
-    p_us.set_defaults(func=cmd_unregister_service)
-
-    p_lsvc = sub.add_parser("list-services", help="List registered services.")
-    p_lsvc.set_defaults(func=cmd_list_services)
 
     return p
 
