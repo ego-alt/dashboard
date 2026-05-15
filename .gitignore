@@ -28,3 +28,12 @@ dist-ssr
 
 # Virtual environment
 venv/
+.venv/
+
+# Python tooling caches
+.pytest_cache/
+.ruff_cache/
+
+# Local app state (SQLite DB, env file)
+*.db
+.env
