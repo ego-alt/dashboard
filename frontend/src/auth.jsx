@@ -1,9 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
 import { apiJson, logout as apiLogout } from './api';
 
 const AuthCtx = createContext(null);
 
 export function AuthProvider({ children }) {
+  // undefined = not yet resolved, null = anonymous, object = logged in.
   const [user, setUser] = useState(undefined);
 
   const refresh = useCallback(() => {
@@ -35,21 +37,25 @@ export function useAuth() {
   return ctx;
 }
 
+function Centered({ children }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center text-slate-500">
+      {children}
+    </div>
+  );
+}
+
 export function RequireAuth({ children }) {
   const { user } = useAuth();
+  const location = useLocation();
 
   if (user === undefined) {
-    return (
-      <motion className="flex min-h-[40vh] items-center justify-center text-slate-400">
-        Loading…
-      </div>
-    );
+    return <Centered>Loading…</Centered>;
   }
 
   if (user === null) {
-    const next = encodeURIComponent(window.location.pathname + window.location.search);
-    window.location.replace(`/login?next=${next}`);
-    return null;
+    const next = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/login?next=${next}`} replace />;
   }
 
   return children;
