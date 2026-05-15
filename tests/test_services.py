@@ -26,7 +26,7 @@ def test_enabled_service_discovered(client, make_user, monkeypatch):
                     "homehub.enable": "true",
                     "homehub.name": "Library",
                     "homehub.route": "/library/",
-                    "homehub.icon": "📚",
+                    "homehub.icon": "book",
                 },
             )
         ],
@@ -39,7 +39,7 @@ def test_enabled_service_discovered(client, make_user, monkeypatch):
         "slug": "library",
         "display_name": "Library",
         "route_prefix": "/library/",
-        "icon": "📚",
+        "icon": "book",
         "description": None,
         "container_name": "library",
         "status": "running",

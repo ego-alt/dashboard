@@ -64,7 +64,7 @@ services:
       homehub.enable: "true"
       homehub.name: "Library"
       homehub.route: "/library/"
-      homehub.icon: "📚"
+      homehub.icon: "book"
       homehub.description: "EPUB library + reader"
     command:
       - uv
@@ -105,7 +105,7 @@ services:
       homehub.enable: "true"
       homehub.name: "Calendar"
       homehub.route: "/calendar/"
-      homehub.icon: "📅"
+      homehub.icon: "calendar"
       homehub.description: "Mood tracker + events"
     command:
       - sh

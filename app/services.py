@@ -9,7 +9,7 @@ Recognized labels (all under the ``homehub.`` prefix):
   enable       "true"/"1"/"yes" — opt in (required)
   route        nginx path to link the tile to, e.g. "/library/" (required)
   name         display name (defaults to the container name)
-  icon         emoji/short string (optional; UI shows a monogram otherwise)
+  icon         icon key, e.g. book or calendar (optional; UI picks by slug or monogram)
   description  one-line blurb (optional)
 """
 

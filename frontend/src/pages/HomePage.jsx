@@ -1,35 +1,11 @@
 import { useEffect, useState } from 'react';
 import { apiJson } from '../api';
+import ServiceIcon from '../components/ServiceIcon.jsx';
 
 const STATUS = {
   running: { dot: 'bg-green-500', label: 'running' },
   stopped: { dot: 'bg-amber-500', label: 'stopped' },
 };
-
-const MONO_COLORS = [
-  'bg-rose-500',
-  'bg-amber-500',
-  'bg-emerald-500',
-  'bg-sky-500',
-  'bg-violet-500',
-  'bg-fuchsia-500',
-  'bg-teal-500',
-  'bg-indigo-500',
-];
-
-function Monogram({ name, slug }) {
-  const letter = (name || '?').trim().charAt(0).toUpperCase() || '?';
-  let h = 0;
-  for (const ch of slug) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  const color = MONO_COLORS[h % MONO_COLORS.length];
-  return (
-    <span
-      className={`flex h-10 w-10 items-center justify-center rounded-lg text-base font-semibold text-white ${color}`}
-    >
-      {letter}
-    </span>
-  );
-}
 
 export default function HomePage() {
   const [services, setServices] = useState(null); // null = loading
@@ -64,11 +40,11 @@ export default function HomePage() {
             const tile = (
               <div className="flex h-full flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition group-hover:border-slate-400">
                 <div className="mb-3 flex items-center justify-between">
-                  {s.icon ? (
-                    <span className="text-3xl leading-none">{s.icon}</span>
-                  ) : (
-                    <Monogram name={s.display_name} slug={s.slug} />
-                  )}
+                  <ServiceIcon
+                    icon={s.icon}
+                    name={s.display_name}
+                    slug={s.slug}
+                  />
                   <span className="flex items-center gap-1.5 text-xs text-slate-500">
                     <span className={`h-2 w-2 rounded-full ${st.dot}`} />
                     {st.label}
