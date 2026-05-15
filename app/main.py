@@ -1,12 +1,10 @@
 """Dashboard API: Docker monitor + auth provider for the home stack."""
 
-import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, Response
-from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session as DbSession
 
 from app.auth import (
@@ -41,21 +39,6 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Dashboard API", lifespan=lifespan)
-
-
-_cors_origins = [
-    o.strip()
-    for o in os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(",")
-    if o.strip()
-]
-if _cors_origins:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=_cors_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
 
 
 def _unwrap(result: Dict[str, Any]) -> Dict[str, Any]:

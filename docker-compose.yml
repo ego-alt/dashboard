@@ -34,7 +34,6 @@ services:
     environment:
       DATABASE_URL: sqlite:////data/dashboard.db
       SESSION_COOKIE_SECURE: "1"
-      CORS_ORIGINS: ""
     # Match the host's docker.sock GID so the non-root app user can read it.
     # Find with: stat -c '%g' /var/run/docker.sock   (Pi/Debian usually 999.)
     group_add:
