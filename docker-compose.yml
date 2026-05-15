@@ -4,7 +4,7 @@
 # Bootstrap:
 #   1) scripts/dev-certs.sh             # write tls/home.crt + tls/home.key
 #   2) docker compose up -d
-#   3) docker compose exec dashboard python -m app.cli create-admin <username>
+#   3) uv run python scripts/household_sql_pass.py   # once: users + sync
 #   4) Open https://localhost (or https://home.local with a hosts entry)
 
 services:
@@ -21,6 +21,10 @@ services:
     depends_on:
       dashboard:
         condition: service_healthy
+      library:
+        condition: service_started
+      calendar:
+        condition: service_started
 
   dashboard:
     build: .
@@ -36,10 +40,69 @@ services:
     group_add:
       - "${DOCKER_GID:-999}"
     volumes:
-      - dashboard_data:/data
+      - ./data:/data
       - /var/run/docker.sock:/var/run/docker.sock
     expose:
       - "8000"
 
-volumes:
-  dashboard_data:
+  library:
+    build: ../library
+    image: library:dev
+    container_name: library
+    restart: unless-stopped
+    environment:
+      APPLICATION_ROOT: /library
+      AUTH_PROXY_HEADER: X-Forwarded-User
+      BOOK_DIR: /data/books
+      SECRET_KEY: ${LIBRARY_SECRET_KEY:-}
+    volumes:
+      - ../library/instance:/app/instance
+      - ${LIBRARY_BOOK_DIR:-../library/books}:/data/books
+    expose:
+      - "5001"
+    command:
+      - uv
+      - run
+      - gunicorn
+      - app:create_app()
+      - --bind
+      - 0.0.0.0:5001
+      - --workers
+      - "2"
+      - --threads
+      - "4"
+      - --timeout
+      - "120"
+      - --worker-class
+      - gthread
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5001/healthz')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  calendar:
+    build: ../calendar
+    image: calendar:dev
+    container_name: calendar
+    restart: unless-stopped
+    environment:
+      APPLICATION_ROOT: /calendar
+      AUTH_PROXY_HEADER: X-Forwarded-User
+      SECRET_KEY: ${CALENDAR_SECRET_KEY:-}
+    volumes:
+      - ../calendar/instance:/app/instance
+    expose:
+      - "5002"
+    command:
+      - sh
+      - -c
+      - uv run flask db upgrade && exec uv run gunicorn 'app:create_app()' --bind 0.0.0.0:5002 --workers 2 --timeout 120 --worker-class sync
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5002/healthz')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+

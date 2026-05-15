@@ -37,4 +37,5 @@ venv/
 # Local app state (SQLite DB, env file)
 *.db
 .env
+.bootstrap-credentials
 tls/

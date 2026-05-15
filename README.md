@@ -21,9 +21,51 @@ The architecture rationale lives in [`PLAN.md`](PLAN.md).
 ```sh
 scripts/dev-certs.sh                                       # one-time TLS for home.local + localhost
 docker compose up -d --build
-docker compose exec dashboard python -m app.cli create-admin <username>
+uv run python scripts/household_sql_pass.py                # once (or after adding users)
+docker compose up -d --build
 open https://localhost                                     # accept self-signed if no mkcert
+open https://localhost/library/                            # EPUB library (dashboard login required)
+open https://localhost/calendar/                           # calendar (dashboard login required)
 ```
+
+Set `LIBRARY_BOOK_DIR` in `.env` to your existing books path (e.g.
+`/mnt/backup/books`). The compose file mounts `../library/instance` for the
+SQLite DB — point that at your existing `instance/` if migrating a live deploy.
+
+### Scripts (`scripts/`)
+
+| Script | Purpose |
+|--------|---------|
+| `dev-certs.sh` | TLS certs for nginx (`./tls/home.crt` + `.key`) |
+| `household_sql_pass.py` | One-time bootstrap: backups, dashboard users, sync |
+| `sync_household_users.py` | **Ongoing:** copy dashboard roster → library/calendar shadow `users` |
+
+Dashboard DB is bind-mounted like library/calendar: **`./data/dashboard.db`** →
+`/data/dashboard.db` in the container (same file on host and in Docker).
+
+**First-time / reset:**
+
+```sh
+uv run python scripts/household_sql_pass.py
+```
+
+Creates `data/dashboard.db`, household users `admin` + `natalieha`, syncs library
+and calendar. Passwords go to `.bootstrap-credentials` unless
+`DASHBOARD_ADMIN_PASSWORD` / `DASHBOARD_NATALIE_PASSWORD` are set.
+
+**After adding a dashboard user** (`python -m app.cli create-user …`):
+
+```sh
+uv run python scripts/sync_household_users.py
+```
+
+**Sync does not:** copy passwords, merge bookmarks/events, or change numeric
+`user_id`s. It only ensures each dashboard username exists in the app DBs
+(`password_hash` NULL for proxy mode). First HTTP visit also auto-creates missing
+rows; the script avoids surprises before someone opens an app.
+
+Optional: `sync_household_users.py --prune-library` drops library users absent
+from dashboard with no bookmarks/tags.
 
 If your host's `docker.sock` has a non-default GID, set `DOCKER_GID` before
 `compose up`. Pi/Debian is usually `999`, macOS + colima is often `991` — check

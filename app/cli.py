@@ -28,6 +28,39 @@ def _read_new_password() -> str:
     return pw1
 
 
+def _resolve_password(explicit: str | None) -> str:
+    if explicit is not None:
+        if len(explicit) < MIN_PASSWORD_LEN:
+            print(f"password must be at least {MIN_PASSWORD_LEN} characters", file=sys.stderr)
+            sys.exit(1)
+        return explicit
+    return _read_new_password()
+
+
+def _add_user(
+    db,
+    *,
+    username: str,
+    password: str,
+    is_admin: bool,
+    display_name: str | None = None,
+) -> User:
+    existing = db.query(User).filter(User.username == username).one_or_none()
+    if existing is not None:
+        print(f"user {username!r} already exists (id={existing.id})", file=sys.stderr)
+        sys.exit(1)
+    user = User(
+        username=username,
+        display_name=display_name or username,
+        password_hash=hash_password(password),
+        is_admin=is_admin,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
 def _require_user(db, username: str) -> User:
     user = db.query(User).filter(User.username == username).one_or_none()
     if user is None:
@@ -38,19 +71,27 @@ def _require_user(db, username: str) -> User:
 
 def cmd_create_admin(args) -> None:
     with session_scope() as db:
-        if db.query(User).filter(User.username == args.username).one_or_none():
-            print(f"user {args.username!r} already exists", file=sys.stderr)
-            sys.exit(1)
-        pw = _read_new_password()
-        user = User(
+        user = _add_user(
+            db,
             username=args.username,
-            display_name=args.display_name or args.username,
-            password_hash=hash_password(pw),
+            password=_resolve_password(args.password),
             is_admin=True,
+            display_name=args.display_name,
         )
-        db.add(user)
-        db.commit()
         print(f"created admin user {args.username!r} (id={user.id})")
+
+
+def cmd_create_user(args) -> None:
+    with session_scope() as db:
+        user = _add_user(
+            db,
+            username=args.username,
+            password=_resolve_password(args.password),
+            is_admin=args.admin,
+            display_name=args.display_name,
+        )
+        role = "admin" if user.is_admin else "user"
+        print(f"created {role} {args.username!r} (id={user.id})")
 
 
 def cmd_passwd(args) -> None:
@@ -86,7 +127,23 @@ def build_parser() -> argparse.ArgumentParser:
     p_create = sub.add_parser("create-admin", help="Create an admin user.")
     p_create.add_argument("username")
     p_create.add_argument("--display-name", default=None)
+    p_create.add_argument(
+        "--password",
+        default=None,
+        help="Non-interactive bootstrap (min 8 chars). Prefer env + getpass in normal use.",
+    )
     p_create.set_defaults(func=cmd_create_admin)
+
+    p_user = sub.add_parser("create-user", help="Create a non-admin user.")
+    p_user.add_argument("username")
+    p_user.add_argument("--display-name", default=None)
+    p_user.add_argument(
+        "--admin",
+        action="store_true",
+        help="Grant dashboard admin (library role is still separate).",
+    )
+    p_user.add_argument("--password", default=None)
+    p_user.set_defaults(func=cmd_create_user)
 
     p_pwd = sub.add_parser("passwd", help="Change a user's password.")
     p_pwd.add_argument("username")

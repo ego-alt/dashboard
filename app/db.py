@@ -5,7 +5,7 @@ from typing import Iterator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./dashboard.db")
+DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./data/dashboard.db")
 
 _engine_kwargs: dict = {}
 if DATABASE_URL.startswith("sqlite"):

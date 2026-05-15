@@ -8,10 +8,10 @@ env var when running behind the dashboard's nginx.
 
 This is a plan, not a spec — fixed decisions are flagged; open ones live in §12.
 
-**Status (2026-05-15)** — Steps 1–3 of §8 complete: auth tables / module /
-endpoints + bootstrap CLI, multi-stage Dockerfile, nginx-fronted compose with
-TLS termination and the `auth_request` location wired up for future backends.
-Up next: step 4 (wire library into nginx) and step 5 (flip it into proxy mode).
+**Status (2026-05-15)** — Steps 1–7 of §8 complete: dashboard auth + nginx
+compose; library and calendar wired at `/library/` and `/calendar/` with
+`auth_request` + `AUTH_PROXY_HEADER` proxy auth. Up next: §8.8–9 tighten /
+multi-user smoke test; future: unify per-app SQLite users tables via SQL.
 
 ---
 
