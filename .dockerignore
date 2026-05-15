@@ -1,0 +1,32 @@
+# Source control
+.git
+.gitignore
+
+# Local virtualenvs and tooling caches
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.ruff_cache
+.mypy_cache
+
+# Local dev artifacts
+*.db
+.env
+*.log
+tls/
+node_modules
+frontend/node_modules
+frontend/dist
+
+# Tests + docs aren't needed at runtime
+tests
+PLAN.md
+README.md
+
+# Editor / OS noise
+.DS_Store
+.vscode
+.idea
