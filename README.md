@@ -143,11 +143,11 @@ app/                FastAPI application
   system_stats.py   psutil-only host stats
   main.py           routes + lifespan
   cli.py            operator CLI
-frontend/           React 19 + Vite SPA (early stage)
+frontend/           React 19 + Vite SPA (login + dashboard shell + router)
 nginx/conf.d/       Reverse-proxy + auth_request config
-scripts/            dev-certs.sh
+scripts/            dev-certs.sh, household_sql_pass.py, sync_household_users.py
 tests/              pytest
-Dockerfile          Multi-stage uv build for the FastAPI service
-docker-compose.yml  nginx + dashboard (library/calendar slot in later)
+Dockerfile          Multi-stage (Vite build + uv) for the FastAPI service
+docker-compose.yml  nginx + dashboard + library + calendar
 PLAN.md             Full design rationale + migration roadmap
 ```
