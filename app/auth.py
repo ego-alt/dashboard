@@ -11,8 +11,9 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+from argon2 import PasswordHasher
+from argon2.exceptions import InvalidHashError, VerificationError
 from fastapi import Depends, HTTPException, Request, Response
-from passlib.hash import argon2
 from sqlalchemy import delete
 from sqlalchemy.orm import Session as DbSession
 
@@ -26,10 +27,15 @@ SESSION_TTL = timedelta(days=14)
 # steal the cookie before second factor.
 MFA_PENDING_TTL = timedelta(minutes=5)
 
+# Single PasswordHasher instance: argon2-cffi recommends reuse so memory/time
+# parameters are amortized. ``hash`` produces ``$argon2id$v=19$...`` which is
+# the same wire format passlib used, so existing hashes verify without migration.
+_PH = PasswordHasher()
+
 # A precomputed argon2id hash of an arbitrary value, used to make the failure
 # path of /login take the same time when the username doesn't exist as when it
 # does. Defeats trivial timing-based username enumeration without per-call work.
-_FAKE_HASH = argon2.using(type="ID").hash("not-a-real-password-timing-only")
+_FAKE_HASH = _PH.hash("not-a-real-password-timing-only")
 
 
 def _cookie_secure(request: Request) -> bool:
@@ -49,13 +55,15 @@ def _cookie_secure(request: Request) -> bool:
 
 
 def hash_password(plain: str) -> str:
-    return argon2.using(type="ID").hash(plain)
+    return _PH.hash(plain)
 
 
 def verify_password(plain: str, stored_hash: str) -> bool:
+    if not stored_hash:
+        return False
     try:
-        return argon2.verify(plain, stored_hash)
-    except (ValueError, TypeError):
+        return _PH.verify(stored_hash, plain)
+    except (VerificationError, InvalidHashError):
         return False
 
 

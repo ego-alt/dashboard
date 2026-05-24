@@ -66,7 +66,7 @@ def test_credentials_list_returns_user_credentials_only(client, make_user, TestS
 
 
 def test_delete_credential_removes_only_own(client, make_user, TestSession):
-    alice = make_user(username="alice", password="hunter2-pass")
+    make_user(username="alice", password="hunter2-pass")
     bob = make_user(username="bob", password="hunter2-pass")
     db = TestSession()
     try:

@@ -2,7 +2,6 @@
 
 import io
 import urllib.error
-from unittest.mock import patch
 
 import pytest
 
