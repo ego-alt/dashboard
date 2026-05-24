@@ -1,6 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../auth.jsx';
-import { disableTotp, enableTotp, setupTotp } from '../api';
+import {
+  deletePasskey,
+  disableTotp,
+  enableTotp,
+  listPasskeys,
+  setupTotp,
+} from '../api';
+import { passkeysSupported, registerPasskey } from '../webauthn';
 
 /**
  * Account settings. Currently: 2FA enrollment / disable.
@@ -194,6 +201,134 @@ export default function SettingsPage() {
           </form>
         )}
       </section>
+
+      <PasskeysSection />
     </div>
+  );
+}
+
+function PasskeysSection() {
+  const [passkeys, setPasskeys] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [newName, setNewName] = useState('');
+
+  useEffect(() => {
+    listPasskeys()
+      .then(setPasskeys)
+      .catch(() => setPasskeys([]));
+  }, []);
+
+  async function onAdd(e) {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      await registerPasskey(newName || 'Passkey');
+      const fresh = await listPasskeys();
+      setPasskeys(fresh);
+      setNewName('');
+    } catch (err) {
+      if (err?.name !== 'NotAllowedError') {
+        setError('Could not register passkey.');
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onDelete(id) {
+    if (!confirm('Remove this passkey?')) return;
+    setBusy(true);
+    setError('');
+    try {
+      await deletePasskey(id);
+      const fresh = await listPasskeys();
+      setPasskeys(fresh);
+    } catch {
+      setError('Could not remove passkey.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!passkeysSupported()) {
+    return (
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h3 className="mb-2 text-base font-semibold text-slate-900">Passkeys</h3>
+        <p className="text-sm text-slate-600">
+          This browser doesn't support WebAuthn. Open the dashboard in a recent
+          browser to enroll a passkey.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <h3 className="mb-1 text-base font-semibold text-slate-900">Passkeys</h3>
+      <p className="mb-4 text-sm text-slate-600">
+        Sign in without a password using your device's built-in authenticator
+        (Touch ID, Windows Hello, security key, etc.). A passkey alone is a
+        strong factor — 2FA isn't asked for again on top of it.
+      </p>
+
+      {passkeys === null ? (
+        <p className="text-sm text-slate-500">Loading…</p>
+      ) : passkeys.length === 0 ? (
+        <p className="mb-4 text-sm text-slate-500">No passkeys yet.</p>
+      ) : (
+        <ul className="mb-4 divide-y divide-slate-100">
+          {passkeys.map((k) => (
+            <li
+              key={k.id}
+              className="flex items-center justify-between py-2 text-sm"
+            >
+              <div>
+                <div className="font-medium text-slate-900">{k.name}</div>
+                <div className="text-xs text-slate-500">
+                  added {new Date(k.created_at).toLocaleDateString()}
+                  {k.last_used_at && (
+                    <>
+                      {' '}
+                      · last used {new Date(k.last_used_at).toLocaleDateString()}
+                    </>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => onDelete(k.id)}
+                disabled={busy}
+                className="text-xs text-rose-600 hover:underline disabled:opacity-50"
+              >
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <form onSubmit={onAdd} className="flex items-end gap-2">
+        <div className="flex-1">
+          <label className="mb-1 block text-xs font-medium text-slate-700">
+            Nickname for this device
+          </label>
+          <input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="iPhone, Yubikey, …"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={busy}
+          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+        >
+          Add passkey
+        </button>
+      </form>
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+    </section>
   );
 }

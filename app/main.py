@@ -38,7 +38,7 @@ from app.docker_control import (
     start_container,
     stop_container,
 )
-from app.models import User, UserSession
+from app.models import User, UserSession, WebauthnCredential
 from app.services import list_services
 from app.spa import register_spa
 from app.system_stats import get_system_stats
@@ -51,6 +51,20 @@ from app.totp import (
     verify_totp_code,
     verify_totp_or_recovery,
 )
+from app.webauthn_helpers import (
+    RP_ID,
+    RP_NAME,
+    RP_ORIGIN,
+    challenges as webauthn_challenges,
+)
+import webauthn as webauthn_lib
+from webauthn.helpers.structs import (
+    PublicKeyCredentialDescriptor,
+    UserVerificationRequirement,
+)
+from webauthn.helpers.cose import COSEAlgorithmIdentifier
+from webauthn.helpers import base64url_to_bytes
+from pydantic import BaseModel
 
 # Gateway containers that must never be stopped/restarted from the dashboard —
 # doing so would sever the very session/route serving this request. UI also
@@ -307,6 +321,205 @@ def totp_verify(
         user_id=user.id,
         success=True,
         reason=f"totp-{mode}",
+        ip=ip,
+        user_agent=user_agent,
+    )
+    return {"ok": True, "username": user.username}
+
+
+# ---------- WebAuthn / passkeys ----------
+
+
+class _WebauthnFinishRegistration(BaseModel):
+    token: str
+    name: str
+    credential: dict
+
+
+class _WebauthnFinishAuthentication(BaseModel):
+    token: str
+    credential: dict
+
+
+@app.post("/auth/webauthn/register/begin")
+def webauthn_register_begin(
+    user: User = Depends(current_user), db: DbSession = Depends(get_db)
+):
+    """Issue registration options for the current user. The client passes
+    them to ``navigator.credentials.create()`` and posts the response back
+    to /register/finish."""
+    existing = (
+        db.query(WebauthnCredential)
+        .filter(WebauthnCredential.user_id == user.id)
+        .all()
+    )
+    exclude = [
+        PublicKeyCredentialDescriptor(id=c.credential_id) for c in existing
+    ]
+    options = webauthn_lib.generate_registration_options(
+        rp_id=RP_ID,
+        rp_name=RP_NAME,
+        user_id=str(user.id).encode(),
+        user_name=user.username,
+        user_display_name=user.display_name or user.username,
+        exclude_credentials=exclude,
+        supported_pub_key_algs=[
+            COSEAlgorithmIdentifier.ECDSA_SHA_256,
+            COSEAlgorithmIdentifier.RSASSA_PKCS1_v1_5_SHA_256,
+        ],
+    )
+    token = webauthn_challenges.issue(options.challenge, user_id=user.id)
+    payload = webauthn_lib.options_to_json(options)
+    import json
+
+    return {"token": token, "options": json.loads(payload)}
+
+
+@app.post("/auth/webauthn/register/finish")
+def webauthn_register_finish(
+    body: _WebauthnFinishRegistration,
+    user: User = Depends(current_user),
+    db: DbSession = Depends(get_db),
+):
+    entry = webauthn_challenges.consume(body.token)
+    if entry is None:
+        raise HTTPException(status_code=400, detail="challenge expired")
+    challenge, owner_id = entry
+    if owner_id is not None and owner_id != user.id:
+        raise HTTPException(status_code=400, detail="challenge owner mismatch")
+    try:
+        verified = webauthn_lib.verify_registration_response(
+            credential=body.credential,
+            expected_challenge=challenge,
+            expected_rp_id=RP_ID,
+            expected_origin=RP_ORIGIN,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"attestation invalid: {exc}")
+    raw_transports = (body.credential.get("response") or {}).get("transports") or []
+    transports = ",".join(raw_transports) or None
+    db.add(
+        WebauthnCredential(
+            user_id=user.id,
+            credential_id=verified.credential_id,
+            public_key=verified.credential_public_key,
+            sign_count=verified.sign_count,
+            transports=transports,
+            name=(body.name or "Passkey")[:120],
+        )
+    )
+    db.commit()
+    return {"ok": True}
+
+
+@app.get("/auth/webauthn/credentials")
+def webauthn_list_credentials(
+    user: User = Depends(current_user), db: DbSession = Depends(get_db)
+):
+    creds = (
+        db.query(WebauthnCredential)
+        .filter(WebauthnCredential.user_id == user.id)
+        .order_by(WebauthnCredential.created_at.desc())
+        .all()
+    )
+    return [
+        {
+            "id": c.id,
+            "name": c.name,
+            "created_at": c.created_at.isoformat(),
+            "last_used_at": c.last_used_at.isoformat() if c.last_used_at else None,
+        }
+        for c in creds
+    ]
+
+
+@app.delete("/auth/webauthn/credentials/{cred_id}")
+def webauthn_delete_credential(
+    cred_id: int,
+    user: User = Depends(current_user),
+    db: DbSession = Depends(get_db),
+):
+    cred = (
+        db.query(WebauthnCredential)
+        .filter(
+            WebauthnCredential.id == cred_id,
+            WebauthnCredential.user_id == user.id,
+        )
+        .one_or_none()
+    )
+    if cred is None:
+        raise HTTPException(status_code=404, detail="not found")
+    db.delete(cred)
+    db.commit()
+    return {"ok": True}
+
+
+@app.post("/auth/webauthn/login/begin")
+def webauthn_login_begin():
+    """Issue assertion options for discoverable / resident-key passkeys.
+    No username required — the authenticator picks the credential."""
+    options = webauthn_lib.generate_authentication_options(
+        rp_id=RP_ID,
+        user_verification=UserVerificationRequirement.PREFERRED,
+    )
+    token = webauthn_challenges.issue(options.challenge, user_id=None)
+    import json
+
+    return {"token": token, "options": json.loads(webauthn_lib.options_to_json(options))}
+
+
+@app.post("/auth/webauthn/login/finish")
+def webauthn_login_finish(
+    body: _WebauthnFinishAuthentication,
+    request: Request,
+    response: Response,
+    db: DbSession = Depends(get_db),
+):
+    entry = webauthn_challenges.consume(body.token)
+    if entry is None:
+        raise HTTPException(status_code=400, detail="challenge expired")
+    challenge, _ = entry
+    raw_id_b64 = body.credential.get("rawId") or body.credential.get("id")
+    if not raw_id_b64:
+        raise HTTPException(status_code=400, detail="missing rawId")
+    try:
+        raw_id = base64url_to_bytes(raw_id_b64)
+    except Exception:
+        raise HTTPException(status_code=400, detail="bad rawId")
+    stored = (
+        db.query(WebauthnCredential)
+        .filter(WebauthnCredential.credential_id == raw_id)
+        .one_or_none()
+    )
+    if stored is None:
+        raise HTTPException(status_code=401, detail="unknown credential")
+    try:
+        verified = webauthn_lib.verify_authentication_response(
+            credential=body.credential,
+            expected_challenge=challenge,
+            expected_rp_id=RP_ID,
+            expected_origin=RP_ORIGIN,
+            credential_public_key=stored.public_key,
+            credential_current_sign_count=stored.sign_count,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=401, detail=f"assertion invalid: {exc}")
+    stored.sign_count = verified.new_sign_count
+    stored.last_used_at = datetime.now(timezone.utc)
+    user = stored.user
+    user.last_login_at = datetime.now(timezone.utc)
+    # A successful passkey assertion is a strong factor on its own — skip the
+    # TOTP gate even if the user has TOTP enrolled.
+    ip = (request.client.host if request.client else "") or ""
+    user_agent = request.headers.get("user-agent", "")
+    token = mint_session(db, user, ip=ip, user_agent=user_agent)
+    set_session_cookie(request, response, token)
+    record_login_event(
+        db,
+        username=user.username,
+        user_id=user.id,
+        success=True,
+        reason="passkey",
         ip=ip,
         user_agent=user_agent,
     )

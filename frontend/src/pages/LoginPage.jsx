@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { login, verifyTotp } from '../api';
 import { useAuth } from '../auth.jsx';
+import { passkeysSupported, signInWithPasskey } from '../webauthn';
 
 export default function LoginPage() {
   const { user, refresh } = useAuth();
@@ -41,6 +42,22 @@ export default function LoginPage() {
             ? 'Too many attempts. Try again in a minute.'
             : 'Something went wrong. Try again.',
       );
+      setBusy(false);
+    }
+  }
+
+  async function onPasskeySignIn() {
+    setBusy(true);
+    setError('');
+    try {
+      await signInWithPasskey();
+      await refresh();
+      navigate(next, { replace: true });
+    } catch (err) {
+      // NotAllowedError is the browser saying "user cancelled" — quiet.
+      if (err?.name !== 'NotAllowedError') {
+        setError('Passkey sign-in failed. Try again or use your password.');
+      }
       setBusy(false);
     }
   }
@@ -107,6 +124,23 @@ export default function LoginPage() {
             >
               {busy ? 'Signing in…' : 'Sign in'}
             </button>
+            {passkeysSupported() && (
+              <>
+                <div className="my-2 flex items-center gap-3 text-xs text-slate-400">
+                  <span className="h-px flex-1 bg-slate-200" />
+                  or
+                  <span className="h-px flex-1 bg-slate-200" />
+                </div>
+                <button
+                  type="button"
+                  onClick={onPasskeySignIn}
+                  disabled={busy}
+                  className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Sign in with passkey
+                </button>
+              </>
+            )}
           </form>
         )}
 

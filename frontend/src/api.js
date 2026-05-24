@@ -65,3 +65,37 @@ export async function enableTotp(code) {
 export async function disableTotp(code) {
   return postForm('/auth/totp/disable', { code });
 }
+
+// ---------- WebAuthn / passkeys ----------
+
+export async function registerPasskeyBegin() {
+  return apiJson('/auth/webauthn/register/begin', { method: 'POST' });
+}
+
+export async function registerPasskeyFinish(body) {
+  return apiJson('/auth/webauthn/register/finish', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function listPasskeys() {
+  return apiJson('/auth/webauthn/credentials');
+}
+
+export async function deletePasskey(id) {
+  return apiJson(`/auth/webauthn/credentials/${id}`, { method: 'DELETE' });
+}
+
+export async function loginPasskeyBegin() {
+  return apiJson('/auth/webauthn/login/begin', { method: 'POST' });
+}
+
+export async function loginPasskeyFinish(body) {
+  return apiJson('/auth/webauthn/login/finish', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
