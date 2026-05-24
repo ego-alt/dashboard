@@ -31,23 +31,24 @@ Mandatory. Each app declares these in `:root` (light) with optional
     --color-bg-overlay;     /* modal backdrop / dimming layer */
 
     /* Borders */
-    --color-border;         /* default form/card borders */
-    --color-border-strong;  /* high-contrast borders (calendar day cells) */
+    --color-border;         /* form/card borders */
 
-    /* Text */
+    /* Text — three levels */
     --color-text-primary;   /* default body text */
     --color-text-secondary; /* slightly de-emphasised */
-    --color-text-muted;     /* metadata, captions */
-    --color-text-faint;     /* placeholders, disabled-feeling */
+    --color-text-muted;     /* metadata, captions, placeholders */
 
     /* Accent */
     --color-accent;         /* primary-button bg, focus ring */
-    --color-accent-hover;   /* primary-button hover */
-    --color-accent-soft;    /* soft accent fills (badge, today-pill) */
+    --color-accent-hover;   /* primary-button hover, soft accent fills */
 
     /* Status */
     --color-danger;         /* destructive-button bg, error text */
     --color-danger-hover;
+
+    /* Decoration */
+    --color-shadow;         /* box-shadow tint */
+    --color-highlight-soft; /* hover bg, subtle separators */
 
     /* Spacing scale */
     --space-2;              /*  8px — tight gap inside controls */
@@ -61,20 +62,22 @@ Mandatory. Each app declares these in `:root` (light) with optional
     --radius-lg;            /* 16px — mobile bottom-sheet */
     --radius-pill;          /* full-round — pills, circular dots */
 
-    /* Type scale */
-    --text-sm;              /* secondary type */
-    --text-base;            /* body */
-    --text-lg;              /* headings, prominent labels */
+    /* Type scale — four sizes */
+    --text-sm;              /* 14px — captions, secondary */
+    --text-base;            /* 16px — body */
+    --text-lg;              /* 20px — h2, emphasis */
+    --text-xl;              /* 32px — h1 */
 
     /* Fonts */
-    --font-sans;            /* primary UI font */
+    --font-sans;            /* primary UI font (Arial, Helvetica, sans-serif) */
     --font-mono;            /* form inputs / terminal-flavoured surfaces */
 }
 ```
 
-Apps **may** add their own role-style tokens for unique surfaces (calendar
-adds `--color-bg-overlay-strong`, `--color-border-soft`, `--color-stripe`).
-These are app-local and don't enter the spec.
+**14 color tokens + 4 sizes + 4 spaces + 4 radii.** Apps **may** add their own
+role-style tokens for unique surfaces (calendar adds `--color-bg-overlay-strong`,
+`--color-border-soft`, `--color-stripe`, etc.). These are app-local and don't
+enter the spec.
 
 ### Reference values (current apps)
 
