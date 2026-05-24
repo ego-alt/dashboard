@@ -69,8 +69,8 @@ Mandatory. Each app declares these in `:root` (light) with optional
     --text-xl;              /* 32px — h1 */
 
     /* Fonts */
-    --font-sans;            /* primary UI font (Arial, Helvetica, sans-serif) */
-    --font-mono;            /* form inputs / terminal-flavoured surfaces */
+    --font-sans;            /* 'Inter', Arial, Helvetica, sans-serif */
+    --font-mono;            /* ui-monospace, SFMono-Regular, Menlo, Consolas, monospace */
 }
 ```
 
@@ -79,16 +79,31 @@ role-style tokens for unique surfaces (calendar adds `--color-bg-overlay-strong`
 `--color-border-soft`, `--color-stripe`, etc.). These are app-local and don't
 enter the spec.
 
+Inter is loaded via Google Fonts in each app's HTML entry point with the
+preconnect pair + a `wght@400..700` variable subset. Falls back to Arial when
+the CDN is blocked.
+
 ### Reference values (current apps)
 
-| Role | Calendar (Gruvbox) | Library (Soft) | Dashboard (Slate, target) |
-|---|---|---|---|
-| `--color-bg-base` | `#282828` | `#FFF1E5` | `#f8fafc` |
-| `--color-text-primary` | `#ebdbb2` | `#34495E` | `#0f172a` |
-| `--color-accent` | `#689d6a` | `#6AACFF` | `#0f172a` |
-| `--color-danger` | `#cc241d` | `#C0392B` | `#e11d48` |
+| Role | Calendar (Gruvbox) | Library (Soft, light) | Library (dark) | Dashboard (Slate) |
+|---|---|---|---|---|
+| `--color-bg-base` | `#282828` | `#FFF1E5` | `#282828` | `#f8fafc` |
+| `--color-text-primary` | `#ebdbb2` | `#34495E` | `#ebdbb2` | `#0f172a` |
+| `--color-accent` | `#689d6a` | `#6AACFF` | `#689d6a` | `#0f172a` |
+| `--color-danger` | `#cc241d` | `#C0392B` | `#cc241d` | `#e11d48` |
 
-(Dashboard column is the target — not yet implemented.)
+Library's dark mode adopts calendar's Gruvbox values so the two apps converge
+at night; light mode keeps library's soft-academia identity.
+
+### Heading conventions (per-app, not spec tokens)
+
+Applied identically in calendar + library; dashboard headings use Tailwind
+utility classes mapping to the same scale.
+
+| Element | Rule |
+|---|---|
+| `h1` | `font-size: var(--text-xl)` · `font-weight: 550` · `letter-spacing: -0.01em` · `color: var(--color-text-muted)` |
+| `h2` | `font-size: var(--text-lg)` · `font-weight: 600` |
 
 ---
 
@@ -184,23 +199,22 @@ and small).
 
 ## Current adoption
 
-- ✅ **Calendar** — tokens + primitives shipped (`309d3ef`).
-- 🟡 **Library** — token interface adopted (rename of existing variables);
-  primitives defined but not applied to elements yet. Pending visual review
-  + Bootstrap-vs-`.btn` collision plan.
-- ❌ **Dashboard** — uses Tailwind's slate palette directly today; tokens
-  not declared. Quick win: add `:root` token block, wire Tailwind theme to
-  read from it. No structural change needed.
+- ✅ **Calendar** — tokens, primitives, headings, font all shipped.
+- ✅ **Library** — same, plus dark mode unified to calendar's Gruvbox palette.
+  Reader page also migrated off Bootstrap's `.btn-outline-*` to spec primitives.
+- 🟡 **Dashboard** — tokens + primitives in place; LoginPage + SettingsPage
+  migrated to `.btn` / `.input`. HomePage + MonitorPage still use Tailwind
+  utilities (palette flows through via the same tokens; structural primitives
+  not applied). Heading conventions not yet enforced.
 
 ## Open questions
 
-- **Bootstrap collision in library.** Library loads Bootstrap 5 from CDN for
-  grid utilities (`.container`, `.row`, `.col-md-*`). Bootstrap also defines
-  `.btn` and `.btn-*` variants. Two paths: (a) replace Bootstrap's grid with
-  vanilla flex/grid and remove the CDN load; (b) rename the spec primitive
-  in library only (e.g. `.ui-btn`) to avoid the clash.
-- **Dashboard Tailwind integration.** Two ways to consume the tokens: keep
-  Tailwind utility classes pointing at the token vars (palette unifies, no
-  primitives), or also use `.btn`/`.input` for select components (deeper
-  unification, more divergence from typical React-Tailwind UX). Pick when
-  dashboard's token adoption happens.
+- **Library still loads Bootstrap CDN** for grid utilities (`.container`,
+  `.row`, `.col-md-*`) on the index page and additional utilities on the reader
+  page. Buttons + inputs are off Bootstrap now; only the grid + a handful of
+  spacing utilities remain. If those are replaced with vanilla flex/grid, the
+  CDN load can go.
+- **Dashboard primitive coverage**. HomePage / MonitorPage are still
+  Tailwind-styled. Migrating means rewriting utility-class chains to `.btn`
+  variants on a per-component basis. Worth it for consistency, awkward for
+  Tailwind-native devs.
