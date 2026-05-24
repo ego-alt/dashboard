@@ -3,6 +3,7 @@ import { RequireAuth, useAuth } from './auth.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import HomePage from './pages/HomePage.jsx';
 import MonitorPage from './pages/MonitorPage.jsx';
+import SettingsPage from './pages/SettingsPage.jsx';
 
 function TopBar() {
   const { user, logout } = useAuth();
@@ -26,6 +27,9 @@ function TopBar() {
                 Monitor
               </NavLink>
             )}
+            <NavLink to="/settings" className={linkCls}>
+              Settings
+            </NavLink>
           </nav>
         </div>
         <div className="flex items-center gap-3 text-sm text-slate-600">
@@ -79,6 +83,16 @@ export default function App() {
                 <MonitorPage />
               </Shell>
             </AdminOnly>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <RequireAuth>
+            <Shell>
+              <SettingsPage />
+            </Shell>
           </RequireAuth>
         }
       />

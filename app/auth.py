@@ -21,6 +21,10 @@ from .models import LoginEvent, User, UserSession
 
 SESSION_COOKIE = "session"
 SESSION_TTL = timedelta(days=14)
+# Short window for the first-factor session, after which the user must complete
+# the TOTP verify step. Long enough for fumbling, short enough to be useless to
+# steal the cookie before second factor.
+MFA_PENDING_TTL = timedelta(minutes=5)
 
 # A precomputed argon2id hash of an arbitrary value, used to make the failure
 # path of /login take the same time when the username doesn't exist as when it
@@ -76,10 +80,42 @@ def mint_session(db: DbSession, user: User, *, ip: str = "", user_agent: str = "
             expires_at=now + SESSION_TTL,
             ip=ip or None,
             user_agent=user_agent[:255] if user_agent else None,
+            mfa_pending=False,
         )
     )
     db.commit()
     return token
+
+
+def mint_pending_session(
+    db: DbSession, user: User, *, ip: str = "", user_agent: str = ""
+) -> str:
+    """First-factor only. The session is restricted to /auth/totp/verify until
+    the second factor completes (see ``current_user_optional`` rejection and
+    ``mfa_pending_user`` opt-in dependency)."""
+    token = secrets.token_urlsafe(32)
+    now = datetime.now(timezone.utc)
+    db.add(
+        UserSession(
+            token=token,
+            user_id=user.id,
+            created_at=now,
+            expires_at=now + MFA_PENDING_TTL,
+            ip=ip or None,
+            user_agent=user_agent[:255] if user_agent else None,
+            mfa_pending=True,
+        )
+    )
+    db.commit()
+    return token
+
+
+def complete_pending_session(db: DbSession, sess: UserSession) -> None:
+    """Promote a first-factor session to full access. Caller already verified
+    the second factor."""
+    sess.mfa_pending = False
+    sess.expires_at = datetime.now(timezone.utc) + SESSION_TTL
+    db.commit()
 
 
 def lookup_session(db: DbSession, token: str) -> Optional[UserSession]:
@@ -97,7 +133,10 @@ def lookup_session(db: DbSession, token: str) -> Optional[UserSession]:
     exp = sess.expires_at
     if exp.tzinfo is None:
         exp = exp.replace(tzinfo=timezone.utc)
-    if exp - now < SESSION_TTL / 2:
+    # Sliding extension only for fully-authenticated sessions; pending-2FA
+    # sessions keep their short fixed TTL so a stolen first-factor cookie
+    # can't be kept alive without ever completing the second factor.
+    if not sess.mfa_pending and exp - now < SESSION_TTL / 2:
         sess.expires_at = now + SESSION_TTL
         db.commit()
     return sess
@@ -164,11 +203,15 @@ def clear_session_cookie(response: Response) -> None:
 def current_user_optional(
     request: Request, db: DbSession = Depends(get_db)
 ) -> Optional[User]:
+    """The user behind a *fully authenticated* session. Pending-2FA sessions
+    are treated as anonymous everywhere except ``mfa_pending_session``."""
     token = request.cookies.get(SESSION_COOKIE)
     if not token:
         return None
     sess = lookup_session(db, token)
-    return sess.user if sess is not None else None
+    if sess is None or sess.mfa_pending:
+        return None
+    return sess.user
 
 
 def current_user(user: Optional[User] = Depends(current_user_optional)) -> User:
@@ -181,3 +224,16 @@ def current_admin(user: User = Depends(current_user)) -> User:
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="admin only")
     return user
+
+
+def mfa_pending_session(
+    request: Request, db: DbSession = Depends(get_db)
+) -> UserSession:
+    """The session behind a first-factor-only cookie, for /auth/totp/verify."""
+    token = request.cookies.get(SESSION_COOKIE)
+    if not token:
+        raise HTTPException(status_code=401, detail="no pending session")
+    sess = lookup_session(db, token)
+    if sess is None or not sess.mfa_pending:
+        raise HTTPException(status_code=401, detail="no pending session")
+    return sess

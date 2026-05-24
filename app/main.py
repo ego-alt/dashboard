@@ -14,9 +14,12 @@ from sqlalchemy.orm import Session as DbSession
 
 from app.auth import (
     clear_session_cookie,
+    complete_pending_session,
     current_admin,
     current_user,
     current_user_optional,
+    mfa_pending_session,
+    mint_pending_session,
     mint_session,
     record_login_event,
     revoke_session,
@@ -35,10 +38,19 @@ from app.docker_control import (
     start_container,
     stop_container,
 )
-from app.models import User
+from app.models import User, UserSession
 from app.services import list_services
 from app.spa import register_spa
 from app.system_stats import get_system_stats
+from app.totp import (
+    generate_recovery_codes,
+    generate_secret,
+    hash_recovery_codes,
+    provisioning_uri,
+    render_qr_svg,
+    verify_totp_code,
+    verify_totp_or_recovery,
+)
 
 # Gateway containers that must never be stopped/restarted from the dashboard —
 # doing so would sever the very session/route serving this request. UI also
@@ -154,6 +166,20 @@ def login(
             user_agent=user_agent,
         )
         raise HTTPException(status_code=401, detail="bad credentials")
+    if user.totp_enabled:
+        # First factor passed; gate the rest of the app behind /auth/totp/verify.
+        token = mint_pending_session(db, user, ip=ip, user_agent=user_agent)
+        set_session_cookie(request, response, token)
+        record_login_event(
+            db,
+            username=user.username,
+            user_id=user.id,
+            success=True,
+            reason="needs-2fa",
+            ip=ip,
+            user_agent=user_agent,
+        )
+        return {"ok": True, "needs_2fa": True}
     user.last_login_at = datetime.now(timezone.utc)
     token = mint_session(db, user, ip=ip, user_agent=user_agent)
     set_session_cookie(request, response, token)
@@ -186,6 +212,7 @@ def me(user: User = Depends(current_user)):
         "username": user.username,
         "display_name": user.display_name,
         "is_admin": bool(user.is_admin),
+        "totp_enabled": bool(user.totp_enabled),
     }
 
 
@@ -194,6 +221,96 @@ def auth_verify(user: Optional[User] = Depends(current_user_optional)):
     if user is None:
         return Response(status_code=401)
     return Response(status_code=200, headers={"X-User": user.username})
+
+
+# ---------- TOTP 2FA ----------
+
+
+@app.post("/auth/totp/setup")
+def totp_setup(user: User = Depends(current_user), db: DbSession = Depends(get_db)):
+    """Generate a new TOTP secret for the current user and return enrollment
+    materials. The secret is stored immediately but ``totp_enabled`` only flips
+    once /enable receives a valid code, so an abandoned setup is harmless."""
+    if user.totp_enabled:
+        raise HTTPException(status_code=409, detail="2FA already enabled")
+    secret = generate_secret()
+    user.totp_secret = secret
+    db.commit()
+    uri = provisioning_uri(secret, user.username)
+    return {"secret": secret, "uri": uri, "qr_svg": render_qr_svg(uri)}
+
+
+@app.post("/auth/totp/enable")
+def totp_enable(
+    code: str = Form(...),
+    user: User = Depends(current_user),
+    db: DbSession = Depends(get_db),
+):
+    if user.totp_enabled:
+        raise HTTPException(status_code=409, detail="2FA already enabled")
+    if not user.totp_secret or not verify_totp_code(user.totp_secret, code):
+        raise HTTPException(status_code=400, detail="bad code")
+    recovery = generate_recovery_codes()
+    user.totp_recovery_codes = hash_recovery_codes(recovery)
+    user.totp_enabled = True
+    db.commit()
+    # One-time display — these are not stored in plaintext on the server.
+    return {"ok": True, "recovery_codes": recovery}
+
+
+@app.post("/auth/totp/disable")
+def totp_disable(
+    code: str = Form(...),
+    user: User = Depends(current_user),
+    db: DbSession = Depends(get_db),
+):
+    if not user.totp_enabled:
+        raise HTTPException(status_code=409, detail="2FA not enabled")
+    ok, _mode = verify_totp_or_recovery(user, code)
+    if not ok:
+        raise HTTPException(status_code=400, detail="bad code")
+    user.totp_enabled = False
+    user.totp_secret = None
+    user.totp_recovery_codes = None
+    db.commit()
+    return {"ok": True}
+
+
+@app.post("/auth/totp/verify")
+def totp_verify(
+    request: Request,
+    code: str = Form(...),
+    sess: UserSession = Depends(mfa_pending_session),
+    db: DbSession = Depends(get_db),
+):
+    """Second factor of login. Promotes a pending session to fully authenticated."""
+    user = sess.user
+    ip = (request.client.host if request.client else "") or ""
+    user_agent = request.headers.get("user-agent", "")
+    ok, mode = verify_totp_or_recovery(user, code)
+    if not ok:
+        record_login_event(
+            db,
+            username=user.username,
+            user_id=user.id,
+            success=False,
+            reason="bad-totp",
+            ip=ip,
+            user_agent=user_agent,
+        )
+        raise HTTPException(status_code=401, detail="bad code")
+    user.last_login_at = datetime.now(timezone.utc)
+    complete_pending_session(db, sess)
+    record_login_event(
+        db,
+        username=user.username,
+        user_id=user.id,
+        success=True,
+        reason=f"totp-{mode}",
+        ip=ip,
+        user_agent=user_agent,
+    )
+    return {"ok": True, "username": user.username}
 
 
 # ---------- Service registry (home hub) ----------

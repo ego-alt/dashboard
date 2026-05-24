@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -28,6 +28,15 @@ class User(Base):
         DateTime(timezone=True), nullable=True
     )
 
+    # TOTP 2FA. ``totp_secret`` may be set (from /auth/totp/setup) before
+    # ``totp_enabled`` flips true; only the enabled flag gates the login flow.
+    totp_secret: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    totp_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
+    # JSON list of argon2id-hashed unused recovery codes; one-time use.
+    totp_recovery_codes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     sessions: Mapped[list["UserSession"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
@@ -50,6 +59,11 @@ class UserSession(Base):
     )
     ip: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     user_agent: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    # When True, the session has passed first-factor only and is restricted to
+    # /auth/totp/verify until the second factor lands. See current_user_optional.
+    mfa_pending: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
 
     user: Mapped["User"] = relationship(back_populates="sessions")
 
