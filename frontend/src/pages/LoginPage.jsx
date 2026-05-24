@@ -101,7 +101,7 @@ export default function LoginPage() {
                 autoComplete="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-slate-500"
+                className="input"
               />
             </div>
             <div>
@@ -113,14 +113,14 @@ export default function LoginPage() {
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-slate-500"
+                className="input"
               />
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <button
               type="submit"
               disabled={busy || !username || !password}
-              className="w-full rounded-lg bg-slate-900 px-4 py-2 font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+              className="btn btn-primary w-full"
             >
               {busy ? 'Signing in…' : 'Sign in'}
             </button>
@@ -135,7 +135,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={onPasskeySignIn}
                   disabled={busy}
-                  className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  className="btn btn-secondary w-full"
                 >
                   Sign in with passkey
                 </button>
@@ -156,7 +156,7 @@ export default function LoginPage() {
                 inputMode="numeric"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-slate-900 outline-none focus:border-slate-500"
+                className="input font-mono"
                 placeholder="123456"
               />
             </div>
@@ -164,7 +164,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={busy || !code}
-              className="w-full rounded-lg bg-slate-900 px-4 py-2 font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+              className="btn btn-primary w-full"
             >
               {busy ? 'Verifying…' : 'Verify'}
             </button>
@@ -175,7 +175,7 @@ export default function LoginPage() {
                 setCode('');
                 setError('');
               }}
-              className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
+              className="btn btn-secondary w-full text-sm"
             >
               Use a different account
             </button>

@@ -101,7 +101,7 @@ export default function SettingsPage() {
             <button
               onClick={onStartSetup}
               disabled={busy}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+              className="btn btn-primary text-sm"
             >
               Set up 2FA
             </button>
@@ -132,13 +132,13 @@ export default function SettingsPage() {
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 placeholder="123456"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-slate-900 outline-none focus:border-slate-500"
+                className="input font-mono"
               />
               {error && <p className="text-sm text-red-600">{error}</p>}
               <button
                 type="submit"
                 disabled={busy || !code}
-                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                className="btn btn-primary text-sm"
               >
                 {busy ? 'Verifying…' : 'Enable'}
               </button>
@@ -149,7 +149,7 @@ export default function SettingsPage() {
                   setCode('');
                   setError('');
                 }}
-                className="ml-2 rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                className="btn btn-secondary text-sm ml-2"
               >
                 Cancel
               </button>
@@ -171,7 +171,7 @@ export default function SettingsPage() {
             </ul>
             <button
               onClick={() => setRecoveryCodes(null)}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
+              className="btn btn-secondary text-sm"
             >
               I've saved them
             </button>
@@ -188,13 +188,13 @@ export default function SettingsPage() {
               value={code}
               onChange={(e) => setCode(e.target.value)}
               placeholder="123456"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-slate-900 outline-none focus:border-slate-500"
+              className="input font-mono"
             />
             {error && <p className="text-sm text-red-600">{error}</p>}
             <button
               type="submit"
               disabled={busy || !code}
-              className="rounded-lg border border-rose-300 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-900 hover:bg-rose-100 disabled:opacity-50"
+              className="btn btn-danger text-sm"
             >
               {busy ? 'Disabling…' : 'Disable 2FA'}
             </button>
@@ -317,13 +317,13 @@ function PasskeysSection() {
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="iPhone, Yubikey, …"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500"
+            className="input text-sm"
           />
         </div>
         <button
           type="submit"
           disabled={busy}
-          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+          className="btn btn-primary text-sm"
         >
           Add passkey
         </button>
