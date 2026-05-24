@@ -2,7 +2,8 @@
 
 Sessions live in the ``user_sessions`` table — one row per active login, revoke
 via DELETE. ``/auth/verify`` reuses ``current_user_optional`` so an indexed
-SELECT covers each nginx auth_request subrequest.
+SELECT covers each nginx auth_request subrequest. Successful and failed login
+attempts are recorded in ``login_events`` for audit/incident-response.
 """
 
 import os
@@ -16,16 +17,31 @@ from sqlalchemy import delete
 from sqlalchemy.orm import Session as DbSession
 
 from .db import get_db
-from .models import User, UserSession
+from .models import LoginEvent, User, UserSession
 
 SESSION_COOKIE = "session"
 SESSION_TTL = timedelta(days=14)
 
+# A precomputed argon2id hash of an arbitrary value, used to make the failure
+# path of /login take the same time when the username doesn't exist as when it
+# does. Defeats trivial timing-based username enumeration without per-call work.
+_FAKE_HASH = argon2.using(type="ID").hash("not-a-real-password-timing-only")
 
-def _cookie_secure() -> bool:
-    """Whether to mark the session cookie ``Secure``. Set ``SESSION_COOKIE_SECURE=1``
-    once nginx-TLS is in front so browsers refuse to send the cookie over HTTP."""
-    return os.environ.get("SESSION_COOKIE_SECURE", "").lower() in ("1", "true", "yes")
+
+def _cookie_secure(request: Request) -> bool:
+    """Decide whether to mark the session cookie ``Secure``.
+
+    Explicit ``SESSION_COOKIE_SECURE=0|1`` wins. Otherwise default to True iff
+    the request looks like it came in over HTTPS (direct or via nginx, which
+    sets ``X-Forwarded-Proto: https``). This prevents accidentally setting
+    ``Secure`` on a plain-HTTP cookie (which the browser would then refuse to
+    send back, silently breaking auth).
+    """
+    val = os.environ.get("SESSION_COOKIE_SECURE")
+    if val is not None:
+        return val.lower() in ("1", "true", "yes")
+    forwarded = request.headers.get("x-forwarded-proto", "").lower()
+    return forwarded == "https" or request.url.scheme == "https"
 
 
 def hash_password(plain: str) -> str:
@@ -37,6 +53,15 @@ def verify_password(plain: str, stored_hash: str) -> bool:
         return argon2.verify(plain, stored_hash)
     except (ValueError, TypeError):
         return False
+
+
+def timing_safe_no_such_user(password: str) -> None:
+    """Spend the same time we'd spend on a real argon2 verify, then bail.
+
+    Call when looking up by username returned None — keeps the response time
+    indistinguishable from a real wrong-password attempt.
+    """
+    verify_password(password, _FAKE_HASH)
 
 
 def mint_session(db: DbSession, user: User, *, ip: str = "", user_agent: str = "") -> str:
@@ -58,9 +83,23 @@ def mint_session(db: DbSession, user: User, *, ip: str = "", user_agent: str = "
 
 
 def lookup_session(db: DbSession, token: str) -> Optional[UserSession]:
+    """Fetch a non-expired session, sliding the expiry forward when more than
+    half the TTL has elapsed since the last extension.
+
+    Bounded write rate per session: at most once per ``SESSION_TTL / 2`` window.
+    Active users no longer get logged out mid-use; idle ones still expire on the
+    original schedule.
+    """
     sess = db.get(UserSession, token)
     if sess is None or sess.is_expired():
         return None
+    now = datetime.now(timezone.utc)
+    exp = sess.expires_at
+    if exp.tzinfo is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+    if exp - now < SESSION_TTL / 2:
+        sess.expires_at = now + SESSION_TTL
+        db.commit()
     return sess
 
 
@@ -79,14 +118,41 @@ def purge_expired_sessions(db: DbSession) -> int:
     return result.rowcount or 0
 
 
-def set_session_cookie(response: Response, token: str) -> None:
+def record_login_event(
+    db: DbSession,
+    *,
+    username: str,
+    success: bool,
+    user_id: Optional[int] = None,
+    reason: Optional[str] = None,
+    ip: Optional[str] = None,
+    user_agent: Optional[str] = None,
+) -> None:
+    """Append one row to ``login_events``. Best-effort; never raises."""
+    try:
+        db.add(
+            LoginEvent(
+                username=(username or "")[:64],
+                user_id=user_id,
+                success=success,
+                reason=reason,
+                ip=ip or None,
+                user_agent=(user_agent or "")[:255] or None,
+            )
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+
+
+def set_session_cookie(request: Request, response: Response, token: str) -> None:
     response.set_cookie(
         SESSION_COOKIE,
         token,
         max_age=int(SESSION_TTL.total_seconds()),
         httponly=True,
-        secure=_cookie_secure(),
-        samesite="lax",
+        secure=_cookie_secure(request),
+        samesite="strict",
         path="/",
     )
 

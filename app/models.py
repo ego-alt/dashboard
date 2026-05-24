@@ -61,5 +61,32 @@ class UserSession(Base):
         return exp <= datetime.now(timezone.utc)
 
 
+class LoginEvent(Base):
+    """One row per attempted login. Successes and failures both recorded.
+
+    Failures may have ``user_id=None`` (unknown username) and a non-null
+    ``reason`` like ``bad-password`` or ``rate-limit``. Use for ad-hoc
+    auditing and incident response — there is no automatic alerting on top.
+    """
+
+    __tablename__ = "login_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    username: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    success: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    reason: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    ip: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    user_agent: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+        index=True,
+    )
+
+
 #: Services are discovered from Docker container labels (``homehub.*``), not
 #: persisted here — see ``app/services.py``. No Service ORM model by design.

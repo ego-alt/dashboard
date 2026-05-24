@@ -8,8 +8,22 @@ from sqlalchemy.orm import sessionmaker
 
 from app.auth import hash_password
 from app.db import Base, get_db
-from app.main import app
+from app.main import app, limiter
 from app.models import User
+
+
+@pytest.fixture(autouse=True)
+def _isolate_rate_limit():
+    """Disable the per-IP login rate limiter by default — TestClient always
+    looks like the same remote address, so consecutive tests would otherwise
+    eat each other's budget. The dedicated rate-limit test re-enables it."""
+    limiter.enabled = False
+    yield
+    limiter.enabled = False
+    try:
+        limiter.reset()
+    except Exception:
+        pass
 
 
 @pytest.fixture

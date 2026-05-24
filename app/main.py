@@ -4,8 +4,12 @@ import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, Response
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session as DbSession
 
 from app.auth import (
@@ -14,8 +18,10 @@ from app.auth import (
     current_user,
     current_user_optional,
     mint_session,
+    record_login_event,
     revoke_session,
     set_session_cookie,
+    timing_safe_no_such_user,
     verify_password,
     SESSION_COOKIE,
 )
@@ -61,6 +67,40 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="Dashboard API", lifespan=lifespan)
 
+# Per-IP rate limiter. Tunable via env so the home-stack operator can relax it
+# for shared-NAT households or tighten it if abuse shows up in login_events.
+_LOGIN_RATE_LIMIT = os.environ.get("LOGIN_RATE_LIMIT", "5/minute")
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+def _rate_limit_handler(_request: Request, _exc: RateLimitExceeded) -> Response:
+    return Response(
+        content='{"detail":"too many requests"}',
+        status_code=429,
+        media_type="application/json",
+    )
+
+
+@app.middleware("http")
+async def origin_check_middleware(request: Request, call_next):
+    """Reject browser-originated state-changing requests whose Origin doesn't
+    match Host. CORS already blocks cross-origin reads of responses; this stops
+    cross-origin *writes* via form POST that don't trigger preflight.
+
+    Permissive when ``Origin`` is absent (CLI clients, server-to-server,
+    same-origin GETs) — those paths aren't a CSRF vector.
+    """
+    if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        origin = request.headers.get("origin")
+        if origin:
+            origin_host = urlparse(origin).netloc
+            request_host = request.headers.get("host", "")
+            if origin_host and origin_host != request_host:
+                return Response(content="origin mismatch", status_code=403)
+    return await call_next(request)
+
 
 def _unwrap(result: Dict[str, Any]) -> Dict[str, Any]:
     """Convert the docker_control ``{status, message}`` shape into an HTTP 400
@@ -79,6 +119,7 @@ def ping():
 
 
 @app.post("/login")
+@limiter.limit(_LOGIN_RATE_LIMIT)
 def login(
     request: Request,
     response: Response,
@@ -86,17 +127,44 @@ def login(
     password: str = Form(...),
     db: DbSession = Depends(get_db),
 ):
+    ip = (request.client.host if request.client else "") or ""
+    user_agent = request.headers.get("user-agent", "")
     user = db.query(User).filter(User.username == username).one_or_none()
-    if user is None or not verify_password(password, user.password_hash):
+    if user is None:
+        # Run a constant-time argon2 verify against a fake hash so timing
+        # doesn't leak which usernames exist.
+        timing_safe_no_such_user(password)
+        record_login_event(
+            db,
+            username=username,
+            success=False,
+            reason="unknown-user",
+            ip=ip,
+            user_agent=user_agent,
+        )
+        raise HTTPException(status_code=401, detail="bad credentials")
+    if not verify_password(password, user.password_hash):
+        record_login_event(
+            db,
+            username=username,
+            user_id=user.id,
+            success=False,
+            reason="bad-password",
+            ip=ip,
+            user_agent=user_agent,
+        )
         raise HTTPException(status_code=401, detail="bad credentials")
     user.last_login_at = datetime.now(timezone.utc)
-    token = mint_session(
+    token = mint_session(db, user, ip=ip, user_agent=user_agent)
+    set_session_cookie(request, response, token)
+    record_login_event(
         db,
-        user,
-        ip=(request.client.host if request.client else "") or "",
-        user_agent=request.headers.get("user-agent", ""),
+        username=user.username,
+        user_id=user.id,
+        success=True,
+        ip=ip,
+        user_agent=user_agent,
     )
-    set_session_cookie(response, token)
     return {"ok": True, "username": user.username}
 
 
