@@ -10,13 +10,31 @@ import sys
 
 from app.auth import hash_password, purge_expired_sessions
 from app.db import init_db, session_scope
+from app.hibp import password_breach_count
 from app.models import User
 
 
 MIN_PASSWORD_LEN = 8
 
 
-def _read_new_password() -> str:
+def _check_against_hibp(password: str, *, allow_pwned: bool) -> None:
+    """Refuse known-breach passwords unless --allow-pwned was passed.
+
+    Fail-open on network error (password_breach_count returns 0 then).
+    """
+    if allow_pwned:
+        return
+    count = password_breach_count(password)
+    if count > 0:
+        print(
+            f"refusing: that password appears in {count:,} known breach(es). "
+            "Pick another, or pass --allow-pwned to override.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
+def _read_new_password(*, allow_pwned: bool = False) -> str:
     pw1 = getpass.getpass("password: ")
     pw2 = getpass.getpass("password (repeat): ")
     if pw1 != pw2:
@@ -25,16 +43,18 @@ def _read_new_password() -> str:
     if len(pw1) < MIN_PASSWORD_LEN:
         print(f"password must be at least {MIN_PASSWORD_LEN} characters", file=sys.stderr)
         sys.exit(1)
+    _check_against_hibp(pw1, allow_pwned=allow_pwned)
     return pw1
 
 
-def _resolve_password(explicit: str | None) -> str:
+def _resolve_password(explicit: str | None, *, allow_pwned: bool = False) -> str:
     if explicit is not None:
         if len(explicit) < MIN_PASSWORD_LEN:
             print(f"password must be at least {MIN_PASSWORD_LEN} characters", file=sys.stderr)
             sys.exit(1)
+        _check_against_hibp(explicit, allow_pwned=allow_pwned)
         return explicit
-    return _read_new_password()
+    return _read_new_password(allow_pwned=allow_pwned)
 
 
 def _add_user(
@@ -74,7 +94,7 @@ def cmd_create_admin(args) -> None:
         user = _add_user(
             db,
             username=args.username,
-            password=_resolve_password(args.password),
+            password=_resolve_password(args.password, allow_pwned=args.allow_pwned),
             is_admin=True,
             display_name=args.display_name,
         )
@@ -86,7 +106,7 @@ def cmd_create_user(args) -> None:
         user = _add_user(
             db,
             username=args.username,
-            password=_resolve_password(args.password),
+            password=_resolve_password(args.password, allow_pwned=args.allow_pwned),
             is_admin=args.admin,
             display_name=args.display_name,
         )
@@ -97,7 +117,7 @@ def cmd_create_user(args) -> None:
 def cmd_passwd(args) -> None:
     with session_scope() as db:
         user = _require_user(db, args.username)
-        user.password_hash = hash_password(_read_new_password())
+        user.password_hash = hash_password(_read_new_password(allow_pwned=args.allow_pwned))
         db.commit()
         print(f"updated password for {args.username!r}")
 
@@ -124,6 +144,13 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="dashboard-cli")
     sub = p.add_subparsers(dest="cmd", required=True)
 
+    def _add_password_args(sp):
+        sp.add_argument(
+            "--allow-pwned",
+            action="store_true",
+            help="Skip the HIBP breach check (emergencies / network-isolated boxes).",
+        )
+
     p_create = sub.add_parser("create-admin", help="Create an admin user.")
     p_create.add_argument("username")
     p_create.add_argument("--display-name", default=None)
@@ -132,6 +159,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Non-interactive bootstrap (min 8 chars). Prefer env + getpass in normal use.",
     )
+    _add_password_args(p_create)
     p_create.set_defaults(func=cmd_create_admin)
 
     p_user = sub.add_parser("create-user", help="Create a non-admin user.")
@@ -143,10 +171,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Grant dashboard admin (library role is still separate).",
     )
     p_user.add_argument("--password", default=None)
+    _add_password_args(p_user)
     p_user.set_defaults(func=cmd_create_user)
 
     p_pwd = sub.add_parser("passwd", help="Change a user's password.")
     p_pwd.add_argument("username")
+    _add_password_args(p_pwd)
     p_pwd.set_defaults(func=cmd_passwd)
 
     p_ls = sub.add_parser("list-users", help="List all users.")
