@@ -109,21 +109,45 @@ def _rate_limit_handler(_request: Request, _exc: RateLimitExceeded) -> Response:
     )
 
 
+def _allowed_origins() -> set[str]:
+    """Origins permitted to make state-changing requests. Override in
+    production via ``ALLOWED_ORIGINS`` (comma-separated). Defaults cover the
+    Vite dev server, direct uvicorn, and the FastAPI TestClient."""
+    raw = os.environ.get("ALLOWED_ORIGINS")
+    if raw is not None:
+        return {o.strip() for o in raw.split(",") if o.strip()}
+    return {
+        "http://localhost:5173",
+        "http://localhost:8000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:8000",
+        "http://testserver",
+    }
+
+
+_ALLOWED_ORIGINS = _allowed_origins()
+
+
 @app.middleware("http")
 async def origin_check_middleware(request: Request, call_next):
-    """Reject browser-originated state-changing requests whose Origin doesn't
-    match Host. CORS already blocks cross-origin reads of responses; this stops
-    cross-origin *writes* via form POST that don't trigger preflight.
+    """Reject browser-originated state-changing requests from foreign origins.
+    CORS already blocks cross-origin *reads*; this stops cross-origin *writes*
+    (form POST) that don't trigger a preflight.
 
-    Permissive when ``Origin`` is absent (CLI clients, server-to-server,
-    same-origin GETs) — those paths aren't a CSRF vector.
+    An incoming Origin is accepted if it's in ``ALLOWED_ORIGINS`` OR its host
+    matches the request's Host header. The latter covers production behind a
+    proxy that preserves Host (nginx default) without requiring config; the
+    allowlist covers dev where a proxy rewrites Host (Vite with changeOrigin).
+
+    Permissive when ``Origin`` is absent (CLI clients, server-to-server) —
+    those paths aren't a CSRF vector.
     """
     if request.method in ("POST", "PUT", "PATCH", "DELETE"):
         origin = request.headers.get("origin")
-        if origin:
+        if origin and origin not in _ALLOWED_ORIGINS:
             origin_host = urlparse(origin).netloc
             request_host = request.headers.get("host", "")
-            if origin_host and origin_host != request_host:
+            if not origin_host or origin_host != request_host:
                 return Response(content="origin mismatch", status_code=403)
     return await call_next(request)
 
