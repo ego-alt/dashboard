@@ -34,7 +34,7 @@
   --text-sm: 0.875rem;
   --text-base: 1rem;
   --text-lg: 1.25rem;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: Arial, Helvetica, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
