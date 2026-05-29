@@ -50,9 +50,11 @@ Mandatory. Each app declares these in `:root` (light) with optional
     --color-shadow;         /* box-shadow tint */
     --color-highlight-soft; /* hover bg, subtle separators */
 
-    /* Spacing scale */
+    /* Spacing scale (numbers are × 4px) */
+    --space-1;              /*  4px — micro gap (icon padding, tag chips) */
     --space-2;              /*  8px — tight gap inside controls */
     --space-3;              /* 12px — gap between controls */
+    --space-4;              /* 16px — card / form-row rhythm */
     --space-5;              /* 20px — section padding */
     --space-8;              /* 40px — top-level layout rhythm */
 
@@ -74,10 +76,14 @@ Mandatory. Each app declares these in `:root` (light) with optional
 }
 ```
 
-**14 color tokens + 4 sizes + 4 spaces + 4 radii.** Apps **may** add their own
+**14 color tokens + 4 sizes + 6 spaces + 4 radii.** Apps **may** add their own
 role-style tokens for unique surfaces (calendar adds `--color-bg-overlay-strong`,
 `--color-border-soft`, `--color-stripe`, etc.). These are app-local and don't
 enter the spec.
+
+Library additionally defines a semantic status token `--color-success` (used by
+toast notifications). Treat as an app-local extension until a second app needs
+the same role.
 
 Inter is loaded via Google Fonts in each app's HTML entry point with the
 preconnect pair + a `wght@400..700` variable subset. Falls back to Arial when
