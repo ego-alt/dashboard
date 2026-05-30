@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../auth.jsx';
 import {
+  createApiToken,
+  deleteApiToken,
   deletePasskey,
   disableTotp,
   enableTotp,
+  listApiTokens,
   listPasskeys,
   setupTotp,
 } from '../api';
@@ -203,7 +206,163 @@ export default function SettingsPage() {
       </section>
 
       <PasskeysSection />
+
+      <ApiTokensSection />
     </div>
+  );
+}
+
+/**
+ * API tokens for native apps (e.g. the document scanner, which uploads scans to
+ * the calendar). The raw token is shown once at creation — only its hash is
+ * stored server-side — so we surface a copy button and a "save it now" warning.
+ */
+function ApiTokensSection() {
+  const [tokens, setTokens] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [newName, setNewName] = useState('');
+  const [freshToken, setFreshToken] = useState(null); // shown once after creation
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    listApiTokens()
+      .then(setTokens)
+      .catch(() => setTokens([]));
+  }, []);
+
+  async function onCreate(e) {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      const { token } = await createApiToken(newName || 'API token');
+      setFreshToken(token);
+      setCopied(false);
+      setNewName('');
+      const fresh = await listApiTokens();
+      setTokens(fresh);
+    } catch {
+      setError('Could not create token.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onDelete(id) {
+    if (!confirm('Revoke this token? Apps using it will stop working.')) return;
+    setBusy(true);
+    setError('');
+    try {
+      await deleteApiToken(id);
+      const fresh = await listApiTokens();
+      setTokens(fresh);
+    } catch {
+      setError('Could not revoke token.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onCopy() {
+    try {
+      await navigator.clipboard.writeText(freshToken);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <h3 className="mb-1 text-base font-semibold text-slate-900">
+        API tokens
+      </h3>
+      <p className="mb-4 text-sm text-slate-600">
+        Let an app authenticate to your home stack without your password — for
+        example, the document scanner uploading a scan to your calendar. Paste
+        the token into the app once; revoke it here to cut access.
+      </p>
+
+      {freshToken && (
+        <div className="mb-4 space-y-2 rounded-lg bg-amber-50 p-3">
+          <p className="text-sm font-medium text-amber-900">
+            Copy this token now — it won't be shown again.
+          </p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 break-all rounded bg-white p-2 font-mono text-xs text-slate-800">
+              {freshToken}
+            </code>
+            <button onClick={onCopy} className="btn btn-secondary text-xs">
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+          <button
+            onClick={() => setFreshToken(null)}
+            className="btn btn-secondary text-xs"
+          >
+            Done
+          </button>
+        </div>
+      )}
+
+      {tokens === null ? (
+        <p className="text-sm text-slate-500">Loading…</p>
+      ) : tokens.length === 0 ? (
+        <p className="mb-4 text-sm text-slate-500">No tokens yet.</p>
+      ) : (
+        <ul className="mb-4 divide-y divide-slate-100">
+          {tokens.map((t) => (
+            <li
+              key={t.id}
+              className="flex items-center justify-between py-2 text-sm"
+            >
+              <div>
+                <div className="font-medium text-slate-900">
+                  {t.name}{' '}
+                  <span className="font-mono text-xs text-slate-400">
+                    {t.prefix}…
+                  </span>
+                </div>
+                <div className="text-xs text-slate-500">
+                  added {new Date(t.created_at).toLocaleDateString()}
+                  {t.last_used_at ? (
+                    <> · last used {new Date(t.last_used_at).toLocaleDateString()}</>
+                  ) : (
+                    <> · never used</>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => onDelete(t.id)}
+                disabled={busy}
+                className="text-xs text-rose-600 hover:underline disabled:opacity-50"
+              >
+                Revoke
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <form onSubmit={onCreate} className="flex items-end gap-2">
+        <div className="flex-1">
+          <label className="mb-1 block text-xs font-medium text-slate-700">
+            Name for this app
+          </label>
+          <input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Document scanner, …"
+            className="input text-sm"
+          />
+        </div>
+        <button type="submit" disabled={busy} className="btn btn-primary text-sm">
+          Generate token
+        </button>
+      </form>
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+    </section>
   );
 }
 

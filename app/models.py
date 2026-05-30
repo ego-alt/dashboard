@@ -75,6 +75,38 @@ class UserSession(Base):
         return exp <= datetime.now(timezone.utc)
 
 
+class ApiToken(Base):
+    """A long-lived API token for programmatic auth (e.g. the scanner app).
+
+    Unlike sessions these don't expire; revoke by deleting the row. The raw
+    token is shown once at creation and only its SHA-256 hash is stored, so a
+    DB leak can't be replayed. ``prefix`` keeps the leading chars of the raw
+    token for display, so the owner can tell tokens apart.
+    """
+
+    __tablename__ = "api_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token_hash: Mapped[str] = mapped_column(
+        String(64), unique=True, nullable=False, index=True
+    )
+    prefix: Mapped[str] = mapped_column(String(16), nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    user: Mapped["User"] = relationship()
+
+
 class WebauthnCredential(Base):
     """A registered passkey / FIDO2 credential. One row per device per user.
 

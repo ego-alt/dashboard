@@ -97,7 +97,10 @@ npm run dev                                                # vite on http://loca
 | `/login`                             | POST   | public   | Username + password → session cookie |
 | `/logout`                            | POST   | public   | Revoke current session |
 | `/me`                                | GET    | user     | Current-user info |
-| `/auth/verify`                       | GET    | internal | nginx `auth_request`; returns `X-User` on 200 |
+| `/auth/verify`                       | GET    | internal | nginx `auth_request`; session cookie **or** `Authorization: Bearer <api-token>`; returns `X-User` on 200 |
+| `/auth/tokens`                       | GET    | user     | List the caller's API tokens (no raw values) |
+| `/auth/tokens`                       | POST   | user     | Mint an API token (`name`); returns the raw token **once** |
+| `/auth/tokens/{id}`                  | DELETE | user     | Revoke an API token |
 | `/services`                          | GET    | user     | Hub tiles discovered from `homehub.*` Docker labels + status (running/stopped) |
 | `/containers`                        | GET    | user     | List containers (`?stats=1` adds live CPU/network, ~1s per running container) |
 | `/containers/{id}/start\|stop\|restart` | POST | admin   | Container lifecycle (refuses protected gateway containers, 409) |
@@ -107,6 +110,18 @@ npm run dev                                                # vite on http://loca
 
 `/auth/verify` is marked `internal` in nginx — external clients hit 404. Only
 nginx-internal subrequests can reach it.
+
+### API tokens (for native apps)
+
+Native clients (e.g. the document scanner uploading to the calendar) can't hold
+a session cookie, so they authenticate with a long-lived **API token**. Generate
+one in the frontend at **Settings → API tokens** (shown once; only its SHA-256
+hash is stored). The client sends `Authorization: Bearer <token>`; nginx forwards
+it on the `auth_request` to `/auth/verify`, which resolves it to the owning user
+and returns `X-User` — so the token works for the proxied apps exactly like a
+browser session. A token authorizes downstream apps **only**; dashboard-native
+endpoints (`/containers`, `/me`, token management) stay cookie-only. Revoke
+anytime from the same screen.
 
 ## CLI
 
@@ -148,7 +163,7 @@ anti-lockout guard, and a mocked-daemon layer for `app/docker_control.py`.
 app/                FastAPI application
   auth.py           argon2id hashing, sessions, FastAPI deps
   db.py             SQLAlchemy engine, get_db, session_scope
-  models.py         User, UserSession, Service ORM
+  models.py         User, UserSession, ApiToken, WebauthnCredential, LoginEvent ORM
   docker_control.py docker-py wrappers, parallelized stats
   services.py       service discovery from Docker homehub.* labels
   system_stats.py   psutil-only host stats

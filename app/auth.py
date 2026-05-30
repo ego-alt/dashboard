@@ -6,6 +6,7 @@ SELECT covers each nginx auth_request subrequest. Successful and failed login
 attempts are recorded in ``login_events`` for audit/incident-response.
 """
 
+import hashlib
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -165,6 +166,55 @@ def purge_expired_sessions(db: DbSession) -> int:
     return result.rowcount or 0
 
 
+# ---------- API tokens (long-lived, for native clients) ----------
+
+API_TOKEN_PREFIX_LEN = 8
+
+
+def _hash_api_token(raw: str) -> str:
+    """SHA-256 is enough here: the token is 256-bit random, so there's nothing
+    to brute-force — we only need to avoid storing the raw value at rest."""
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def mint_api_token(db: DbSession, user: User, *, name: str) -> str:
+    """Create a long-lived API token for ``user`` and return the raw value.
+    Shown once; only the hash is stored, so it can't be recovered later."""
+    from .models import ApiToken
+
+    raw = secrets.token_urlsafe(32)
+    db.add(
+        ApiToken(
+            user_id=user.id,
+            token_hash=_hash_api_token(raw),
+            prefix=raw[:API_TOKEN_PREFIX_LEN],
+            name=(name or "API token")[:120],
+        )
+    )
+    db.commit()
+    return raw
+
+
+def lookup_api_token(db: DbSession, raw: str) -> Optional[User]:
+    """Resolve a raw Bearer token to its user, updating last_used_at. Returns
+    None if the token is unknown."""
+    from .models import ApiToken
+
+    tok = (
+        db.query(ApiToken)
+        .filter(ApiToken.token_hash == _hash_api_token(raw))
+        .one_or_none()
+    )
+    if tok is None:
+        return None
+    tok.last_used_at = datetime.now(timezone.utc)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+    return tok.user
+
+
 def record_login_event(
     db: DbSession,
     *,
@@ -220,6 +270,26 @@ def current_user_optional(
     if sess is None or sess.mfa_pending:
         return None
     return sess.user
+
+
+def current_user_cookie_or_token(
+    request: Request, db: DbSession = Depends(get_db)
+) -> Optional[User]:
+    """Session cookie *or* ``Authorization: Bearer <api-token>``.
+
+    Used only by ``/auth/verify`` so nginx's auth_request can authorize native
+    clients (the scanner app) that hold an API token but no session cookie. All
+    dashboard-native endpoints keep using ``current_user`` (cookie only), so a
+    token grants downstream-app access — not dashboard control."""
+    user = current_user_optional(request, db)
+    if user is not None:
+        return user
+    auth = request.headers.get("authorization", "")
+    if auth[:7].lower() == "bearer ":
+        raw = auth[7:].strip()
+        if raw:
+            return lookup_api_token(db, raw)
+    return None
 
 
 def current_user(user: Optional[User] = Depends(current_user_optional)) -> User:

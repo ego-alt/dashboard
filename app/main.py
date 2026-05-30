@@ -17,8 +17,10 @@ from app.auth import (
     complete_pending_session,
     current_admin,
     current_user,
+    current_user_cookie_or_token,
     current_user_optional,
     mfa_pending_session,
+    mint_api_token,
     mint_pending_session,
     mint_session,
     record_login_event,
@@ -38,7 +40,7 @@ from app.docker_control import (
     start_container,
     stop_container,
 )
-from app.models import User, UserSession, WebauthnCredential
+from app.models import ApiToken, User, UserSession, WebauthnCredential
 from app.services import list_services
 from app.spa import register_spa
 from app.system_stats import get_system_stats
@@ -255,7 +257,7 @@ def me(user: User = Depends(current_user)):
 
 
 @app.get("/auth/verify")
-def auth_verify(user: Optional[User] = Depends(current_user_optional)):
+def auth_verify(user: Optional[User] = Depends(current_user_cookie_or_token)):
     if user is None:
         return Response(status_code=401)
     return Response(status_code=200, headers={"X-User": user.username})
@@ -548,6 +550,59 @@ def webauthn_login_finish(
         user_agent=user_agent,
     )
     return {"ok": True, "username": user.username}
+
+
+# ---------- API tokens (programmatic auth for native apps) ----------
+
+
+@app.get("/auth/tokens")
+def list_api_tokens(user: User = Depends(current_user), db: DbSession = Depends(get_db)):
+    toks = (
+        db.query(ApiToken)
+        .filter(ApiToken.user_id == user.id)
+        .order_by(ApiToken.created_at.desc())
+        .all()
+    )
+    return [
+        {
+            "id": t.id,
+            "name": t.name,
+            "prefix": t.prefix,
+            "created_at": t.created_at.isoformat(),
+            "last_used_at": t.last_used_at.isoformat() if t.last_used_at else None,
+        }
+        for t in toks
+    ]
+
+
+@app.post("/auth/tokens")
+def create_api_token(
+    name: str = Form(...),
+    user: User = Depends(current_user),
+    db: DbSession = Depends(get_db),
+):
+    """Mint a token for the current user. The raw value is returned exactly
+    once (only its hash is persisted) — the client must store it now."""
+    raw = mint_api_token(db, user, name=name)
+    return {"ok": True, "token": raw}
+
+
+@app.delete("/auth/tokens/{token_id}")
+def delete_api_token(
+    token_id: int,
+    user: User = Depends(current_user),
+    db: DbSession = Depends(get_db),
+):
+    tok = (
+        db.query(ApiToken)
+        .filter(ApiToken.id == token_id, ApiToken.user_id == user.id)
+        .one_or_none()
+    )
+    if tok is None:
+        raise HTTPException(status_code=404, detail="not found")
+    db.delete(tok)
+    db.commit()
+    return {"ok": True}
 
 
 # ---------- Service registry (home hub) ----------

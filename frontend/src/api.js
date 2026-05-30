@@ -99,3 +99,18 @@ export async function loginPasskeyFinish(body) {
     body: JSON.stringify(body),
   });
 }
+
+// ---------- API tokens (for native apps, e.g. the document scanner) ----------
+
+export async function listApiTokens() {
+  return apiJson('/auth/tokens');
+}
+
+/** Returns `{ ok, token }` — the raw token, shown to the user exactly once. */
+export async function createApiToken(name) {
+  return postForm('/auth/tokens', { name });
+}
+
+export async function deleteApiToken(id) {
+  return apiJson(`/auth/tokens/${id}`, { method: 'DELETE' });
+}
