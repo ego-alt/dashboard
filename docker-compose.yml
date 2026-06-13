@@ -136,8 +136,8 @@ services:
       SECRET_KEY: ${MUSIC_SECRET_KEY:-}
     volumes:
       - ../tapes/instance:/app/instance
-      # Read-only library (D2 index-in-place). Same host dir nginx mounts.
-      - ${MUSIC_HOST_DIR:-../tapes/music}:/data/music:ro
+      # Writable: yt-dlp writes _downloads/ here. Pi: set MUSIC_HOST_DIR=/mnt/backup/tapes in .env
+      - ${MUSIC_HOST_DIR:-../tapes/music}:/data/music
     expose:
       - "5003"
     labels:
