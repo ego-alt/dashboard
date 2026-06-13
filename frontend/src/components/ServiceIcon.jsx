@@ -12,14 +12,18 @@ const ACCENTS = [
 const ICON_ALIASES = {
   '📚': 'book',
   '📅': 'calendar',
+  '🎵': 'music',
   library: 'book',
   book: 'book',
   calendar: 'calendar',
+  music: 'music',
+  tapes: 'music',
 };
 
 const SLUG_ICONS = {
   library: 'book',
   calendar: 'calendar',
+  music: 'music',
 };
 
 function hashSlug(slug) {
@@ -41,16 +45,20 @@ function resolveIconKey(icon, slug) {
   return SLUG_ICONS[slug] || null;
 }
 
-function IconShell({ slug, children }) {
+function IconShell({ slug, textClass, children }) {
   const { text, ring } = accentFor(slug);
   return (
     <span
       className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200/90 bg-slate-50 ring-1 ring-inset ${ring}`}
     >
-      <span className={text}>{children}</span>
+      <span className={textClass ?? text}>{children}</span>
     </span>
   );
 }
+
+const ICON_COLORS = {
+  music: 'text-orange-500',
+};
 
 function BookIcon() {
   return (
@@ -87,9 +95,26 @@ function CalendarIcon() {
   );
 }
 
+function MusicIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden>
+      <path
+        d="M9 18V5l12-2v13"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="6" cy="18" r="3" stroke="currentColor" strokeWidth="1.75" />
+      <circle cx="18" cy="16" r="3" stroke="currentColor" strokeWidth="1.75" />
+    </svg>
+  );
+}
+
 const ICONS = {
   book: BookIcon,
   calendar: CalendarIcon,
+  music: MusicIcon,
 };
 
 function Monogram({ name, slug }) {
@@ -107,7 +132,7 @@ export default function ServiceIcon({ icon, name, slug }) {
   const Icon = key ? ICONS[key] : null;
   if (Icon) {
     return (
-      <IconShell slug={slug}>
+      <IconShell slug={slug} textClass={ICON_COLORS[key]}>
         <Icon />
       </IconShell>
     );
