@@ -19,12 +19,17 @@ services:
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./tls:/etc/nginx/tls:ro
+      # X-Accel: nginx serves the audio bytes itself, so it needs the music
+      # library mounted read-only at the path the /_audio/ alias points to.
+      - ${MUSIC_HOST_DIR:-../tapes/music}:/data/music:ro
     depends_on:
       dashboard:
         condition: service_healthy
       library:
         condition: service_started
       calendar:
+        condition: service_started
+      music:
         condition: service_started
 
   dashboard:
@@ -113,6 +118,40 @@ services:
       - uv run flask db upgrade && exec uv run gunicorn 'app:create_app()' --bind 0.0.0.0:5002 --workers 2 --timeout 120 --worker-class sync
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5002/healthz')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  music:
+    build: ../tapes
+    image: music:dev
+    container_name: music
+    restart: unless-stopped
+    environment:
+      APPLICATION_ROOT: /music
+      AUTH_PROXY_HEADER: X-Forwarded-User
+      MUSIC_DIR: /data/music
+      USE_X_ACCEL: "1"
+      SECRET_KEY: ${MUSIC_SECRET_KEY:-}
+    volumes:
+      - ../tapes/instance:/app/instance
+      # Read-only library (D2 index-in-place). Same host dir nginx mounts.
+      - ${MUSIC_HOST_DIR:-../tapes/music}:/data/music:ro
+    expose:
+      - "5003"
+    labels:
+      homehub.enable: "true"
+      homehub.name: "Music"
+      homehub.route: "/music/"
+      homehub.icon: "music"
+      homehub.description: "Cassette-deck streaming"
+    command:
+      - sh
+      - -c
+      - exec uv run gunicorn 'app:create_app()' -c gunicorn.conf.py
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5003/healthz')"]
       interval: 30s
       timeout: 5s
       retries: 3

@@ -26,6 +26,7 @@ DATA_DIR = REPO_ROOT / "data"
 DASHBOARD_DB = DATA_DIR / "dashboard.db"
 LIBRARY_DB = PROJECTS_ROOT / "library" / "instance" / "library.db"
 CALENDAR_DB = PROJECTS_ROOT / "calendar" / "instance" / "events.db"
+MUSIC_DB = PROJECTS_ROOT / "tapes" / "instance" / "music.db"
 
 
 def _dashboard_users(con: sqlite3.Connection) -> list[tuple[str, bool]]:
@@ -82,6 +83,25 @@ def _ensure_calendar(
     )
     uid = con.execute("SELECT last_insert_rowid()").fetchone()[0]
     return f"  calendar: inserted {username!r} (id={uid})"
+
+
+def _ensure_music(con: sqlite3.Connection, username: str, *, dry_run: bool) -> str:
+    row = con.execute(
+        "SELECT id FROM users WHERE username = ?", (username,)
+    ).fetchone()
+    if row:
+        return f"  music: {username!r} exists (id={row[0]})"
+    if dry_run:
+        return f"  music: would insert {username!r}"
+    con.execute(
+        """
+        INSERT INTO users (username, password_hash, created_at)
+        VALUES (?, NULL, datetime('now'))
+        """,
+        (username,),
+    )
+    uid = con.execute("SELECT last_insert_rowid()").fetchone()[0]
+    return f"  music: inserted {username!r} (id={uid})"
 
 
 def _prune_library_orphans(
@@ -146,14 +166,22 @@ def main() -> int:
 
     lib = sqlite3.connect(LIBRARY_DB)
     cal = sqlite3.connect(CALENDAR_DB)
+    # Music is newer — sync it only once its DB exists (first app start creates it).
+    mus = sqlite3.connect(MUSIC_DB) if MUSIC_DB.exists() else None
     try:
         print("\nSync:")
         for username, is_admin in roster:
             print(_ensure_library(lib, username, is_admin, dry_run=args.dry_run))
             print(_ensure_calendar(cal, username, dry_run=args.dry_run))
+            if mus is not None:
+                print(_ensure_music(mus, username, dry_run=args.dry_run))
         if not args.dry_run:
             lib.commit()
             cal.commit()
+            if mus is not None:
+                mus.commit()
+        if mus is None:
+            print(f"  music: skipped (DB not found at {MUSIC_DB})")
 
         if args.prune_library:
             print("\nPrune library:")
@@ -164,6 +192,8 @@ def main() -> int:
     finally:
         lib.close()
         cal.close()
+        if mus is not None:
+            mus.close()
 
     print("\nDone.")
     return 0
