@@ -134,6 +134,13 @@ services:
       MUSIC_DIR: /data/music
       USE_X_ACCEL: "1"
       SECRET_KEY: ${MUSIC_SECRET_KEY:-}
+      # LLM tag correction (Claude Haiku). Without a key, rips fall back to
+      # deterministic cleanup; set LLM_CLEANING=0 to disable even with a key.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LLM_CLEANING: ${LLM_CLEANING:-1}
+      # Cover art from MusicBrainz on rip. Set a contact (email/URL) for their UA policy.
+      ART_LOOKUP: ${ART_LOOKUP:-1}
+      MUSICBRAINZ_CONTACT: ${MUSICBRAINZ_CONTACT:-}
     volumes:
       - ../tapes/instance:/app/instance
       # Writable: yt-dlp writes _downloads/ here. Pi: set MUSIC_HOST_DIR=/mnt/backup/tapes in .env
