@@ -2,8 +2,8 @@
 
 Home-services hub for a Pi-hosted stack: FastAPI auth provider, server-side
 sessions, Docker container monitor, and a React frontend. Nginx terminates TLS
-in front; other services (library, calendar) trust an `X-Forwarded-User` header
-that nginx injects after an `auth_request` to dashboard's `/auth/verify`.
+in front; other services (library, calendar, tapes) trust an `X-Forwarded-User`
+header that nginx injects after an `auth_request` to dashboard's `/auth/verify`.
 
 The architecture rationale lives in [`PLAN.md`](PLAN.md).
 
@@ -26,16 +26,20 @@ uv run python scripts/sync_household_users.py                # mirror users → 
 open https://localhost                                     # hub: a tile per labeled service
 open https://localhost/library/                            # EPUB library (dashboard login required)
 open https://localhost/calendar/                           # calendar (dashboard login required)
+open https://localhost/music/                              # tapes music streamer (dashboard login required)
 ```
 
 The hub auto-discovers services from Docker labels — no registration step.
 Any container with `homehub.enable=true` + `homehub.route` (see the
-`labels:` blocks on `library`/`calendar` in `docker-compose.yml`) appears as
+`labels:` blocks on `library`/`calendar`/`music` in `docker-compose.yml`) appears as
 a tile. Add a service = add labels where you already define the container.
 
 Set `LIBRARY_BOOK_DIR` in `.env` to your existing books path (e.g.
 `/mnt/backup/books`). The compose file mounts `../library/instance` for the
 SQLite DB — point that at your existing `instance/` if migrating a live deploy.
+Likewise set `MUSIC_HOST_DIR` to your music library (e.g. `/mnt/backup/tapes`);
+it's mounted into both nginx (so it can serve audio bytes via `X-Accel`) and the
+tapes service.
 
 ### Scripts (`scripts/`)
 
@@ -175,6 +179,6 @@ scripts/            dev-certs.sh, sync_household_users.py
 docs/               MIGRATION.md (one-time stack consolidation notes)
 tests/              pytest
 Dockerfile          Multi-stage (Vite build + uv) for the FastAPI service
-docker-compose.yml  nginx + dashboard + library + calendar
+docker-compose.yml  nginx + dashboard + library + calendar + music (tapes)
 PLAN.md             Full design rationale + migration roadmap
 ```
