@@ -47,6 +47,8 @@ tapes service.
 |--------|---------|
 | `dev-certs.sh` | TLS certs for nginx (`./tls/home.crt` + `.key`) |
 | `sync_household_users.py` | Copy dashboard roster → library/calendar shadow `users` |
+| `restic-backup.sh` | Nightly off-site backup to GCS (see [Backups](#backups)) |
+| `restic-restore.sh` | Restore wrapper around `restic restore` |
 
 Dashboard DB is bind-mounted like library/calendar: **`./data/dashboard.db`** →
 `/data/dashboard.db` in the container (same file on host and in Docker).
@@ -150,6 +152,24 @@ Notable knobs: `SESSION_COOKIE_SECURE`, `DOCKER_GID`,
 stop/restart — default `dashboard,home-nginx`), and `DASHBOARD_API_TARGET`
 (Vite dev-proxy upstream).
 
+## Backups
+
+Nightly off-site backup of the whole stack to Google Cloud Storage via
+[restic](https://restic.net) — encrypted and deduplicated client-side. One
+snapshot covers the four SQLite DBs (snapshotted consistently and
+integrity-checked first), each app's `.env`, calendar attachments, books, and
+music. A systemd timer runs it at 03:30 with missed-run catch-up.
+
+```sh
+systemctl status restic-backup.timer        # next run
+journalctl -u restic-backup.service -n 50   # last run's log
+sudo systemctl start restic-backup.service  # run now
+sudo scripts/restic-restore.sh --list       # browse snapshots to restore
+```
+
+Full setup (GCS bucket + service account, repo init, install the timer) and
+restore / disaster-recovery steps: [`docs/BACKUPS.md`](docs/BACKUPS.md).
+
 ## Tests
 
 ```sh
@@ -175,8 +195,9 @@ app/                FastAPI application
   cli.py            operator CLI (users, sessions)
 frontend/           React 19 + Vite SPA: login, service-tile home, admin monitor
 nginx/conf.d/       Reverse-proxy + auth_request config
-scripts/            dev-certs.sh, sync_household_users.py
-docs/               MIGRATION.md (one-time stack consolidation notes)
+scripts/            dev-certs.sh, sync_household_users.py, restic-backup.sh
+  systemd/          restic-backup.{service,timer} for the nightly backup
+docs/               MIGRATION.md, BACKUPS.md (restic → GCS runbook)
 tests/              pytest
 Dockerfile          Multi-stage (Vite build + uv) for the FastAPI service
 docker-compose.yml  nginx + dashboard + library + calendar + music (tapes)

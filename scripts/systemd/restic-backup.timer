@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily home-stack restic backup
+
+[Timer]
+# 03:30 local time, jittered up to 15 min so it isn't exactly on the hour.
+OnCalendar=*-*-* 03:30:00
+RandomizedDelaySec=900
+# Catch up a missed run (e.g. the Pi was powered off at 03:30).
+Persistent=true
+
+[Install]
+WantedBy=timers.target
