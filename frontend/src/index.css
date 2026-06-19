@@ -47,9 +47,8 @@ body {
   margin: 0;
 }
 
-/* >>> home-ui-spec primitives — do not edit in place.
- * Canonical copy: dashboard/docs/primitives.css (see docs/ui-spec.md).
- * Synced verbatim into each app; guarded by test_ui_spec_sync.py. */
+/* Shared button + input primitives (see docs/ui-spec.md). The Flask apps carry
+ * these in their structural.css; here they back the migrated React pages. */
 .btn {
     display: inline-flex;
     align-items: center;
@@ -86,4 +85,3 @@ body {
 }
 .input:focus { outline: none; border-color: var(--color-accent); }
 .input::placeholder { color: var(--color-text-muted); }
-/* <<< home-ui-spec primitives */

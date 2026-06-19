@@ -5,15 +5,17 @@ and dashboard should *sit* the same way (same padding, radius, focus ring,
 hover transition) even though each app's palette is different. Users moving
 between apps feel "same product family"; each app keeps its own visual voice.
 
-The spec has three layers:
+The spec is two shared pieces + per-app freedom:
 
-1. **Token interface** — semantic CSS-variable role names. Every app defines
-   the same names. The *values* differ per app.
-2. **Primitive components** — `.btn` + variants, `.input`. Same rules in
-   every app, sourced from the token interface above.
-3. **App-specific extensions** — anything visual that is unique to one app
-   (calendar's mood circles, library's bookshelf spines, dashboard's service
-   tiles) lives in that app's CSS and does not enter the spec.
+1. **Shared base** (`structural.css`) — the non-thematic skeleton: spacing,
+   radii, type, fonts, motion tokens, **and** the `.btn`/`.input` primitives.
+   Byte-identical across the Flask apps (dashboard mirrors the shapes via its
+   React global CSS).
+2. **Per-app theme** (`tokens.css`) — the colour role-tokens. Same names
+   everywhere; values unique per app.
+3. **App-specific extensions** — anything visual unique to one app (calendar's
+   mood circles, library's bookshelf spines, dashboard's service tiles) lives in
+   that app's own CSS and isn't part of the spec.
 
 ---
 
@@ -73,10 +75,16 @@ Mandatory. Each app declares these in `:root` (light) with optional
     /* Fonts */
     --font-sans;            /* 'Inter', Arial, Helvetica, sans-serif */
     --font-mono;            /* ui-monospace, SFMono-Regular, Menlo, Consolas, monospace */
+
+    /* Motion — `ease` is the default curve; --ease-emphasized for entrances/pops */
+    --dur-fast;             /* 0.12s — hover / opacity micro-transitions */
+    --dur-base;             /* 0.20s — default control transitions (matches .btn) */
+    --dur-slow;             /* 0.30s — panels, drawers, progress fills */
+    --ease-emphasized;      /* cubic-bezier(0.16, 1, 0.3, 1) — menus, toasts */
 }
 ```
 
-**14 color tokens + 4 sizes + 6 spaces + 4 radii.** Apps **may** add their own
+**14 color tokens + 4 sizes + 6 spaces + 4 radii + 4 motion.** Apps **may** add their own
 role-style tokens for unique surfaces (calendar adds `--color-bg-overlay-strong`,
 `--color-border-soft`, `--color-stripe`, etc.). These are app-local and don't
 enter the spec.
@@ -89,14 +97,26 @@ Inter is loaded via Google Fonts in each app's HTML entry point with the
 preconnect pair + a `wght@400..700` variable subset. Falls back to Arial when
 the CDN is blocked.
 
+**Breakpoint.** One mobile breakpoint across the stack: **640px**. CSS can't read
+a `var()` inside `@media`, so this is a convention, not a token — write
+`@media (max-width: 640px)`. An app whose layout genuinely pivots elsewhere may
+add its own, but converge on 640px for the primary mobile collapse. (Current
+drift to reconcile: calendar uses 480px, library 575.98/600/768px; tapes is at
+640px.)
+
+**Structural vs chromatic.** Everything above *except the colour tokens* is
+structural — no brand meaning, identical everywhere. It lives (together with the
+`.btn`/`.input` primitives) in `structural.css`; the per-app colours live in
+`tokens.css`. Swap the theme and the skeleton never moves.
+
 ### Reference values (current apps)
 
-| Role | Calendar (Gruvbox) | Library (Soft, light) | Library (dark) | Dashboard (Slate) |
-|---|---|---|---|---|
-| `--color-bg-base` | `#282828` | `#FFF1E5` | `#282828` | `#f8fafc` |
-| `--color-text-primary` | `#ebdbb2` | `#34495E` | `#ebdbb2` | `#0f172a` |
-| `--color-accent` | `#689d6a` | `#6AACFF` | `#689d6a` | `#0f172a` |
-| `--color-danger` | `#cc241d` | `#C0392B` | `#cc241d` | `#e11d48` |
+| Role | Calendar (Gruvbox) | Library (Soft, light) | Library (dark) | Tapes (Gruvbox+orange) | Dashboard (Slate) |
+|---|---|---|---|---|---|
+| `--color-bg-base` | `#282828` | `#FFF1E5` | `#282828` | `#282828` | `#f8fafc` |
+| `--color-text-primary` | `#ebdbb2` | `#34495E` | `#ebdbb2` | `#ebdbb2` | `#0f172a` |
+| `--color-accent` | `#689d6a` | `#6AACFF` | `#689d6a` | `#fe8019` | `#0f172a` |
+| `--color-danger` | `#cc241d` | `#C0392B` | `#cc241d` | `#cc241d` | `#e11d48` |
 
 Library's dark mode adopts calendar's Gruvbox values so the two apps converge
 at night; light mode keeps library's soft-academia identity.
@@ -115,46 +135,11 @@ utility classes mapping to the same scale.
 
 ## Layer 2 — Primitive components
 
-Mandatory. Vanilla-CSS apps (calendar, library) include this file verbatim;
-Tailwind apps (dashboard) can either include it or wire the same shapes via
-Tailwind's `@apply`.
-
-```css
-.btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-2);
-    padding: var(--space-2) var(--space-3);
-    font: inherit;
-    border: 1px solid transparent;
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
-}
-.btn:focus-visible { outline: 2px solid var(--color-accent-hover); outline-offset: 2px; }
-.btn-primary   { background: var(--color-accent); color: #fff; }
-.btn-primary:hover   { background: var(--color-accent-hover); }
-.btn-secondary { background: transparent; border-color: var(--color-border); color: var(--color-text-secondary); }
-.btn-secondary:hover { background: var(--color-highlight-soft, var(--color-bg-inset)); color: var(--color-text-primary); }
-.btn-danger    { background: var(--color-danger); color: #fff; }
-.btn-danger:hover    { background: var(--color-danger-hover); }
-.btn-ghost     { background: transparent; color: var(--color-text-muted); padding: var(--space-2); }
-.btn-ghost:hover     { color: var(--color-text-primary); }
-
-.input {
-    background: var(--color-bg-inset);
-    color: var(--color-text-primary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    padding: var(--space-2);
-    font-family: var(--font-sans);  /* override to --font-mono per-app where appropriate */
-    font-size: var(--text-base);
-    transition: border-color 0.2s ease;
-}
-.input:focus { outline: none; border-color: var(--color-accent); }
-.input::placeholder { color: var(--color-text-faint); }
-```
+`.btn` (+ `-primary` / `-secondary` / `-danger` / `-ghost`) and `.input`. The
+canonical rules live **in `structural.css`** alongside the tokens — the Flask
+apps load that one file; dashboard carries the same shapes in its React global
+CSS. Transitions use `--dur-base`. An app may override a single primitive in its
+own CSS (calendar, for instance, keeps monospace inputs over a base surface).
 
 ### Conventions
 
@@ -187,31 +172,27 @@ otherwise are free to define their own shapes.
 
 ## Distribution
 
-For a personal stack of three repos:
+Each Flask app (tapes, calendar, library) carries two files: a shared
+**`structural.css`** (tokens + primitives — byte-identical across the three) and
+a per-app **`tokens.css`** (colours), loaded in that order. Dashboard
+(React/Tailwind) declares the same colour tokens in its global CSS and styles
+`.btn`/`.input` there directly.
 
-- **Calendar** keeps `static/css/index.css` with the token block + primitives
-  at the top. Source of truth lives there.
-- **Library** mirrors the token block + primitives in `static/css/index.css`
-  (and copies the relevant subset into `reader.css`).
-- **Dashboard** declares the same tokens in `:root` of its global CSS and
-  references them from Tailwind utilities (Tailwind v4 reads CSS vars
-  natively).
-
-If drift becomes painful, lift the primitives to a `home-ui-spec/` git
-submodule that all three apps include. Premature today (changes are infrequent
-and small).
+Keep `structural.css` in sync by copying it verbatim between the apps — it
+changes rarely. Colours and app-specific extensions diverge freely.
 
 ---
 
 ## Current adoption
 
-- ✅ **Calendar** — tokens, primitives, headings, font all shipped.
-- ✅ **Library** — same, plus dark mode unified to calendar's Gruvbox palette.
-  Reader page also migrated off Bootstrap's `.btn-outline-*` to spec primitives.
-- 🟡 **Dashboard** — tokens + primitives in place; LoginPage + SettingsPage
-  migrated to `.btn` / `.input`. HomePage + MonitorPage still use Tailwind
-  utilities (palette flows through via the same tokens; structural primitives
-  not applied). Heading conventions not yet enforced.
+- ✅ **Calendar / Library / Tapes** — shared `structural.css` (tokens +
+  primitives + motion) + per-app `tokens.css`. Library's dark mode unifies to
+  calendar's Gruvbox palette; calendar keeps monospace inputs as its one
+  primitive override.
+- 🟡 **Dashboard** — colour tokens + `.btn`/`.input` in its React global CSS;
+  LoginPage + SettingsPage migrated, HomePage + MonitorPage still on Tailwind
+  utilities (palette flows through the same tokens). Heading conventions not yet
+  enforced.
 
 ## Open questions
 
