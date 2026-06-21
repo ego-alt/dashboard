@@ -145,13 +145,16 @@ export default function UsersPage() {
             className={inputCls}
           />
         </label>
-        <label className="flex items-center gap-2 text-sm text-slate-700">
-          <input
-            type="checkbox"
-            checked={form.is_admin}
-            onChange={(e) => setForm({ ...form, is_admin: e.target.checked })}
-          />
-          Admin
+        <label className="flex flex-col text-xs text-slate-500">
+          <span aria-hidden="true">&nbsp;</span>
+          <span className="mt-1 flex h-[30px] items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={form.is_admin}
+              onChange={(e) => setForm({ ...form, is_admin: e.target.checked })}
+            />
+            Admin
+          </span>
         </label>
         <button
           type="submit"
@@ -167,7 +170,7 @@ export default function UsersPage() {
           <thead className="bg-slate-50 text-left text-slate-500">
             <tr>
               <th className="px-4 py-2 font-medium">User</th>
-              <th className="px-4 py-2 font-medium">Role</th>
+              <th className="px-4 py-2 font-medium">Admin</th>
               <th className="px-4 py-2 font-medium">2FA</th>
               <th className="px-4 py-2 font-medium">Last login</th>
               <th className="px-4 py-2"></th>
@@ -188,15 +191,15 @@ export default function UsersPage() {
                     </div>
                   </td>
                   <td className="px-4 py-2">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        u.is_admin
-                          ? 'bg-indigo-100 text-indigo-800'
-                          : 'bg-slate-200 text-slate-700'
-                      }`}
-                    >
-                      {u.is_admin ? 'admin' : 'user'}
-                    </span>
+                    <input
+                      type="checkbox"
+                      checked={u.is_admin}
+                      disabled={self}
+                      onChange={() => toggleAdmin(u)}
+                      aria-label={`${u.username} is an admin`}
+                      title={self ? "You can't change your own role" : 'Toggle admin'}
+                      className="disabled:opacity-40"
+                    />
                   </td>
                   <td className="px-4 py-2 text-slate-700">
                     {u.totp_enabled ? 'on' : '—'}
@@ -212,13 +215,6 @@ export default function UsersPage() {
                       className="mr-3 text-xs text-slate-600 hover:text-slate-900"
                     >
                       Password
-                    </button>
-                    <button
-                      onClick={() => toggleAdmin(u)}
-                      disabled={self}
-                      className="mr-3 text-xs text-slate-600 hover:text-slate-900 disabled:text-slate-300"
-                    >
-                      {u.is_admin ? 'Demote' : 'Promote'}
                     </button>
                     {u.totp_enabled && (
                       <button
