@@ -16,29 +16,29 @@ function TopBar() {
     }`;
   return (
     <header className="border-b border-slate-200 bg-white">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
-        <div className="flex items-center gap-3">
-          <span className="font-semibold text-slate-900">Home</span>
-          <nav className="flex flex-wrap gap-1">
-            <NavLink to="/" end className={linkCls}>
-              Services
+      {/* Mobile: brand + account on row 1, nav drops to its own full-width row
+          below (order-last + w-full). Desktop: all inline on one row. */}
+      <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+        <span className="font-semibold text-slate-900">Home</span>
+        <nav className="order-last flex w-full flex-wrap gap-1 sm:order-none sm:w-auto">
+          <NavLink to="/" end className={linkCls}>
+            Services
+          </NavLink>
+          {user?.is_admin && (
+            <NavLink to="/monitor" className={linkCls}>
+              Monitor
             </NavLink>
-            {user?.is_admin && (
-              <NavLink to="/monitor" className={linkCls}>
-                Monitor
-              </NavLink>
-            )}
-            {user?.is_admin && (
-              <NavLink to="/users" className={linkCls}>
-                Users
-              </NavLink>
-            )}
-            <NavLink to="/settings" className={linkCls}>
-              Settings
+          )}
+          {user?.is_admin && (
+            <NavLink to="/users" className={linkCls}>
+              Users
             </NavLink>
-          </nav>
-        </div>
-        <div className="flex items-center gap-3 text-sm text-slate-600">
+          )}
+          <NavLink to="/settings" className={linkCls}>
+            Settings
+          </NavLink>
+        </nav>
+        <div className="ml-auto flex items-center gap-3 text-sm text-slate-600">
           <span>{user?.display_name || user?.username}</span>
           <button
             onClick={logout}
