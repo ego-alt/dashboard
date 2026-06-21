@@ -114,6 +114,9 @@ npm run dev                                                # vite on http://loca
 | `/auth/tokens`                       | GET    | user     | List the caller's API tokens (no raw values) |
 | `/auth/tokens`                       | POST   | user     | Mint an API token (`name`); returns the raw token **once** |
 | `/auth/tokens/{id}`                  | DELETE | user     | Revoke an API token |
+| `/users`                             | GET/POST | admin  | List / create users |
+| `/users/{id}/{password,admin,reset-2fa}` | POST | admin   | Reset password, toggle admin, clear a user's 2FA |
+| `/users/{id}`                        | DELETE | admin    | Delete a user (purges their sessions, tokens, passkeys) |
 | `/services`                          | GET    | user     | Hub tiles discovered from `homehub.*` Docker labels + status (running/stopped) |
 | `/containers`                        | GET    | user     | List containers (`?stats=1` adds live CPU/network, ~1s per running container) |
 | `/containers/{id}/start\|stop\|restart` | POST | admin   | Container lifecycle (refuses protected gateway containers, 409) |
@@ -183,11 +186,11 @@ restore / disaster-recovery steps: [`docs/BACKUPS.md`](docs/BACKUPS.md).
 uv run pytest
 ```
 
-87 tests cover the auth surface (login lifecycle, session expiry, TOTP 2FA,
-WebAuthn passkeys, API tokens, HaveIBeenPwned checks, authorization gates),
-label-based service discovery (filtering, status, daemon-down resilience, sort
-order), the protected-container anti-lockout guard, and a mocked-daemon layer
-for `app/docker_control.py`.
+94 tests cover the auth surface (login lifecycle, session expiry, TOTP 2FA,
+WebAuthn passkeys, API tokens, HaveIBeenPwned checks, admin user management,
+authorization gates), label-based service discovery (filtering, status,
+daemon-down resilience, sort order), the protected-container anti-lockout guard,
+and a mocked-daemon layer for `app/docker_control.py`.
 
 ## Layout
 

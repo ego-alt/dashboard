@@ -3,6 +3,7 @@ import { RequireAuth, useAuth } from './auth.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import HomePage from './pages/HomePage.jsx';
 import MonitorPage from './pages/MonitorPage.jsx';
+import UsersPage from './pages/UsersPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 
 function TopBar() {
@@ -25,6 +26,11 @@ function TopBar() {
             {user?.is_admin && (
               <NavLink to="/monitor" className={linkCls}>
                 Monitor
+              </NavLink>
+            )}
+            {user?.is_admin && (
+              <NavLink to="/users" className={linkCls}>
+                Users
               </NavLink>
             )}
             <NavLink to="/settings" className={linkCls}>
@@ -81,6 +87,18 @@ export default function App() {
             <AdminOnly>
               <Shell>
                 <MonitorPage />
+              </Shell>
+            </AdminOnly>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/users"
+        element={
+          <RequireAuth>
+            <AdminOnly>
+              <Shell>
+                <UsersPage />
               </Shell>
             </AdminOnly>
           </RequireAuth>

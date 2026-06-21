@@ -114,3 +114,34 @@ export async function createApiToken(name) {
 export async function deleteApiToken(id) {
   return apiJson(`/auth/tokens/${id}`, { method: 'DELETE' });
 }
+
+// ---------- User management (admin) ----------
+
+export async function listUsers() {
+  return apiJson('/users');
+}
+
+export async function createUser({ username, password, display_name, is_admin }) {
+  return postForm('/users', {
+    username,
+    password,
+    display_name: display_name || '',
+    is_admin: is_admin ? 'true' : 'false',
+  });
+}
+
+export async function setUserPassword(id, password) {
+  return postForm(`/users/${id}/password`, { password });
+}
+
+export async function setUserAdmin(id, isAdmin) {
+  return postForm(`/users/${id}/admin`, { is_admin: isAdmin ? 'true' : 'false' });
+}
+
+export async function resetUser2fa(id) {
+  return apiJson(`/users/${id}/reset-2fa`, { method: 'POST' });
+}
+
+export async function deleteUser(id) {
+  return apiJson(`/users/${id}`, { method: 'DELETE' });
+}
