@@ -107,7 +107,8 @@ export default function UsersPage() {
   if (loading) return <p className="text-slate-500">Loading users…</p>;
 
   const inputCls =
-    'mt-1 rounded-md border border-slate-300 px-2 py-1 text-sm text-slate-900';
+    'mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm text-slate-900';
+  const fieldCls = 'flex w-full flex-col text-xs text-slate-500 sm:w-44';
 
   return (
     <div>
@@ -116,9 +117,9 @@ export default function UsersPage() {
 
       <form
         onSubmit={onCreate}
-        className="mb-6 flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4"
+        className="mb-6 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:flex-row sm:flex-wrap sm:items-end"
       >
-        <label className="flex flex-col text-xs text-slate-500">
+        <label className={fieldCls}>
           Username
           <input
             required
@@ -127,7 +128,7 @@ export default function UsersPage() {
             className={inputCls}
           />
         </label>
-        <label className="flex flex-col text-xs text-slate-500">
+        <label className={fieldCls}>
           Display name
           <input
             value={form.display_name}
@@ -135,7 +136,7 @@ export default function UsersPage() {
             className={inputCls}
           />
         </label>
-        <label className="flex flex-col text-xs text-slate-500">
+        <label className={fieldCls}>
           Password
           <input
             required
@@ -145,8 +146,8 @@ export default function UsersPage() {
             className={inputCls}
           />
         </label>
-        <label className="flex flex-col text-xs text-slate-500">
-          <span aria-hidden="true">&nbsp;</span>
+        <label className={fieldCls}>
+          <span aria-hidden="true" className="hidden sm:block">&nbsp;</span>
           <span className="mt-1 flex h-[30px] items-center gap-2 text-sm text-slate-700">
             <input
               type="checkbox"
@@ -159,7 +160,7 @@ export default function UsersPage() {
         <button
           type="submit"
           disabled={creating}
-          className="rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-700 disabled:opacity-50"
+          className="w-full rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-700 disabled:opacity-50 sm:w-auto"
         >
           {creating ? 'Adding…' : 'Add user'}
         </button>
