@@ -1,9 +1,10 @@
 # Dashboard
 
-Home-services hub for a Pi-hosted stack: FastAPI auth provider, server-side
-sessions, Docker container monitor, and a React frontend. Nginx terminates TLS
-in front; other services (library, calendar, tapes) trust an `X-Forwarded-User`
-header that nginx injects after an `auth_request` to dashboard's `/auth/verify`.
+Home-services hub for a Pi-hosted stack: FastAPI auth provider (passwords,
+passkeys, TOTP 2FA), server-side sessions, Docker container monitor, and a React
+frontend. Nginx terminates TLS in front; other services (library, calendar,
+tapes) trust an `X-Forwarded-User` header that nginx injects after an
+`auth_request` to dashboard's `/auth/verify`.
 
 The architecture rationale lives in [`PLAN.md`](PLAN.md).
 
@@ -11,7 +12,9 @@ The architecture rationale lives in [`PLAN.md`](PLAN.md).
 
 - **Backend**: FastAPI + uvicorn (Python 3.11+, managed by `uv`)
 - **DB**: SQLAlchemy 2.0 over SQLite (drop-in to Postgres later)
-- **Auth**: argon2id hashing, server-side `user_sessions` table, HttpOnly cookies
+- **Auth**: argon2id passwords (breach-checked vs HaveIBeenPwned at set time),
+  server-side `user_sessions` (HttpOnly cookies), TOTP 2FA with recovery codes,
+  WebAuthn passkeys
 - **Frontend**: React 19 + Vite + Tailwind v4
 - **Container view**: docker-py + psutil
 - **Reverse proxy**: nginx (TLS termination + `auth_request`)
@@ -104,6 +107,10 @@ npm run dev                                                # vite on http://loca
 | `/logout`                            | POST   | public   | Revoke current session |
 | `/me`                                | GET    | user     | Current-user info |
 | `/auth/verify`                       | GET    | internal | nginx `auth_request`; session cookie **or** `Authorization: Bearer <api-token>`; returns `X-User` on 200 |
+| `/auth/totp/{setup,enable,disable}`  | POST   | user     | Enroll / manage TOTP 2FA (`enable` returns recovery codes) |
+| `/auth/totp/verify`                  | POST   | pending  | Second-factor step during login |
+| `/auth/webauthn/register/*`, `/credentials` | varies | user | Register, list, remove passkeys |
+| `/auth/webauthn/login/{begin,finish}`| POST   | public   | Passkey login |
 | `/auth/tokens`                       | GET    | user     | List the caller's API tokens (no raw values) |
 | `/auth/tokens`                       | POST   | user     | Mint an API token (`name`); returns the raw token **once** |
 | `/auth/tokens/{id}`                  | DELETE | user     | Revoke an API token |
@@ -176,16 +183,20 @@ restore / disaster-recovery steps: [`docs/BACKUPS.md`](docs/BACKUPS.md).
 uv run pytest
 ```
 
-34 tests cover the auth surface (login lifecycle, session expiry, cookie
-attributes, authorization gates), label-based service discovery (filtering,
-status, daemon-down resilience, sort order), the protected-container
-anti-lockout guard, and a mocked-daemon layer for `app/docker_control.py`.
+87 tests cover the auth surface (login lifecycle, session expiry, TOTP 2FA,
+WebAuthn passkeys, API tokens, HaveIBeenPwned checks, authorization gates),
+label-based service discovery (filtering, status, daemon-down resilience, sort
+order), the protected-container anti-lockout guard, and a mocked-daemon layer
+for `app/docker_control.py`.
 
 ## Layout
 
 ```
 app/                FastAPI application
   auth.py           argon2id hashing, sessions, FastAPI deps
+  totp.py           TOTP 2FA + recovery codes
+  webauthn_helpers.py  passkey registration / assertion
+  hibp.py           HaveIBeenPwned k-anonymity password check
   db.py             SQLAlchemy engine, get_db, session_scope
   models.py         User, UserSession, ApiToken, WebauthnCredential, LoginEvent ORM
   docker_control.py docker-py wrappers, parallelized stats
