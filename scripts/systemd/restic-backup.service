@@ -1,6 +1,6 @@
 [Unit]
 Description=Home-stack restic backup to GCS
-Documentation=file:///opt/home-stack/dashboard/docs/BACKUPS.md
+Documentation=file:///home/idego/Projects/dashboard/docs/BACKUPS.md
 Wants=network-online.target
 After=network-online.target
 
@@ -10,7 +10,7 @@ EnvironmentFile=/etc/restic/home-stack.env
 # Adjust to wherever the dashboard repo is cloned on the Pi. STACK_ROOT is
 # derived from this path (the parent dir), so the script finds the sibling
 # library/, calendar/ and tapes/ checkouts automatically.
-ExecStart=/opt/home-stack/dashboard/scripts/restic-backup.sh
+ExecStart=/home/idego/Projects/dashboard/scripts/restic-backup.sh
 # Be a good citizen on the Pi — backups are not latency-sensitive.
 Nice=10
 IOSchedulingClass=idle
