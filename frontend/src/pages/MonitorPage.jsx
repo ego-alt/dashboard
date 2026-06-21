@@ -6,6 +6,8 @@ import { useAuth } from '../auth.jsx';
 // these even for admins; the server is the real backstop (returns 409).
 const PROTECTED = new Set(['dashboard', 'home-nginx']);
 
+const CARD = 'rounded-xl border border-slate-200 bg-white shadow-sm';
+
 function fmtAge(s) {
   if (s == null) return '—';
   if (s < 3600) return `${Math.round(s / 60)}m ago`;
@@ -18,7 +20,7 @@ function fmtBytes(b) {
   return b >= 1e9 ? `${(b / 1e9).toFixed(2)} GB` : `${(b / 1e6).toFixed(0)} MB`;
 }
 
-function BackupsCard() {
+function BackupsSection() {
   const [s, setS] = useState(null);
   const [err, setErr] = useState('');
   useEffect(() => {
@@ -27,25 +29,33 @@ function BackupsCard() {
       .catch((e) => setErr(e.body?.detail || 'Failed to load backup status'));
   }, []);
 
-  const wrap = 'mt-6 rounded-lg border border-slate-200 bg-white p-4';
+  const heading = (extra) => (
+    <div className="mb-3 flex items-center gap-3">
+      <h3 className="text-base font-semibold text-slate-900">Backups</h3>
+      {extra}
+    </div>
+  );
+
   if (err)
     return (
-      <div className={wrap}>
+      <section className={`mt-6 ${CARD} p-4`}>
+        {heading()}
         <p className="text-sm text-red-600">{err}</p>
-      </div>
+      </section>
     );
   if (!s)
     return (
-      <div className={wrap}>
-        <p className="text-sm text-slate-500">Loading backups…</p>
-      </div>
+      <section className={`mt-6 ${CARD} p-4`}>
+        {heading()}
+        <p className="text-sm text-slate-500">Loading…</p>
+      </section>
     );
   if (!s.available)
     return (
-      <div className={wrap}>
-        <h2 className="text-lg font-semibold text-slate-900">Backups</h2>
-        <p className="mt-1 text-sm text-slate-500">No backup has run yet.</p>
-      </div>
+      <section className={`mt-6 ${CARD} p-4`}>
+        {heading()}
+        <p className="text-sm text-slate-500">No backup has run yet.</p>
+      </section>
     );
 
   const healthy = s.ok && !s.stale;
@@ -53,13 +63,12 @@ function BackupsCard() {
   const pill = healthy ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
 
   return (
-    <div className={wrap}>
-      <div className="mb-3 flex items-center gap-3">
-        <h2 className="text-lg font-semibold text-slate-900">Backups</h2>
+    <section className={`mt-6 ${CARD} p-4`}>
+      {heading(
         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${pill}`}>
           {label}
-        </span>
-      </div>
+        </span>,
+      )}
       {Array.isArray(s.databases) && s.databases.length > 0 && (
         <div className="mb-3 flex flex-wrap gap-2">
           {s.databases.map((d) => (
@@ -99,7 +108,7 @@ function BackupsCard() {
           {s.error || 'Last backup is stale — check the timer on the Pi.'}
         </p>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -152,104 +161,109 @@ export default function MonitorPage() {
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-slate-900">Containers</h2>
-        <button
-          onClick={load}
-          className="rounded-md border border-slate-300 px-3 py-1 text-sm hover:bg-slate-50"
-        >
-          Refresh
-        </button>
-      </div>
-      {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
-      {loading ? (
-        <p className="text-slate-500">Loading containers…</p>
-      ) : (
-      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-        <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-left text-slate-500">
-            <tr>
-              <th className="px-4 py-2 font-medium">Name</th>
-              <th className="px-4 py-2 font-medium">Status</th>
-              <th className="px-4 py-2 font-medium">CPU %</th>
-              <th className="px-4 py-2 font-medium">RX KB</th>
-              <th className="px-4 py-2 font-medium">TX KB</th>
-              <th className="px-4 py-2 font-medium">Runtime s</th>
-              <th className="px-4 py-2"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {containers.map((c) => {
-              const protectedC = PROTECTED.has(c.name);
-              return (
-                <tr key={c.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-2 font-mono text-slate-800">{c.name}</td>
-                  <td className="px-4 py-2">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        c.status === 'running'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-slate-200 text-slate-700'
-                      }`}
-                    >
-                      {c.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2 text-slate-700">
-                    {statsLoading && c.status === 'running' && c.cpu_percent == null
-                      ? '…'
-                      : (c.cpu_percent ?? '—')}
-                  </td>
-                  <td className="px-4 py-2 text-slate-700">
-                    {statsLoading && c.status === 'running' && c.network_rx_kb == null
-                      ? '…'
-                      : (c.network_rx_kb ?? '—')}
-                  </td>
-                  <td className="px-4 py-2 text-slate-700">
-                    {statsLoading && c.status === 'running' && c.network_tx_kb == null
-                      ? '…'
-                      : (c.network_tx_kb ?? '—')}
-                  </td>
-                  <td className="px-4 py-2 text-slate-700">
-                    {statsLoading && c.status === 'running' && c.runtime_seconds == null
-                      ? '…'
-                      : (c.runtime_seconds ?? '—')}
-                  </td>
-                  <td className="px-4 py-2 text-right whitespace-nowrap">
-                    {!isAdmin ? null : protectedC ? (
-                      <span className="text-xs text-slate-400">protected</span>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => action(c, 'stop')}
-                          className="mr-3 text-xs text-slate-600 hover:text-slate-900"
-                        >
-                          Stop
-                        </button>
-                        <button
-                          onClick={() => action(c, 'restart')}
-                          className="text-xs text-slate-600 hover:text-slate-900"
-                        >
-                          Restart
-                        </button>
-                      </>
-                    )}
-                  </td>
+      <h2 className="mb-4 text-lg font-semibold text-slate-900">Monitor</h2>
+
+      <section className={`${CARD} overflow-hidden`}>
+        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+          <h3 className="text-base font-semibold text-slate-900">Containers</h3>
+          <button
+            onClick={load}
+            className="rounded-md border border-slate-300 px-3 py-1 text-sm hover:bg-slate-50"
+          >
+            Refresh
+          </button>
+        </div>
+        {error && <p className="px-4 pt-3 text-sm text-red-600">{error}</p>}
+        {loading ? (
+          <p className="px-4 py-6 text-slate-500">Loading containers…</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-50 text-left text-slate-500">
+                <tr>
+                  <th className="px-4 py-2 font-medium">Name</th>
+                  <th className="px-4 py-2 font-medium">Status</th>
+                  <th className="px-4 py-2 font-medium">CPU %</th>
+                  <th className="px-4 py-2 font-medium">RX KB</th>
+                  <th className="px-4 py-2 font-medium">TX KB</th>
+                  <th className="px-4 py-2 font-medium">Runtime s</th>
+                  <th className="px-4 py-2"></th>
                 </tr>
-              );
-            })}
-            {containers.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-slate-400">
-                  No containers
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-      )}
-      <BackupsCard />
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {containers.map((c) => {
+                  const protectedC = PROTECTED.has(c.name);
+                  return (
+                    <tr key={c.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-2 font-mono text-slate-800">{c.name}</td>
+                      <td className="px-4 py-2">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                            c.status === 'running'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-slate-200 text-slate-700'
+                          }`}
+                        >
+                          {c.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-slate-700">
+                        {statsLoading && c.status === 'running' && c.cpu_percent == null
+                          ? '…'
+                          : (c.cpu_percent ?? '—')}
+                      </td>
+                      <td className="px-4 py-2 text-slate-700">
+                        {statsLoading && c.status === 'running' && c.network_rx_kb == null
+                          ? '…'
+                          : (c.network_rx_kb ?? '—')}
+                      </td>
+                      <td className="px-4 py-2 text-slate-700">
+                        {statsLoading && c.status === 'running' && c.network_tx_kb == null
+                          ? '…'
+                          : (c.network_tx_kb ?? '—')}
+                      </td>
+                      <td className="px-4 py-2 text-slate-700">
+                        {statsLoading && c.status === 'running' && c.runtime_seconds == null
+                          ? '…'
+                          : (c.runtime_seconds ?? '—')}
+                      </td>
+                      <td className="px-4 py-2 text-right whitespace-nowrap">
+                        {!isAdmin ? null : protectedC ? (
+                          <span className="text-xs text-slate-400">protected</span>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => action(c, 'stop')}
+                              className="mr-3 text-xs text-slate-600 hover:text-slate-900"
+                            >
+                              Stop
+                            </button>
+                            <button
+                              onClick={() => action(c, 'restart')}
+                              className="text-xs text-slate-600 hover:text-slate-900"
+                            >
+                              Restart
+                            </button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {containers.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-6 text-center text-slate-400">
+                      No containers
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <BackupsSection />
     </div>
   );
 }
