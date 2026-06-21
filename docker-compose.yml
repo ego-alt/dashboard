@@ -40,6 +40,7 @@ services:
     environment:
       DATABASE_URL: sqlite:////data/dashboard.db
       SESSION_COOKIE_SECURE: "1"
+      BACKUP_STATUS_FILE: /backups/status.json
     # Match the host's docker.sock GID so the non-root app user can read it.
     # Find with: stat -c '%g' /var/run/docker.sock   (Pi/Debian usually 999.)
     group_add:
@@ -47,6 +48,11 @@ services:
     volumes:
       - ./data:/data
       - /var/run/docker.sock:/var/run/docker.sock
+      # Read-only view of the backup run-status the host's restic-backup.sh
+      # writes (set BACKUP_STATUS_FILE to this dir in /etc/restic/home-stack.env).
+      # A dedicated dir, not the staging dir — no restic creds or staged DBs leak
+      # into the dashboard. Missing dir/file just reads as "no backup yet".
+      - ${BACKUP_STATUS_DIR:-/var/lib/home-stack-backup-status}:/backups:ro
     expose:
       - "8000"
 

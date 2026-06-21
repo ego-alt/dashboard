@@ -119,6 +119,20 @@ A nightly `restic check` adds GCS egress; once a week is plenty. Either set
 restic check --read-data-subset=5%   # also re-reads a sample of actual data
 ```
 
+### Status in the dashboard
+
+Each run writes a JSON status file (outcome, time, duration, per-DB integrity,
+snapshot count, repo size). The dashboard's **Monitor → Backups** card reads it
+read-only and flags a run that failed or is older than ~36h — so a silent
+failure surfaces in the UI. The dashboard never gets restic creds.
+
+No config needed: the script writes to `/var/lib/home-stack-backup-status/` by
+default (a **dedicated** dir, not the staging dir — so the read-only mount can't
+see staged DBs), and `docker-compose.yml` already mounts that dir into the
+dashboard at `/backups:ro`. Override both with `BACKUP_STATUS_FILE` (env file)
+and `BACKUP_STATUS_DIR` (compose) only if you relocate it. Tune staleness with
+`BACKUP_STALE_AFTER_HOURS` on the dashboard service.
+
 ---
 
 ## Restoring

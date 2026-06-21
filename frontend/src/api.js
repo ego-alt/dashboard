@@ -145,3 +145,9 @@ export async function resetUser2fa(id) {
 export async function deleteUser(id) {
   return apiJson(`/users/${id}`, { method: 'DELETE' });
 }
+
+// ---------- Backups (admin) ----------
+
+export async function backupStatus() {
+  return apiJson('/backups/status');
+}

@@ -123,6 +123,7 @@ npm run dev                                                # vite on http://loca
 | `/containers/{id}/logs`              | GET    | user     | Recent logs |
 | `/stats/system`                      | GET    | user     | psutil CPU / mem / disk |
 | `/stats/containers/{id}`             | GET    | user     | Per-container CPU / network |
+| `/backups/status`                    | GET    | admin    | Last backup run (reads the status file; powers the Monitor "Backups" card) |
 
 `/auth/verify` is marked `internal` in nginx — external clients hit 404. Only
 nginx-internal subrequests can reach it.
@@ -168,7 +169,9 @@ Nightly off-site backup of the whole stack to Google Cloud Storage via
 [restic](https://restic.net) — encrypted and deduplicated client-side. One
 snapshot covers the four SQLite DBs (snapshotted consistently and
 integrity-checked first), each app's `.env`, calendar attachments, books, and
-music. A systemd timer runs it at 03:30 with missed-run catch-up.
+music. A systemd timer runs it at 03:30 with missed-run catch-up. Each run
+writes a small status file the **Monitor → Backups** card reads, so a stale or
+failed backup is visible in the UI (the dashboard never holds restic creds).
 
 ```sh
 systemctl status restic-backup.timer        # next run
@@ -186,11 +189,12 @@ restore / disaster-recovery steps: [`docs/BACKUPS.md`](docs/BACKUPS.md).
 uv run pytest
 ```
 
-94 tests cover the auth surface (login lifecycle, session expiry, TOTP 2FA,
+98 tests cover the auth surface (login lifecycle, session expiry, TOTP 2FA,
 WebAuthn passkeys, API tokens, HaveIBeenPwned checks, admin user management,
 authorization gates), label-based service discovery (filtering, status,
 daemon-down resilience, sort order), the protected-container anti-lockout guard,
-and a mocked-daemon layer for `app/docker_control.py`.
+the backup-status endpoint (freshness/staleness), and a mocked-daemon layer for
+`app/docker_control.py`.
 
 ## Layout
 

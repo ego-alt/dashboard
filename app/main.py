@@ -1,5 +1,6 @@
 """Dashboard API: Docker monitor + auth provider for the home stack."""
 
+import json
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -811,6 +812,39 @@ def system_stats_endpoint(_: User = Depends(current_user)):
 @app.get("/stats/containers/{container_id}", response_model=Dict[str, Any])
 def container_stats_endpoint(container_id: str, _: User = Depends(current_user)):
     return _unwrap(get_container_stats(container_id))
+
+
+# ---------- Backups (admin; reads the status file the backup script writes) ----------
+
+_BACKUP_STATUS_FILE = os.environ.get(
+    "BACKUP_STATUS_FILE", "/var/lib/home-stack-backup/status.json"
+)
+_BACKUP_STALE_HOURS = float(os.environ.get("BACKUP_STALE_AFTER_HOURS", "36"))
+
+
+@app.get("/backups/status")
+def backup_status_endpoint(_: User = Depends(current_admin)):
+    """Last backup run, read from the status file ``restic-backup.sh`` writes.
+    The dashboard holds no restic creds — it only reads this summary, and a
+    missing file just means no backup has run yet."""
+    if not os.path.exists(_BACKUP_STATUS_FILE):
+        return {"available": False}
+    try:
+        with open(_BACKUP_STATUS_FILE) as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        raise HTTPException(status_code=500, detail="backup status file unreadable")
+    age_seconds = None
+    stale = True
+    finished = data.get("finished_at")
+    if finished:
+        try:
+            ts = datetime.fromisoformat(str(finished).replace("Z", "+00:00"))
+            age_seconds = (datetime.now(timezone.utc) - ts).total_seconds()
+            stale = age_seconds > _BACKUP_STALE_HOURS * 3600
+        except ValueError:
+            pass
+    return {"available": True, "age_seconds": age_seconds, "stale": stale, **data}
 
 
 # ---------- React SPA (built into app/static by Docker / manual npm run build) ----------
