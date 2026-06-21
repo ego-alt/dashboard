@@ -27,7 +27,7 @@ function BackupsCard() {
       .catch((e) => setErr(e.body?.detail || 'Failed to load backup status'));
   }, []);
 
-  const wrap = 'mb-6 rounded-lg border border-slate-200 bg-white p-4';
+  const wrap = 'mt-6 rounded-lg border border-slate-200 bg-white p-4';
   if (err)
     return (
       <div className={wrap}>
@@ -60,6 +60,20 @@ function BackupsCard() {
           {label}
         </span>
       </div>
+      {Array.isArray(s.databases) && s.databases.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          {s.databases.map((d) => (
+            <span
+              key={d.app}
+              className={`rounded-full px-2 py-0.5 text-xs ${
+                d.ok ? 'bg-slate-100 text-slate-700' : 'bg-red-100 text-red-800'
+              }`}
+            >
+              {d.app} {d.ok ? '✓' : '✗'}
+            </span>
+          ))}
+        </div>
+      )}
       <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-4">
         <div>
           <dt className="text-slate-500">Last run</dt>
@@ -80,20 +94,6 @@ function BackupsCard() {
           <dd className="text-slate-900">{fmtBytes(s.repo_bytes)}</dd>
         </div>
       </dl>
-      {Array.isArray(s.databases) && s.databases.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {s.databases.map((d) => (
-            <span
-              key={d.app}
-              className={`rounded-full px-2 py-0.5 text-xs ${
-                d.ok ? 'bg-slate-100 text-slate-700' : 'bg-red-100 text-red-800'
-              }`}
-            >
-              {d.app} {d.ok ? '✓' : '✗'}
-            </span>
-          ))}
-        </div>
-      )}
       {!healthy && (
         <p className="mt-3 text-sm text-red-600">
           {s.error || 'Last backup is stale — check the timer on the Pi.'}
@@ -152,7 +152,6 @@ export default function MonitorPage() {
 
   return (
     <div>
-      <BackupsCard />
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-slate-900">Containers</h2>
         <button
@@ -250,6 +249,7 @@ export default function MonitorPage() {
         </table>
       </div>
       )}
+      <BackupsCard />
     </div>
   );
 }

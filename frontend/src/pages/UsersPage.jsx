@@ -169,7 +169,8 @@ export default function UsersPage() {
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50 text-left text-slate-500">
             <tr>
-              <th className="px-4 py-2 font-medium">User</th>
+              <th className="px-4 py-2 font-medium">Username</th>
+              <th className="px-4 py-2 font-medium">Name</th>
               <th className="px-4 py-2 font-medium">Admin</th>
               <th className="px-4 py-2 font-medium">2FA</th>
               <th className="px-4 py-2 font-medium">Last login</th>
@@ -181,14 +182,12 @@ export default function UsersPage() {
               const self = u.id === me?.id;
               return (
                 <tr key={u.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-2">
-                    <div className="font-medium text-slate-900">
-                      {u.display_name || u.username}
-                    </div>
-                    <div className="text-xs text-slate-500">
-                      @{u.username}
-                      {self && ' · you'}
-                    </div>
+                  <td className="px-4 py-2 text-slate-700">
+                    @{u.username}
+                    {self && <span className="text-xs text-slate-400"> · you</span>}
+                  </td>
+                  <td className="px-4 py-2 text-slate-900">
+                    {u.display_name || <span className="text-slate-400">—</span>}
                   </td>
                   <td className="px-4 py-2">
                     <input
@@ -237,7 +236,7 @@ export default function UsersPage() {
             })}
             {users.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={6} className="px-4 py-6 text-center text-slate-400">
                   No users
                 </td>
               </tr>
