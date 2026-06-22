@@ -38,7 +38,137 @@ function fmtMem(c) {
     c.mem_used_mb >= 1024
       ? `${(c.mem_used_mb / 1024).toFixed(1)} GB`
       : `${Math.round(c.mem_used_mb)} MB`;
-  return c.mem_percent != null ? `${used} · ${c.mem_percent.toFixed(0)}%` : used;
+  return c.mem_percent != null ? `${used} (${c.mem_percent.toFixed(0)}%)` : used;
+}
+
+// Usage bars go amber past 75% and red past 90% so a filling disk reads at a
+// glance. CPU temp is colored against the Pi's throttle points (~80/85°C).
+function pctTone(p) {
+  if (p == null) return 'slate';
+  if (p >= 90) return 'red';
+  if (p >= 75) return 'amber';
+  return 'slate';
+}
+
+function tempTone(t) {
+  if (t == null) return 'slate';
+  if (t >= 80) return 'red';
+  if (t >= 70) return 'amber';
+  return 'slate';
+}
+
+const BAR_FILL = { slate: 'bg-slate-400', amber: 'bg-amber-500', red: 'bg-red-500' };
+
+function Metric({ label, value, percent, tone = 'slate' }) {
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-2">
+        <dt className="text-xs text-slate-500">{label}</dt>
+        <dd className="font-mono text-sm text-slate-900">{value}</dd>
+      </div>
+      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+        <div
+          className={`h-full rounded-full ${BAR_FILL[tone]}`}
+          style={{ width: `${Math.min(100, Math.max(0, percent || 0))}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function HostSection({ live, hidden }) {
+  const [s, setS] = useState(null);
+  const [err, setErr] = useState('');
+  const inFlight = useRef(false);
+
+  const fetchStats = useCallback(async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    try {
+      setS(await apiJson('/stats/system'));
+      setErr('');
+    } catch (e) {
+      setErr(e.body?.detail || 'Failed to load host stats');
+    } finally {
+      inFlight.current = false;
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  useEffect(() => {
+    if (!live || hidden) return undefined;
+    const id = setInterval(fetchStats, POLL_MS);
+    return () => clearInterval(id);
+  }, [live, hidden, fetchStats]);
+
+  const heading = (
+    <h3 className="mb-3 text-base font-semibold text-slate-900">Host</h3>
+  );
+
+  if (err)
+    return (
+      <section className={`${CARD} mb-6 p-4`}>
+        {heading}
+        <p className="text-sm text-red-600">{err}</p>
+      </section>
+    );
+  if (!s)
+    return (
+      <section className={`${CARD} mb-6 p-4`}>
+        {heading}
+        <p className="text-sm text-slate-500">Loading…</p>
+      </section>
+    );
+
+  const memPct = s.memory_percent;
+  return (
+    <section className={`${CARD} mb-6 p-4`}>
+      {heading}
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+        <Metric
+          label="CPU"
+          value={`${Math.round(s.cpu_percent)}%`}
+          percent={s.cpu_percent}
+          tone={pctTone(s.cpu_percent)}
+        />
+        <Metric
+          label="Memory"
+          value={`${(s.memory_used / 1024).toFixed(1)}/${(s.memory_total / 1024).toFixed(1)} GB`}
+          percent={memPct}
+          tone={pctTone(memPct)}
+        />
+        <Metric
+          label="Disk /"
+          value={
+            s.disk_percent != null
+              ? `${s.disk_used}/${s.disk_total} GB`
+              : '—'
+          }
+          percent={s.disk_percent}
+          tone={pctTone(s.disk_percent)}
+        />
+        {s.cpu_temp_c != null && (
+          <Metric
+            label="CPU temp"
+            value={`${s.cpu_temp_c.toFixed(1)} °C`}
+            percent={(s.cpu_temp_c / 85) * 100}
+            tone={tempTone(s.cpu_temp_c)}
+          />
+        )}
+        {s.data_mount && (
+          <Metric
+            label={`Data ${s.data_mount}`}
+            value={`${s.data_disk_used}/${s.data_disk_total} GB`}
+            percent={s.data_disk_percent}
+            tone={pctTone(s.data_disk_percent)}
+          />
+        )}
+      </dl>
+    </section>
+  );
 }
 
 function BackupsSection() {
@@ -259,6 +389,8 @@ export default function MonitorPage() {
   return (
     <div>
       <h2 className="mb-4 text-lg font-semibold text-slate-900">Monitor</h2>
+
+      <HostSection live={live} hidden={hidden} />
 
       <section className={`${CARD} overflow-hidden`}>
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
