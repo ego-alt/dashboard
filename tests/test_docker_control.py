@@ -31,17 +31,25 @@ def _fake_container(*, cid="abc123", name="library", status="running", with_stat
         "Config": {"Cmd": ["python"]},
     }
     if with_stats:
+        # one_shot reads return raw cumulative counters with precpu empty; the
+        # client computes CPU% from the delta across polls.
         c.stats.return_value = {
             "cpu_stats": {
                 "cpu_usage": {"total_usage": 2_000_000_000},
                 "system_cpu_usage": 10_000_000_000,
                 "online_cpus": 4,
             },
-            "precpu_stats": {
-                "cpu_usage": {"total_usage": 1_000_000_000},
-                "system_cpu_usage": 9_000_000_000,
+            "precpu_stats": {},
+            # Two interfaces — exercises summing across all of them, not eth0 only.
+            "networks": {
+                "eth0": {"rx_bytes": 2048, "tx_bytes": 1024},
+                "eth1": {"rx_bytes": 1024, "tx_bytes": 512},
             },
-            "networks": {"eth0": {"rx_bytes": 2048, "tx_bytes": 1024}},
+            "memory_stats": {
+                "usage": 100 * 1024 * 1024,
+                "limit": 200 * 1024 * 1024,
+                "stats": {"inactive_file": 20 * 1024 * 1024},
+            },
         }
     else:
         c.stats.side_effect = RuntimeError("daemon failure")
@@ -66,11 +74,27 @@ def test_get_containers_returns_metadata_plus_live_stats(mock_client):
     assert row["name"] == "library"
     assert row["status"] == "running"
     assert row["image"] == "library:latest"
-    # CPU delta is 1e9 over system delta 1e9, scaled by 4 cores → 400%.
-    assert row["cpu_percent"] == 400.0
-    assert row["network_rx_kb"] == 2.0
-    assert row["network_tx_kb"] == 1.0
-    assert row["runtime_seconds"] == 2.0
+    # Raw CPU counters passed through for client-side delta math.
+    assert row["cpu_total"] == 2_000_000_000
+    assert row["system_cpu"] == 10_000_000_000
+    assert row["online_cpus"] == 4
+    # Cumulative byte counters, summed across eth0 + eth1.
+    assert row["network_rx_bytes"] == 3072
+    assert row["network_tx_bytes"] == 1536
+    # Working-set memory = usage (100 MB) − inactive_file (20 MB) = 80 MB of 200.
+    assert row["mem_used_mb"] == 80.0
+    assert row["mem_limit_mb"] == 200.0
+    assert row["mem_percent"] == 40.0
+
+
+def test_stats_online_cpus_falls_back_to_percpu_length(mock_client):
+    c = _fake_container()
+    cpu = c.stats.return_value["cpu_stats"]
+    del cpu["online_cpus"]
+    cpu["cpu_usage"]["percpu_usage"] = [1, 2, 3]
+    mock_client.containers.list.return_value = [c]
+    row = docker_control.get_containers(include_stats=True)[0]
+    assert row["online_cpus"] == 3
 
 
 def test_get_containers_isolates_per_container_stats_failures(mock_client):
@@ -80,8 +104,8 @@ def test_get_containers_isolates_per_container_stats_failures(mock_client):
     rows = docker_control.get_containers(include_stats=True)
     assert len(rows) == 2
     by_id = {r["id"]: r for r in rows}
-    assert "cpu_percent" in by_id["good"]
-    assert "cpu_percent" not in by_id["bad"]
+    assert "cpu_total" in by_id["good"]
+    assert "cpu_total" not in by_id["bad"]
 
 
 def test_get_containers_skips_stats_for_stopped(mock_client):

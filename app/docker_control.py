@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 import docker
 
 _STATS_FAN_OUT = 8
+_MB = 1024 * 1024
 
 
 @cache
@@ -14,35 +15,57 @@ def _get_client():
 
 
 def _stats_for(container) -> Dict[str, Any]:
-    """Stats for an already-resolved Container — avoids a second daemon round-trip."""
-    try:
-        stats = container.stats(stream=False)
-        cpu_delta = (
-            stats["cpu_stats"]["cpu_usage"]["total_usage"]
-            - stats["precpu_stats"]["cpu_usage"]["total_usage"]
-        )
-        system_delta = (
-            stats["cpu_stats"]["system_cpu_usage"]
-            - stats["precpu_stats"]["system_cpu_usage"]
-        )
-        cpu_percent = 0.0
-        if system_delta > 0 and cpu_delta > 0:
-            cpu_count = stats["cpu_stats"].get("online_cpus", 1)
-            cpu_percent = (cpu_delta / system_delta) * cpu_count * 100.0
+    """A single instantaneous stats read for an already-resolved Container.
 
+    ``one_shot=True`` skips the daemon's ~1s CPU-sampling window (which is what
+    made the Monitor page take seconds to load) — it returns raw cumulative
+    counters with ``precpu_stats`` empty. The client diffs successive polls into
+    a CPU% and network rate, so the per-container daemon work stays cheap enough
+    to poll on an interval.
+    """
+    try:
+        stats = container.stats(stream=False, one_shot=True)
+        cpu = stats.get("cpu_stats") or {}
+        cpu_usage = cpu.get("cpu_usage") or {}
+        # online_cpus is sometimes absent; fall back to per-CPU array length.
+        online_cpus = (
+            cpu.get("online_cpus") or len(cpu_usage.get("percpu_usage") or []) or 1
+        )
+
+        # Sum every interface — the container's network device isn't always
+        # "eth0" (Docker bridge networks often name it otherwise), so hardcoding
+        # one interface silently reads zero on a Pi.
         networks = stats.get("networks") or {}
-        network_rx = networks.get("eth0", {}).get("rx_bytes", 0)
-        network_tx = networks.get("eth0", {}).get("tx_bytes", 0)
+        network_rx = sum(n.get("rx_bytes", 0) for n in networks.values())
+        network_tx = sum(n.get("tx_bytes", 0) for n in networks.values())
+
+        # Memory: subtract reclaimable page cache so we report working-set, the
+        # way `docker stats` does. cgroup v2 exposes "inactive_file"; v1 calls it
+        # "total_inactive_file". Without this the Pi's page cache inflates usage.
+        mem = stats.get("memory_stats") or {}
+        mem_detail = mem.get("stats") or {}
+        inactive = mem_detail.get(
+            "inactive_file", mem_detail.get("total_inactive_file", 0)
+        )
+        mem_used = max(mem.get("usage", 0) - inactive, 0)
+        mem_limit = mem.get("limit", 0)
+        mem_percent = (mem_used / mem_limit * 100.0) if mem_limit else 0.0
 
         return {
             "status": "success",
             "stats": {
-                "cpu_percent": round(cpu_percent, 2),
-                "network_rx_kb": round(network_rx / 1024, 2),
-                "network_tx_kb": round(network_tx / 1024, 2),
-                "runtime_seconds": round(
-                    stats["cpu_stats"]["cpu_usage"]["total_usage"] / 1_000_000_000, 2
-                ),
+                # Raw cumulative CPU counters (nanoseconds) + core count; the
+                # client computes CPU% from the delta between two polls.
+                "cpu_total": cpu_usage.get("total_usage", 0),
+                "system_cpu": cpu.get("system_cpu_usage", 0),
+                "online_cpus": online_cpus,
+                "mem_used_mb": round(mem_used / _MB, 1),
+                "mem_limit_mb": round(mem_limit / _MB, 1),
+                "mem_percent": round(mem_percent, 1),
+                # Cumulative counters since container start; the client diffs
+                # successive polls into a per-second rate.
+                "network_rx_bytes": network_rx,
+                "network_tx_bytes": network_tx,
             },
         }
     except Exception as e:
@@ -95,10 +118,11 @@ def _metadata_row(container) -> Dict[str, Any]:
 
 
 def get_containers(*, include_stats: bool = False) -> List[Dict[str, Any]]:
-    """List containers. Live CPU/network stats are optional and slow.
+    """List containers, optionally with a single instantaneous stats read.
 
-    Each ``container.stats(stream=False)`` blocks ~1s while Docker samples CPU,
-    so stats are fetched in parallel and only for running containers.
+    Stats use ``one_shot`` reads (see ``_stats_for``) so no per-container
+    sampling block, but they're still an extra daemon round-trip each — fetched
+    in parallel and only for running containers.
     """
     containers = _get_client().containers.list(all=True)
     if not containers:
