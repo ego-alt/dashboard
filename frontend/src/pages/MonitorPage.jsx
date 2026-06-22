@@ -76,7 +76,26 @@ function Metric({ label, value, percent, tone = 'slate' }) {
   );
 }
 
-function HostSection({ live, hidden }) {
+// Reflects + toggles the shared polling state; shown on both Host and
+// Containers since one `live` flag drives both cards.
+function LiveToggle({ live, onToggle }) {
+  return (
+    <button
+      onClick={onToggle}
+      className={`flex items-center gap-1.5 rounded-md border px-3 py-1 text-sm ${
+        live
+          ? 'border-green-300 bg-green-50 text-green-800'
+          : 'border-slate-300 hover:bg-slate-50'
+      }`}
+      title={live ? `Live — refreshing every ${POLL_MS / 1000}s` : 'Paused'}
+    >
+      <span className={`h-2 w-2 rounded-full ${live ? 'bg-green-500' : 'bg-slate-400'}`} />
+      {live ? 'Live' : 'Paused'}
+    </button>
+  );
+}
+
+function HostSection({ live, hidden, onToggleLive }) {
   const [s, setS] = useState(null);
   const [err, setErr] = useState('');
   const inFlight = useRef(false);
@@ -105,7 +124,10 @@ function HostSection({ live, hidden }) {
   }, [live, hidden, fetchStats]);
 
   const heading = (
-    <h3 className="mb-3 text-base font-semibold text-slate-900">Host</h3>
+    <div className="mb-3 flex items-center justify-between">
+      <h3 className="text-base font-semibold text-slate-900">Host</h3>
+      <LiveToggle live={live} onToggle={onToggleLive} />
+    </div>
   );
 
   if (err)
@@ -174,16 +196,34 @@ function HostSection({ live, hidden }) {
 function BackupsSection() {
   const [s, setS] = useState(null);
   const [err, setErr] = useState('');
-  useEffect(() => {
+
+  // Backups run nightly, so this isn't on the 5s poll — fetched on mount and
+  // on demand via the Refresh button (the only card that still needs one).
+  const load = useCallback(() => {
     backupStatus()
-      .then(setS)
+      .then((data) => {
+        setS(data);
+        setErr('');
+      })
       .catch((e) => setErr(e.body?.detail || 'Failed to load backup status'));
   }, []);
 
+  useEffect(() => {
+    load();
+  }, [load]);
+
   const heading = (extra) => (
-    <div className="mb-3 flex items-center gap-3">
-      <h3 className="text-base font-semibold text-slate-900">Backups</h3>
-      {extra}
+    <div className="mb-3 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <h3 className="text-base font-semibold text-slate-900">Backups</h3>
+        {extra}
+      </div>
+      <button
+        onClick={load}
+        className="rounded-md border border-slate-300 px-3 py-1 text-sm hover:bg-slate-50"
+      >
+        Refresh
+      </button>
     </div>
   );
 
@@ -390,33 +430,12 @@ export default function MonitorPage() {
     <div>
       <h2 className="mb-4 text-lg font-semibold text-slate-900">Monitor</h2>
 
-      <HostSection live={live} hidden={hidden} />
+      <HostSection live={live} hidden={hidden} onToggleLive={() => setLive((v) => !v)} />
 
       <section className={`${CARD} overflow-hidden`}>
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
           <h3 className="text-base font-semibold text-slate-900">Containers</h3>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setLive((v) => !v)}
-              className={`flex items-center gap-1.5 rounded-md border px-3 py-1 text-sm ${
-                live
-                  ? 'border-green-300 bg-green-50 text-green-800'
-                  : 'border-slate-300 hover:bg-slate-50'
-              }`}
-              title={live ? `Live — refreshing every ${POLL_MS / 1000}s` : 'Paused'}
-            >
-              <span
-                className={`h-2 w-2 rounded-full ${live ? 'bg-green-500' : 'bg-slate-400'}`}
-              />
-              {live ? 'Live' : 'Paused'}
-            </button>
-            <button
-              onClick={() => load(true)}
-              className="rounded-md border border-slate-300 px-3 py-1 text-sm hover:bg-slate-50"
-            >
-              Refresh
-            </button>
-          </div>
+          <LiveToggle live={live} onToggle={() => setLive((v) => !v)} />
         </div>
         {error && <p className="px-4 pt-3 text-sm text-red-600">{error}</p>}
         {loading ? (
