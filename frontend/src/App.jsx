@@ -6,6 +6,22 @@ import MonitorPage from './pages/MonitorPage.jsx';
 import UsersPage from './pages/UsersPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 
+// Closed-door "sign out" glyph — matches the door icon the calendar/library apps use.
+function DoorIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden>
+      <path
+        d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16M4 21h16"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="15" cy="12.5" r="1.1" fill="currentColor" />
+    </svg>
+  );
+}
+
 function TopBar() {
   const { user, logout } = useAuth();
   const linkCls = ({ isActive }) =>
@@ -38,8 +54,13 @@ function TopBar() {
           <span className="bp-label text-xs text-[var(--color-text-muted)]">
             {user?.display_name || user?.username}
           </span>
-          <button onClick={logout} className="btn btn-secondary bp-label text-xs">
-            Sign out
+          <button
+            onClick={logout}
+            className="btn btn-ghost"
+            title="Sign out"
+            aria-label="Sign out"
+          >
+            <DoorIcon />
           </button>
         </div>
       </div>
