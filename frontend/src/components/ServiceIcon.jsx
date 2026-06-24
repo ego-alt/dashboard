@@ -1,12 +1,7 @@
+// Icon ink colours — light enough to read on the dark chip.
 const ACCENTS = [
-  { text: 'text-rose-600', ring: 'ring-rose-200/80' },
-  { text: 'text-amber-600', ring: 'ring-amber-200/80' },
-  { text: 'text-emerald-600', ring: 'ring-emerald-200/80' },
-  { text: 'text-sky-600', ring: 'ring-sky-200/80' },
-  { text: 'text-violet-600', ring: 'ring-violet-200/80' },
-  { text: 'text-fuchsia-600', ring: 'ring-fuchsia-200/80' },
-  { text: 'text-teal-600', ring: 'ring-teal-200/80' },
-  { text: 'text-indigo-600', ring: 'ring-indigo-200/80' },
+  'text-rose-400', 'text-amber-400', 'text-emerald-400', 'text-sky-400',
+  'text-violet-400', 'text-fuchsia-400', 'text-teal-400', 'text-indigo-400',
 ];
 
 const ICON_ALIASES = {
@@ -46,10 +41,11 @@ function resolveIconKey(icon, slug) {
 }
 
 function IconShell({ slug, textClass, children }) {
-  const { text, ring } = accentFor(slug);
+  const text = accentFor(slug);
   return (
     <span
-      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200/90 bg-slate-50 ring-1 ring-inset ${ring}`}
+      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border"
+      style={{ background: 'var(--color-bg-inset)', borderColor: 'var(--color-border)' }}
     >
       <span className={textClass ?? text}>{children}</span>
     </span>
@@ -57,7 +53,7 @@ function IconShell({ slug, textClass, children }) {
 }
 
 const ICON_COLORS = {
-  music: 'text-orange-500',
+  music: 'text-orange-400',
 };
 
 function BookIcon() {
@@ -119,7 +115,7 @@ const ICONS = {
 
 function Monogram({ name, slug }) {
   const letter = (name || '?').trim().charAt(0).toUpperCase() || '?';
-  const { text } = accentFor(slug);
+  const text = accentFor(slug);
   return (
     <IconShell slug={slug}>
       <span className={`text-sm font-semibold tracking-tight ${text}`}>{letter}</span>

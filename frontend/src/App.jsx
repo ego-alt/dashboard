@@ -9,17 +9,13 @@ import SettingsPage from './pages/SettingsPage.jsx';
 function TopBar() {
   const { user, logout } = useAuth();
   const linkCls = ({ isActive }) =>
-    `rounded-md px-3 py-1 text-sm ${
-      isActive
-        ? 'bg-slate-200 text-slate-900'
-        : 'text-slate-600 hover:bg-slate-100'
-    }`;
+    `bp-nav-link${isActive ? ' bp-nav-link-active' : ''}`;
   return (
-    <header className="border-b border-slate-200 bg-white">
+    <header className="bp-topbar">
       {/* Mobile: brand + account on row 1, nav drops to its own full-width row
           below (order-last + w-full). Desktop: all inline on one row. */}
       <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-        <span className="font-semibold text-slate-900">Home</span>
+        <span className="bp-brand">Home</span>
         <nav className="order-last flex w-full flex-wrap gap-1 sm:order-none sm:w-auto">
           <NavLink to="/" end className={linkCls}>
             Services
@@ -38,12 +34,11 @@ function TopBar() {
             Settings
           </NavLink>
         </nav>
-        <div className="ml-auto flex items-center gap-3 text-sm text-slate-600">
-          <span>{user?.display_name || user?.username}</span>
-          <button
-            onClick={logout}
-            className="rounded-md border border-slate-300 px-3 py-1 hover:bg-slate-50"
-          >
+        <div className="ml-auto flex items-center gap-3">
+          <span className="bp-label text-xs text-[var(--color-text-muted)]">
+            {user?.display_name || user?.username}
+          </span>
+          <button onClick={logout} className="btn btn-secondary bp-label text-xs">
             Sign out
           </button>
         </div>
@@ -54,7 +49,7 @@ function TopBar() {
 
 function Shell({ children }) {
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen">
       <TopBar />
       <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
     </div>

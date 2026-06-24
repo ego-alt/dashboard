@@ -77,18 +77,18 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-lg font-semibold text-slate-900">Account settings</h2>
+      <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">Account settings</h2>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-6 shadow-sm">
         <div className="mb-4 flex items-baseline justify-between">
-          <h3 className="text-base font-semibold text-slate-900">
+          <h3 className="text-base font-semibold text-[var(--color-text-primary)]">
             Two-factor authentication
           </h3>
           <span
             className={`rounded-full px-2 py-0.5 text-xs ${
               user?.totp_enabled
-                ? 'bg-emerald-100 text-emerald-800'
-                : 'bg-slate-200 text-slate-600'
+                ? 'bg-emerald-500/15 text-emerald-300'
+                : 'bg-[var(--color-bg-inset)] text-[var(--color-text-secondary)]'
             }`}
           >
             {user?.totp_enabled ? 'Enabled' : 'Disabled'}
@@ -97,7 +97,7 @@ export default function SettingsPage() {
 
         {!user?.totp_enabled && !enrollment && !recoveryCodes && (
           <>
-            <p className="mb-4 text-sm text-slate-600">
+            <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
               Add a second factor (TOTP) on top of your password. Use an
               authenticator app like 1Password, Bitwarden, or Google Authenticator.
             </p>
@@ -113,7 +113,7 @@ export default function SettingsPage() {
 
         {enrollment && (
           <div className="space-y-4">
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-[var(--color-text-secondary)]">
               Scan the QR code with your authenticator app, then enter the
               6-digit code below to confirm.
             </p>
@@ -121,9 +121,9 @@ export default function SettingsPage() {
               className="mx-auto h-48 w-48 [&_svg]:h-full [&_svg]:w-full"
               dangerouslySetInnerHTML={{ __html: enrollment.qr_svg }}
             />
-            <details className="text-sm text-slate-600">
+            <details className="text-sm text-[var(--color-text-secondary)]">
               <summary className="cursor-pointer">Can't scan? Show secret</summary>
-              <code className="mt-2 block break-all rounded bg-slate-100 p-2 font-mono text-xs">
+              <code className="mt-2 block break-all rounded bg-[var(--color-bg-inset)] p-2 font-mono text-xs">
                 {enrollment.secret}
               </code>
             </details>
@@ -137,7 +137,7 @@ export default function SettingsPage() {
                 placeholder="123456"
                 className="input font-mono"
               />
-              {error && <p className="text-sm text-red-600">{error}</p>}
+              {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
               <button
                 type="submit"
                 disabled={busy || !code}
@@ -162,12 +162,12 @@ export default function SettingsPage() {
 
         {recoveryCodes && (
           <div className="space-y-3">
-            <p className="text-sm font-medium text-amber-900">
+            <p className="text-sm font-medium text-amber-300">
               Save these recovery codes somewhere safe. They will not be shown
               again — each one works once if you lose access to your
               authenticator.
             </p>
-            <ul className="grid grid-cols-2 gap-2 rounded-lg bg-amber-50 p-3 font-mono text-sm text-amber-900">
+            <ul className="grid grid-cols-2 gap-2 rounded-lg bg-amber-500/15 p-3 font-mono text-sm text-amber-300">
               {recoveryCodes.map((c) => (
                 <li key={c}>{c}</li>
               ))}
@@ -183,7 +183,7 @@ export default function SettingsPage() {
 
         {user?.totp_enabled && !recoveryCodes && (
           <form onSubmit={onDisable} className="space-y-3">
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-[var(--color-text-secondary)]">
               To turn 2FA off, enter a current authenticator code or a recovery code.
             </p>
             <input
@@ -193,7 +193,7 @@ export default function SettingsPage() {
               placeholder="123456"
               className="input font-mono"
             />
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
             <button
               type="submit"
               disabled={busy || !code}
@@ -274,23 +274,23 @@ function ApiTokensSection() {
   }
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h3 className="mb-1 text-base font-semibold text-slate-900">
+    <section className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-6 shadow-sm">
+      <h3 className="mb-1 text-base font-semibold text-[var(--color-text-primary)]">
         API tokens
       </h3>
-      <p className="mb-4 text-sm text-slate-600">
+      <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
         Let an app authenticate to your home stack without your password — for
         example, the document scanner uploading a scan to your calendar. Paste
         the token into the app once; revoke it here to cut access.
       </p>
 
       {freshToken && (
-        <div className="mb-4 space-y-2 rounded-lg bg-amber-50 p-3">
-          <p className="text-sm font-medium text-amber-900">
+        <div className="mb-4 space-y-2 rounded-lg bg-amber-500/15 p-3">
+          <p className="text-sm font-medium text-amber-300">
             Copy this token now — it won't be shown again.
           </p>
           <div className="flex items-center gap-2">
-            <code className="flex-1 break-all rounded bg-white p-2 font-mono text-xs text-slate-800">
+            <code className="flex-1 break-all rounded bg-[var(--color-bg-elevated)] p-2 font-mono text-xs text-[var(--color-text-primary)]">
               {freshToken}
             </code>
             <button onClick={onCopy} className="btn btn-secondary text-xs">
@@ -307,24 +307,24 @@ function ApiTokensSection() {
       )}
 
       {tokens === null ? (
-        <p className="text-sm text-slate-500">Loading…</p>
+        <p className="text-sm text-[var(--color-text-muted)]">Loading…</p>
       ) : tokens.length === 0 ? (
-        <p className="mb-4 text-sm text-slate-500">No tokens yet.</p>
+        <p className="mb-4 text-sm text-[var(--color-text-muted)]">No tokens yet.</p>
       ) : (
-        <ul className="mb-4 divide-y divide-slate-100">
+        <ul className="mb-4 divide-y divide-[var(--color-border)]">
           {tokens.map((t) => (
             <li
               key={t.id}
               className="flex items-center justify-between py-2 text-sm"
             >
               <div>
-                <div className="font-medium text-slate-900">
+                <div className="font-medium text-[var(--color-text-primary)]">
                   {t.name}{' '}
-                  <span className="font-mono text-xs text-slate-400">
+                  <span className="font-mono text-xs text-[var(--color-text-muted)]">
                     {t.prefix}…
                   </span>
                 </div>
-                <div className="text-xs text-slate-500">
+                <div className="text-xs text-[var(--color-text-muted)]">
                   added {new Date(t.created_at).toLocaleDateString()}
                   {t.last_used_at ? (
                     <> · last used {new Date(t.last_used_at).toLocaleDateString()}</>
@@ -336,7 +336,7 @@ function ApiTokensSection() {
               <button
                 onClick={() => onDelete(t.id)}
                 disabled={busy}
-                className="text-xs text-rose-600 hover:underline disabled:opacity-50"
+                className="text-xs text-[var(--color-danger)] hover:underline disabled:opacity-50"
               >
                 Revoke
               </button>
@@ -347,7 +347,7 @@ function ApiTokensSection() {
 
       <form onSubmit={onCreate} className="flex items-end gap-2">
         <div className="flex-1">
-          <label className="mb-1 block text-xs font-medium text-slate-700">
+          <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
             Name for this app
           </label>
           <input
@@ -361,7 +361,7 @@ function ApiTokensSection() {
           Generate token
         </button>
       </form>
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-sm text-[var(--color-danger)]">{error}</p>}
     </section>
   );
 }
@@ -413,9 +413,9 @@ function PasskeysSection() {
 
   if (!passkeysSupported()) {
     return (
-      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h3 className="mb-2 text-base font-semibold text-slate-900">Passkeys</h3>
-        <p className="text-sm text-slate-600">
+      <section className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-6 shadow-sm">
+        <h3 className="mb-2 text-base font-semibold text-[var(--color-text-primary)]">Passkeys</h3>
+        <p className="text-sm text-[var(--color-text-secondary)]">
           This browser doesn't support WebAuthn. Open the dashboard in a recent
           browser to enroll a passkey.
         </p>
@@ -424,28 +424,28 @@ function PasskeysSection() {
   }
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h3 className="mb-1 text-base font-semibold text-slate-900">Passkeys</h3>
-      <p className="mb-4 text-sm text-slate-600">
+    <section className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-6 shadow-sm">
+      <h3 className="mb-1 text-base font-semibold text-[var(--color-text-primary)]">Passkeys</h3>
+      <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
         Sign in without a password using your device's built-in authenticator
         (Touch ID, Windows Hello, security key, etc.). A passkey alone is a
         strong factor — 2FA isn't asked for again on top of it.
       </p>
 
       {passkeys === null ? (
-        <p className="text-sm text-slate-500">Loading…</p>
+        <p className="text-sm text-[var(--color-text-muted)]">Loading…</p>
       ) : passkeys.length === 0 ? (
-        <p className="mb-4 text-sm text-slate-500">No passkeys yet.</p>
+        <p className="mb-4 text-sm text-[var(--color-text-muted)]">No passkeys yet.</p>
       ) : (
-        <ul className="mb-4 divide-y divide-slate-100">
+        <ul className="mb-4 divide-y divide-[var(--color-border)]">
           {passkeys.map((k) => (
             <li
               key={k.id}
               className="flex items-center justify-between py-2 text-sm"
             >
               <div>
-                <div className="font-medium text-slate-900">{k.name}</div>
-                <div className="text-xs text-slate-500">
+                <div className="font-medium text-[var(--color-text-primary)]">{k.name}</div>
+                <div className="text-xs text-[var(--color-text-muted)]">
                   added {new Date(k.created_at).toLocaleDateString()}
                   {k.last_used_at && (
                     <>
@@ -458,7 +458,7 @@ function PasskeysSection() {
               <button
                 onClick={() => onDelete(k.id)}
                 disabled={busy}
-                className="text-xs text-rose-600 hover:underline disabled:opacity-50"
+                className="text-xs text-[var(--color-danger)] hover:underline disabled:opacity-50"
               >
                 Remove
               </button>
@@ -469,7 +469,7 @@ function PasskeysSection() {
 
       <form onSubmit={onAdd} className="flex items-end gap-2">
         <div className="flex-1">
-          <label className="mb-1 block text-xs font-medium text-slate-700">
+          <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
             Nickname for this device
           </label>
           <input
@@ -487,7 +487,7 @@ function PasskeysSection() {
           Add passkey
         </button>
       </form>
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-sm text-[var(--color-danger)]">{error}</p>}
     </section>
   );
 }

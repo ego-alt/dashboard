@@ -12,7 +12,7 @@ const WARM_MS = 1000;
 // these even for admins; the server is the real backstop (returns 409).
 const PROTECTED = new Set(['dashboard', 'home-nginx']);
 
-const CARD = 'rounded-xl border border-slate-200 bg-white shadow-sm';
+const CARD = 'rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] shadow-sm';
 
 function fmtAge(s) {
   if (s == null) return '—';
@@ -57,16 +57,16 @@ function tempTone(t) {
   return 'slate';
 }
 
-const BAR_FILL = { slate: 'bg-slate-400', amber: 'bg-amber-500', red: 'bg-red-500' };
+const BAR_FILL = { slate: 'bg-[var(--color-text-muted)]', amber: 'bg-amber-500', red: 'bg-red-500' };
 
 function Metric({ label, value, percent, tone = 'slate' }) {
   return (
     <div>
       <div className="flex items-baseline justify-between gap-2">
-        <dt className="text-xs text-slate-500">{label}</dt>
-        <dd className="font-mono text-sm text-slate-900">{value}</dd>
+        <dt className="text-xs text-[var(--color-text-muted)]">{label}</dt>
+        <dd className="font-mono text-sm text-[var(--color-text-primary)]">{value}</dd>
       </div>
-      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-bg-inset)]">
         <div
           className={`h-full rounded-full ${BAR_FILL[tone]}`}
           style={{ width: `${Math.min(100, Math.max(0, percent || 0))}%` }}
@@ -84,12 +84,12 @@ function LiveToggle({ live, onToggle }) {
       onClick={onToggle}
       className={`flex items-center gap-1.5 rounded-md border px-3 py-1 text-sm ${
         live
-          ? 'border-green-300 bg-green-50 text-green-800'
-          : 'border-slate-300 hover:bg-slate-50'
+          ? 'border-green-500/40 bg-green-500/10 text-green-300'
+          : 'border-[var(--color-border)] hover:bg-[var(--color-highlight-soft)]'
       }`}
       title={live ? `Live — refreshing every ${POLL_MS / 1000}s` : 'Paused'}
     >
-      <span className={`h-2 w-2 rounded-full ${live ? 'bg-green-500' : 'bg-slate-400'}`} />
+      <span className={`h-2 w-2 rounded-full ${live ? 'bg-green-500' : 'bg-[var(--color-text-muted)]'}`} />
       {live ? 'Live' : 'Paused'}
     </button>
   );
@@ -125,7 +125,7 @@ function HostSection({ live, hidden, onToggleLive }) {
 
   const heading = (
     <div className="mb-3 flex items-center justify-between">
-      <h3 className="text-base font-semibold text-slate-900">Host</h3>
+      <h3 className="text-base font-semibold text-[var(--color-text-primary)]">Host</h3>
       <LiveToggle live={live} onToggle={onToggleLive} />
     </div>
   );
@@ -134,14 +134,14 @@ function HostSection({ live, hidden, onToggleLive }) {
     return (
       <section className={`${CARD} mb-6 p-4`}>
         {heading}
-        <p className="text-sm text-red-600">{err}</p>
+        <p className="text-sm text-[var(--color-danger)]">{err}</p>
       </section>
     );
   if (!s)
     return (
       <section className={`${CARD} mb-6 p-4`}>
         {heading}
-        <p className="text-sm text-slate-500">Loading…</p>
+        <p className="text-sm text-[var(--color-text-muted)]">Loading…</p>
       </section>
     );
 
@@ -215,12 +215,12 @@ function BackupsSection() {
   const heading = (extra) => (
     <div className="mb-3 flex items-center justify-between">
       <div className="flex items-center gap-3">
-        <h3 className="text-base font-semibold text-slate-900">Backups</h3>
+        <h3 className="text-base font-semibold text-[var(--color-text-primary)]">Backups</h3>
         {extra}
       </div>
       <button
         onClick={load}
-        className="rounded-md border border-slate-300 px-3 py-1 text-sm hover:bg-slate-50"
+        className="rounded-md border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-highlight-soft)]"
       >
         Refresh
       </button>
@@ -231,27 +231,27 @@ function BackupsSection() {
     return (
       <section className={`mt-6 ${CARD} p-4`}>
         {heading()}
-        <p className="text-sm text-red-600">{err}</p>
+        <p className="text-sm text-[var(--color-danger)]">{err}</p>
       </section>
     );
   if (!s)
     return (
       <section className={`mt-6 ${CARD} p-4`}>
         {heading()}
-        <p className="text-sm text-slate-500">Loading…</p>
+        <p className="text-sm text-[var(--color-text-muted)]">Loading…</p>
       </section>
     );
   if (!s.available)
     return (
       <section className={`mt-6 ${CARD} p-4`}>
         {heading()}
-        <p className="text-sm text-slate-500">No backup has run yet.</p>
+        <p className="text-sm text-[var(--color-text-muted)]">No backup has run yet.</p>
       </section>
     );
 
   const healthy = s.ok && !s.stale;
   const label = !s.ok ? 'failed' : s.stale ? 'stale' : 'healthy';
-  const pill = healthy ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+  const pill = healthy ? 'bg-green-500/15 text-green-300' : 'bg-red-500/15 text-red-300';
 
   return (
     <section className={`mt-6 ${CARD} p-4`}>
@@ -266,7 +266,7 @@ function BackupsSection() {
             <span
               key={d.app}
               className={`rounded-full px-2 py-0.5 text-xs ${
-                d.ok ? 'bg-slate-100 text-slate-700' : 'bg-red-100 text-red-800'
+                d.ok ? 'bg-[var(--color-bg-inset)] text-[var(--color-text-secondary)]' : 'bg-red-500/15 text-red-300'
               }`}
             >
               {d.app} {d.ok ? '✓' : '✗'}
@@ -276,26 +276,26 @@ function BackupsSection() {
       )}
       <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-4">
         <div>
-          <dt className="text-slate-500">Last run</dt>
-          <dd className="text-slate-900">{fmtAge(s.age_seconds)}</dd>
+          <dt className="text-[var(--color-text-muted)]">Last run</dt>
+          <dd className="text-[var(--color-text-primary)]">{fmtAge(s.age_seconds)}</dd>
         </div>
         <div>
-          <dt className="text-slate-500">Duration</dt>
-          <dd className="text-slate-900">
+          <dt className="text-[var(--color-text-muted)]">Duration</dt>
+          <dd className="text-[var(--color-text-primary)]">
             {s.duration_seconds != null ? `${s.duration_seconds}s` : '—'}
           </dd>
         </div>
         <div>
-          <dt className="text-slate-500">Snapshots</dt>
-          <dd className="text-slate-900">{s.snapshot_count ?? '—'}</dd>
+          <dt className="text-[var(--color-text-muted)]">Snapshots</dt>
+          <dd className="text-[var(--color-text-primary)]">{s.snapshot_count ?? '—'}</dd>
         </div>
         <div>
-          <dt className="text-slate-500">Repo size</dt>
-          <dd className="text-slate-900">{fmtBytes(s.repo_bytes)}</dd>
+          <dt className="text-[var(--color-text-muted)]">Repo size</dt>
+          <dd className="text-[var(--color-text-primary)]">{fmtBytes(s.repo_bytes)}</dd>
         </div>
       </dl>
       {!healthy && (
-        <p className="mt-3 text-sm text-red-600">
+        <p className="mt-3 text-sm text-[var(--color-danger)]">
           {s.error || 'Last backup is stale — check the timer on the Pi.'}
         </p>
       )}
@@ -428,22 +428,22 @@ export default function MonitorPage() {
 
   return (
     <div>
-      <h2 className="mb-4 text-lg font-semibold text-slate-900">Monitor</h2>
+      <h2 className="mb-4 text-lg font-semibold text-[var(--color-text-primary)]">Monitor</h2>
 
       <HostSection live={live} hidden={hidden} onToggleLive={() => setLive((v) => !v)} />
 
       <section className={`${CARD} overflow-hidden`}>
-        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-          <h3 className="text-base font-semibold text-slate-900">Containers</h3>
+        <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
+          <h3 className="text-base font-semibold text-[var(--color-text-primary)]">Containers</h3>
           <LiveToggle live={live} onToggle={() => setLive((v) => !v)} />
         </div>
-        {error && <p className="px-4 pt-3 text-sm text-red-600">{error}</p>}
+        {error && <p className="px-4 pt-3 text-sm text-[var(--color-danger)]">{error}</p>}
         {loading ? (
-          <p className="px-4 py-6 text-slate-500">Loading containers…</p>
+          <p className="px-4 py-6 text-[var(--color-text-muted)]">Loading containers…</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 text-left text-slate-500">
+              <thead className="bg-[var(--color-bg-inset)] text-left text-[var(--color-text-muted)]">
                 <tr>
                   <th className="px-4 py-2 font-medium">Name</th>
                   <th className="px-4 py-2 font-medium">Status</th>
@@ -454,41 +454,41 @@ export default function MonitorPage() {
                   <th className="px-4 py-2"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[var(--color-border)]">
                 {containers.map((c) => {
                   const protectedC = PROTECTED.has(c.name);
                   return (
-                    <tr key={c.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-2 font-mono text-slate-800">{c.name}</td>
+                    <tr key={c.id} className="hover:bg-[var(--color-highlight-soft)]">
+                      <td className="px-4 py-2 font-mono text-[var(--color-text-primary)]">{c.name}</td>
                       <td className="px-4 py-2">
                         <span
                           className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                             c.status === 'running'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-slate-200 text-slate-700'
+                              ? 'bg-green-500/15 text-green-300'
+                              : 'bg-[var(--color-bg-inset)] text-[var(--color-text-secondary)]'
                           }`}
                         >
                           {c.status}
                         </span>
                       </td>
-                      <td className="px-4 py-2 text-slate-700">
+                      <td className="px-4 py-2 text-[var(--color-text-secondary)]">
                         {statsPending && c.status === 'running' && c.cpu_percent == null
                           ? '…'
                           : (c.cpu_percent ?? '—')}
                       </td>
-                      <td className="px-4 py-2 text-slate-700">
+                      <td className="px-4 py-2 text-[var(--color-text-secondary)]">
                         {statsPending && c.status === 'running' && c.mem_used_mb == null
                           ? '…'
                           : fmtMem(c)}
                       </td>
-                      <td className="px-4 py-2 text-slate-700">
+                      <td className="px-4 py-2 text-[var(--color-text-secondary)]">
                         {statsPending && c.status === 'running' && c.rx_rate_kbs == null
                           ? '…'
                           : c.status === 'running'
                             ? fmtRate(c.rx_rate_kbs)
                             : '—'}
                       </td>
-                      <td className="px-4 py-2 text-slate-700">
+                      <td className="px-4 py-2 text-[var(--color-text-secondary)]">
                         {statsPending && c.status === 'running' && c.tx_rate_kbs == null
                           ? '…'
                           : c.status === 'running'
@@ -497,18 +497,18 @@ export default function MonitorPage() {
                       </td>
                       <td className="px-4 py-2 text-right whitespace-nowrap">
                         {!isAdmin ? null : protectedC ? (
-                          <span className="text-xs text-slate-400">protected</span>
+                          <span className="text-xs text-[var(--color-text-muted)]">protected</span>
                         ) : (
                           <>
                             <button
                               onClick={() => action(c, 'stop')}
-                              className="mr-3 text-xs text-slate-600 hover:text-slate-900"
+                              className="mr-3 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
                             >
                               Stop
                             </button>
                             <button
                               onClick={() => action(c, 'restart')}
-                              className="text-xs text-slate-600 hover:text-slate-900"
+                              className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
                             >
                               Restart
                             </button>
@@ -520,7 +520,7 @@ export default function MonitorPage() {
                 })}
                 {containers.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-6 text-center text-slate-400">
+                    <td colSpan={7} className="px-4 py-6 text-center text-[var(--color-text-muted)]">
                       No containers
                     </td>
                   </tr>

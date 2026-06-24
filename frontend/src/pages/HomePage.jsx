@@ -20,17 +20,17 @@ export default function HomePage() {
       });
   }, []);
 
-  if (services === null) return <p className="text-slate-500">Loading…</p>;
+  if (services === null)
+    return <p className="bp-label text-sm text-[var(--color-text-muted)]">Loading…</p>;
 
   return (
     <div>
-      <h2 className="mb-4 text-lg font-semibold text-slate-900">Services</h2>
-      {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+      <h2 className="bp-heading mb-5">Services</h2>
+      {error && <p className="mb-3 text-sm text-[var(--color-danger)]">{error}</p>}
       {services.length === 0 ? (
-        <p className="text-sm text-slate-500">
-          No services discovered. Add{' '}
-          <code className="rounded bg-slate-200 px-1 py-0.5">homehub.*</code>{' '}
-          labels to a container in <code className="rounded bg-slate-200 px-1 py-0.5">docker-compose.yml</code>.
+        <p className="text-sm text-[var(--color-text-muted)]">
+          No services discovered. Add <code className="bp-code">homehub.*</code>{' '}
+          labels to a container in <code className="bp-code">docker-compose.yml</code>.
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -38,21 +38,21 @@ export default function HomePage() {
             const st = STATUS[s.status] || { dot: 'bg-slate-400', label: s.status };
             const reachable = s.status === 'running';
             const tile = (
-              <div className="flex h-full flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition group-hover:border-slate-400">
+              <div className="bp-card flex h-full flex-col">
                 <div className="mb-3 flex items-center justify-between">
                   <ServiceIcon
                     icon={s.icon}
                     name={s.display_name}
                     slug={s.slug}
                   />
-                  <span className="flex items-center gap-1.5 text-xs text-slate-500">
+                  <span className="bp-label flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
                     <span className={`h-2 w-2 rounded-full ${st.dot}`} />
                     {st.label}
                   </span>
                 </div>
-                <div className="font-medium text-slate-900">{s.display_name}</div>
+                <div className="font-medium text-[var(--color-text-primary)]">{s.display_name}</div>
                 {s.description && (
-                  <div className="mt-1 text-sm text-slate-500">{s.description}</div>
+                  <div className="mt-1 text-sm text-[var(--color-text-muted)]">{s.description}</div>
                 )}
               </div>
             );

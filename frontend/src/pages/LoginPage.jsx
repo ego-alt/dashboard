@@ -81,10 +81,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
-      <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-        <h1 className="mb-1 text-xl font-semibold text-slate-900">Home</h1>
-        <p className="mb-6 text-sm text-slate-500">
+    <div className="flex min-h-screen items-center justify-center bg-[var(--color-bg-inset)] px-4">
+      <div className="w-full max-w-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-8 shadow-sm">
+        <h1 className="mb-1 text-xl font-semibold text-[var(--color-text-primary)]">Home</h1>
+        <p className="mb-6 text-sm text-[var(--color-text-muted)]">
           {stage === 'credentials'
             ? 'Sign in to continue.'
             : 'Enter the 6-digit code from your authenticator app, or a recovery code.'}
@@ -93,7 +93,7 @@ export default function LoginPage() {
         {stage === 'credentials' && (
           <form onSubmit={onCredentialsSubmit} className="space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
+              <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">
                 Username
               </label>
               <input
@@ -105,7 +105,7 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
+              <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">
                 Password
               </label>
               <input
@@ -116,7 +116,7 @@ export default function LoginPage() {
                 className="input"
               />
             </div>
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
             <button
               type="submit"
               disabled={busy || !username || !password}
@@ -126,10 +126,10 @@ export default function LoginPage() {
             </button>
             {passkeysSupported() && (
               <>
-                <div className="my-2 flex items-center gap-3 text-xs text-slate-400">
-                  <span className="h-px flex-1 bg-slate-200" />
+                <div className="my-2 flex items-center gap-3 text-xs text-[var(--color-text-muted)]">
+                  <span className="h-px flex-1 bg-[var(--color-bg-inset)]" />
                   or
-                  <span className="h-px flex-1 bg-slate-200" />
+                  <span className="h-px flex-1 bg-[var(--color-bg-inset)]" />
                 </div>
                 <button
                   type="button"
@@ -147,7 +147,7 @@ export default function LoginPage() {
         {stage === 'totp' && (
           <form onSubmit={onTotpSubmit} className="space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
+              <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">
                 Code
               </label>
               <input
@@ -160,7 +160,7 @@ export default function LoginPage() {
                 placeholder="123456"
               />
             </div>
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
             <button
               type="submit"
               disabled={busy || !code}

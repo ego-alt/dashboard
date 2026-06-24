@@ -1,26 +1,31 @@
 @import "tailwindcss";
 
-/* Home-stack design tokens — slate palette. Role names match the shared spec
- * (see ../../docs/ui-spec.md). Tailwind v4 reads these natively, and the .btn
- * primitives below source from them too. */
+/* Home-stack dashboard — "blueprint" skin (slate-blue drafting field). Role names
+ * match the shared spec (../../docs/ui-spec.md); the .btn / .input primitives and
+ * the React pages source from these tokens, so the whole skin lives in this file. */
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 
-  --color-bg-base: #f8fafc;            /* slate-50 */
-  --color-bg-elevated: #ffffff;
-  --color-bg-inset: #f1f5f9;           /* slate-100 */
-  --color-bg-overlay: rgba(15, 23, 42, 0.7);
-  --color-border: #e2e8f0;             /* slate-200 */
-  --color-text-primary: #0f172a;       /* slate-900 */
-  --color-text-secondary: #334155;     /* slate-700 */
-  --color-text-muted: #64748b;         /* slate-500 */
-  --color-accent: #0f172a;             /* slate-900 — dashboard's primary */
-  --color-accent-hover: #1e293b;       /* slate-800 */
-  --color-on-accent: #ffffff;          /* text on accent / danger fills */
-  --color-on-accent-hover: #ffffff;
-  --color-danger: #e11d48;             /* rose-600 */
-  --color-danger-hover: #be123c;       /* rose-700 */
-  --color-highlight-soft: #f1f5f9;     /* alias for hover bg */
+  --color-bg-base: #182230;            /* deep slate-blue drafting field */
+  --color-bg-elevated: #1f2c3c;        /* panels / cards */
+  --color-bg-inset: #141d28;
+  --color-bg-overlay: rgba(10, 16, 24, 0.72);
+  --color-border: #35485e;             /* slate structural line */
+  --color-text-primary: #d4dde8;       /* soft slate-200 */
+  --color-text-secondary: #a4b3c4;
+  --color-text-muted: #6c7e93;         /* dimmed annotation */
+  --color-accent: #6f9bc4;             /* slate-blue / steel "ink" */
+  --color-accent-hover: #8fb4d8;
+  --color-on-accent: #0f1a26;          /* dark text on accent fills */
+  --color-on-accent-hover: #0f1a26;
+  --color-danger: #e0697d;             /* muted rose — legible on slate */
+  --color-danger-hover: #cf5570;
+  --color-highlight-soft: rgba(111, 155, 196, 0.10);
+
+  /* Drafting grid — a fine minor grid with a heavier major line every 5 cells. */
+  --grid-line: rgba(148, 163, 184, 0.05);
+  --grid-major: rgba(148, 163, 184, 0.10);
+  --grid-cell: 26px;
 
   --space-2: 8px;
   --space-3: 12px;
@@ -45,10 +50,92 @@ body,
 
 body {
   margin: 0;
+  background-color: var(--color-bg-base);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  /* graph-paper grid: minor + major lines layered */
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px);
+  background-size:
+    var(--grid-cell) var(--grid-cell),
+    var(--grid-cell) var(--grid-cell),
+    calc(var(--grid-cell) * 5) calc(var(--grid-cell) * 5),
+    calc(var(--grid-cell) * 5) calc(var(--grid-cell) * 5);
+  background-position: -1px -1px;
 }
 
-/* Shared button + input primitives (see docs/ui-spec.md). The Flask apps carry
- * these in their structural.css; here they back the migrated React pages. */
+/* --- blueprint primitives --------------------------------------------- */
+
+/* A drafting "frame": 1px structural border + accent corner ticks (top-left,
+ * bottom-right), brightening on hover. The blueprint character is carried by the
+ * grid, borders and ticks — not by the typography. */
+.bp-card {
+  position: relative;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-5);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+.bp-card::before,
+.bp-card::after {
+  content: "";
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  border-color: var(--color-accent);
+  pointer-events: none;
+}
+.bp-card::before { top: -1px; left: -1px; border-top: 1px solid; border-left: 1px solid; }
+.bp-card::after { bottom: -1px; right: -1px; border-bottom: 1px solid; border-right: 1px solid; }
+.bp-card:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 55%, var(--color-border));
+  box-shadow: 0 0 24px -12px var(--color-accent);
+}
+
+.bp-heading {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.bp-code {
+  font-family: var(--font-mono);
+  background: var(--color-bg-inset);
+  color: var(--color-accent);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+}
+
+/* Top bar + nav. */
+.bp-topbar {
+  border-bottom: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-bg-elevated) 82%, transparent);
+  backdrop-filter: blur(6px);
+}
+.bp-brand {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.bp-nav-link {
+  font-size: var(--text-sm);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  color: var(--color-text-muted);
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.bp-nav-link:hover { color: var(--color-text-primary); background: var(--color-highlight-soft); }
+.bp-nav-link-active {
+  color: var(--color-accent);
+  border-color: var(--color-border);
+  background: var(--color-highlight-soft);
+}
+
+/* --- shared button + input primitives (token-driven) ------------------ */
 .btn {
     display: inline-flex;
     align-items: center;
@@ -66,7 +153,7 @@ body {
 .btn-primary   { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-on-accent); }
 .btn-primary:hover:not(:disabled) { background: var(--color-accent-hover); border-color: var(--color-accent-hover); color: var(--color-on-accent-hover); }
 .btn-secondary { background: transparent; border-color: var(--color-border); color: var(--color-text-secondary); }
-.btn-secondary:hover:not(:disabled) { background: var(--color-highlight-soft); border-color: var(--color-border); color: var(--color-text-primary); }
+.btn-secondary:hover:not(:disabled) { background: var(--color-highlight-soft); border-color: var(--color-accent); color: var(--color-text-primary); }
 .btn-danger    { background: var(--color-danger); border-color: var(--color-danger); color: var(--color-on-accent); }
 .btn-danger:hover:not(:disabled) { background: var(--color-danger-hover); border-color: var(--color-danger-hover); color: var(--color-on-accent-hover); }
 .btn-ghost     { background: transparent; border-color: transparent; color: var(--color-text-muted); padding: var(--space-2); }

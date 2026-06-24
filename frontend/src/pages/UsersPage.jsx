@@ -104,20 +104,20 @@ export default function UsersPage() {
     }
   }
 
-  if (loading) return <p className="text-slate-500">Loading users…</p>;
+  if (loading) return <p className="text-[var(--color-text-muted)]">Loading users…</p>;
 
   const inputCls =
-    'mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm text-slate-900';
-  const fieldCls = 'flex w-full flex-col text-xs text-slate-500 sm:w-44';
+    'mt-1 w-full rounded-md border border-[var(--color-border)] px-2 py-1 text-sm text-[var(--color-text-primary)]';
+  const fieldCls = 'flex w-full flex-col text-xs text-[var(--color-text-muted)] sm:w-44';
 
   return (
     <div>
-      <h2 className="mb-4 text-lg font-semibold text-slate-900">Users</h2>
-      {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+      <h2 className="mb-4 text-lg font-semibold text-[var(--color-text-primary)]">Users</h2>
+      {error && <p className="mb-3 text-sm text-[var(--color-danger)]">{error}</p>}
 
       <form
         onSubmit={onCreate}
-        className="mb-6 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:flex-row sm:flex-wrap sm:items-end"
+        className="mb-6 flex flex-col gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-4 sm:flex-row sm:flex-wrap sm:items-end"
       >
         <label className={fieldCls}>
           Username
@@ -148,7 +148,7 @@ export default function UsersPage() {
         </label>
         <label className={fieldCls}>
           <span aria-hidden="true" className="hidden sm:block">&nbsp;</span>
-          <span className="mt-1 flex h-[30px] items-center gap-2 text-sm text-slate-700">
+          <span className="mt-1 flex h-[30px] items-center gap-2 text-sm text-[var(--color-text-secondary)]">
             <input
               type="checkbox"
               checked={form.is_admin}
@@ -160,15 +160,15 @@ export default function UsersPage() {
         <button
           type="submit"
           disabled={creating}
-          className="w-full rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-700 disabled:opacity-50 sm:w-auto"
+          className="w-full rounded-md bg-[var(--color-bg-inset)] px-3 py-1.5 text-sm text-white hover:bg-[var(--color-highlight-soft)] disabled:opacity-50 sm:w-auto"
         >
           {creating ? 'Adding…' : 'Add user'}
         </button>
       </form>
 
-      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+      <div className="overflow-x-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)]">
         <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-left text-slate-500">
+          <thead className="bg-[var(--color-bg-inset)] text-left text-[var(--color-text-muted)]">
             <tr>
               <th className="px-4 py-2 font-medium">Username</th>
               <th className="px-4 py-2 font-medium">Name</th>
@@ -178,17 +178,17 @@ export default function UsersPage() {
               <th className="px-4 py-2"></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-[var(--color-border)]">
             {users.map((u) => {
               const self = u.id === me?.id;
               return (
-                <tr key={u.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-2 text-slate-700">
+                <tr key={u.id} className="hover:bg-[var(--color-highlight-soft)]">
+                  <td className="px-4 py-2 text-[var(--color-text-secondary)]">
                     @{u.username}
-                    {self && <span className="text-xs text-slate-400"> · you</span>}
+                    {self && <span className="text-xs text-[var(--color-text-muted)]"> · you</span>}
                   </td>
-                  <td className="px-4 py-2 text-slate-900">
-                    {u.display_name || <span className="text-slate-400">—</span>}
+                  <td className="px-4 py-2 text-[var(--color-text-primary)]">
+                    {u.display_name || <span className="text-[var(--color-text-muted)]">—</span>}
                   </td>
                   <td className="px-4 py-2">
                     <input
@@ -201,10 +201,10 @@ export default function UsersPage() {
                       className="disabled:opacity-40"
                     />
                   </td>
-                  <td className="px-4 py-2 text-slate-700">
+                  <td className="px-4 py-2 text-[var(--color-text-secondary)]">
                     {u.totp_enabled ? 'on' : '—'}
                   </td>
-                  <td className="px-4 py-2 text-slate-500">
+                  <td className="px-4 py-2 text-[var(--color-text-muted)]">
                     {u.last_login_at
                       ? new Date(u.last_login_at).toLocaleString()
                       : '—'}
@@ -212,14 +212,14 @@ export default function UsersPage() {
                   <td className="px-4 py-2 text-right whitespace-nowrap">
                     <button
                       onClick={() => resetPassword(u)}
-                      className="mr-3 text-xs text-slate-600 hover:text-slate-900"
+                      className="mr-3 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
                     >
                       Password
                     </button>
                     {u.totp_enabled && (
                       <button
                         onClick={() => reset2fa(u)}
-                        className="mr-3 text-xs text-slate-600 hover:text-slate-900"
+                        className="mr-3 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
                       >
                         Reset 2FA
                       </button>
@@ -227,7 +227,7 @@ export default function UsersPage() {
                     <button
                       onClick={() => remove(u)}
                       disabled={self}
-                      className="text-xs text-red-600 hover:text-red-800 disabled:text-slate-300"
+                      className="text-xs text-[var(--color-danger)] hover:text-red-300 disabled:text-[var(--color-text-muted)]"
                     >
                       Delete
                     </button>
@@ -237,7 +237,7 @@ export default function UsersPage() {
             })}
             {users.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={6} className="px-4 py-6 text-center text-[var(--color-text-muted)]">
                   No users
                 </td>
               </tr>

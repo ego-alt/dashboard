@@ -39,7 +39,7 @@ export function useAuth() {
 
 function Centered({ children }) {
   return (
-    <div className="flex min-h-screen items-center justify-center text-slate-500">
+    <div className="flex min-h-screen items-center justify-center text-[var(--color-text-muted)]">
       {children}
     </div>
   );
