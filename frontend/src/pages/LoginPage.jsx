@@ -82,7 +82,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--color-bg-inset)] px-4">
-      <div className="w-full max-w-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-8 shadow-sm">
+      <div className="w-full max-w-sm bp-card p-8">
         <h1 className="mb-1 text-xl font-semibold text-[var(--color-text-primary)]">Home</h1>
         <p className="mb-6 text-sm text-[var(--color-text-muted)]">
           {stage === 'credentials'

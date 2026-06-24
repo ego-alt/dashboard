@@ -12,7 +12,7 @@ const WARM_MS = 1000;
 // these even for admins; the server is the real backstop (returns 409).
 const PROTECTED = new Set(['dashboard', 'home-nginx']);
 
-const CARD = 'rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] shadow-sm';
+const CARD = 'bp-card';
 
 function fmtAge(s) {
   if (s == null) return '—';

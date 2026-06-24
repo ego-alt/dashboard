@@ -117,7 +117,7 @@ export default function UsersPage() {
 
       <form
         onSubmit={onCreate}
-        className="mb-6 flex flex-col gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-4 sm:flex-row sm:flex-wrap sm:items-end"
+        className="mb-6 flex flex-col gap-3 bp-card p-4 sm:flex-row sm:flex-wrap sm:items-end"
       >
         <label className={fieldCls}>
           Username
@@ -166,7 +166,7 @@ export default function UsersPage() {
         </button>
       </form>
 
-      <div className="overflow-x-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)]">
+      <div className="overflow-x-auto bp-card">
         <table className="min-w-full text-sm">
           <thead className="bg-[var(--color-bg-inset)] text-left text-[var(--color-text-muted)]">
             <tr>

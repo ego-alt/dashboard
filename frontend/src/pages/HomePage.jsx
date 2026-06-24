@@ -38,7 +38,7 @@ export default function HomePage() {
             const st = STATUS[s.status] || { dot: 'bg-slate-400', label: s.status };
             const reachable = s.status === 'running';
             const tile = (
-              <div className="bp-card flex h-full flex-col">
+              <div className={`bp-card bp-ticks flex h-full flex-col p-5 ${reachable ? 'bp-card-link' : ''}`}>
                 <div className="mb-3 flex items-center justify-between">
                   <ServiceIcon
                     icon={s.icon}

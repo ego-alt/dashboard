@@ -77,11 +77,11 @@ body {
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  padding: var(--space-5);
   transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
-.bp-card::before,
-.bp-card::after {
+/* Corner ticks — opt-in via .bp-ticks (the Services tiles), not on every panel. */
+.bp-ticks::before,
+.bp-ticks::after {
   content: "";
   position: absolute;
   width: 11px;
@@ -89,9 +89,12 @@ body {
   border-color: var(--color-accent);
   pointer-events: none;
 }
-.bp-card::before { top: -1px; left: -1px; border-top: 1px solid; border-left: 1px solid; }
-.bp-card::after { bottom: -1px; right: -1px; border-bottom: 1px solid; border-right: 1px solid; }
-.bp-card:hover {
+.bp-ticks::before { top: -1px; left: -1px; border-top: 1px solid; border-left: 1px solid; }
+.bp-ticks::after { bottom: -1px; right: -1px; border-bottom: 1px solid; border-right: 1px solid; }
+/* Interactive variant — only genuinely clickable tiles brighten + glow on hover.
+ * Static panels use plain .bp-card so they don't pretend to be clickable. */
+.bp-card-link { cursor: pointer; }
+.bp-card-link:hover {
   border-color: color-mix(in srgb, var(--color-accent) 55%, var(--color-border));
   box-shadow: 0 0 24px -12px var(--color-accent);
 }
