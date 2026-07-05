@@ -106,8 +106,7 @@ export default function UsersPage() {
 
   if (loading) return <p className="text-[var(--color-text-muted)]">Loading users…</p>;
 
-  const inputCls =
-    'mt-1 w-full rounded-md border border-[var(--color-border)] px-2 py-1 text-sm text-[var(--color-text-primary)]';
+  const inputCls = 'input mt-1';
   const fieldCls = 'flex w-full flex-col text-xs text-[var(--color-text-muted)] sm:w-44';
 
   return (

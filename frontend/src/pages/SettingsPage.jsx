@@ -347,7 +347,7 @@ function ApiTokensSection() {
 
       <form onSubmit={onCreate} className="flex items-end gap-2">
         <div className="flex-1">
-          <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
+          <label className="mb-1 block text-xs text-[var(--color-text-muted)]">
             Name for this app
           </label>
           <input
@@ -469,7 +469,7 @@ function PasskeysSection() {
 
       <form onSubmit={onAdd} className="flex items-end gap-2">
         <div className="flex-1">
-          <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
+          <label className="mb-1 block text-xs text-[var(--color-text-muted)]">
             Nickname for this device
           </label>
           <input
