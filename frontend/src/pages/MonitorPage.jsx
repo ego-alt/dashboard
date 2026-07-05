@@ -216,7 +216,7 @@ function BackupsSection() {
         <h3 className="text-base font-semibold text-[var(--color-text-primary)]">Backups</h3>
         {extra}
       </div>
-      <button onClick={load} className="btn btn-secondary text-sm">
+      <button onClick={load} className="btn btn-primary text-sm">
         Refresh
       </button>
     </div>
