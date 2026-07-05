@@ -160,7 +160,7 @@ export default function UsersPage() {
         <button
           type="submit"
           disabled={creating}
-          className="w-full rounded-md bg-[var(--color-bg-inset)] px-3 py-1.5 text-sm text-white hover:bg-[var(--color-highlight-soft)] disabled:opacity-50 sm:w-auto"
+          className="btn btn-primary w-full text-sm sm:w-auto"
         >
           {creating ? 'Adding…' : 'Add user'}
         </button>
@@ -212,14 +212,14 @@ export default function UsersPage() {
                   <td className="px-4 py-2 text-right whitespace-nowrap">
                     <button
                       onClick={() => resetPassword(u)}
-                      className="mr-3 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                      className="btn-link mr-3 text-xs"
                     >
                       Password
                     </button>
                     {u.totp_enabled && (
                       <button
                         onClick={() => reset2fa(u)}
-                        className="mr-3 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                        className="btn-link mr-3 text-xs"
                       >
                         Reset 2FA
                       </button>
@@ -227,7 +227,7 @@ export default function UsersPage() {
                     <button
                       onClick={() => remove(u)}
                       disabled={self}
-                      className="text-xs text-[var(--color-danger)] hover:text-red-300 disabled:text-[var(--color-text-muted)]"
+                      className="btn-link btn-link-danger text-xs"
                     >
                       Delete
                     </button>

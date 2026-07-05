@@ -82,10 +82,8 @@ function LiveToggle({ live, onToggle }) {
   return (
     <button
       onClick={onToggle}
-      className={`flex items-center gap-1.5 rounded-md border px-3 py-1 text-sm ${
-        live
-          ? 'border-green-500/40 bg-green-500/10 text-green-300'
-          : 'border-[var(--color-border)] hover:bg-[var(--color-highlight-soft)]'
+      className={`btn text-sm ${
+        live ? 'border-green-500/40 bg-green-500/10 text-green-300' : 'btn-secondary'
       }`}
       title={live ? `Live — refreshing every ${POLL_MS / 1000}s` : 'Paused'}
     >
@@ -218,10 +216,7 @@ function BackupsSection() {
         <h3 className="text-base font-semibold text-[var(--color-text-primary)]">Backups</h3>
         {extra}
       </div>
-      <button
-        onClick={load}
-        className="rounded-md border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-highlight-soft)]"
-      >
+      <button onClick={load} className="btn btn-secondary text-sm">
         Refresh
       </button>
     </div>
@@ -502,13 +497,13 @@ export default function MonitorPage() {
                           <>
                             <button
                               onClick={() => action(c, 'stop')}
-                              className="mr-3 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                              className="btn-link mr-3 text-xs"
                             >
                               Stop
                             </button>
                             <button
                               onClick={() => action(c, 'restart')}
-                              className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                              className="btn-link text-xs"
                             >
                               Restart
                             </button>

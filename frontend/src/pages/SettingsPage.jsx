@@ -336,7 +336,7 @@ function ApiTokensSection() {
               <button
                 onClick={() => onDelete(t.id)}
                 disabled={busy}
-                className="text-xs text-[var(--color-danger)] hover:underline disabled:opacity-50"
+                className="btn-link btn-link-danger text-xs"
               >
                 Revoke
               </button>
@@ -458,7 +458,7 @@ function PasskeysSection() {
               <button
                 onClick={() => onDelete(k.id)}
                 disabled={busy}
-                className="text-xs text-[var(--color-danger)] hover:underline disabled:opacity-50"
+                className="btn-link btn-link-danger text-xs"
               >
                 Remove
               </button>

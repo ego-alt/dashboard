@@ -148,6 +148,8 @@ own CSS (calendar, for instance, keeps monospace inputs over a base surface).
 - **`.btn-secondary`** — alternative action (Cancel, Close).
 - **`.btn-danger`** — destructive (Delete, Disable 2FA).
 - **`.btn-ghost`** — icon-only header buttons; no fill, no border.
+- **`.btn-link`** (+ `-danger`) — bare text actions in table rows / inline
+  lists (Stop, Revoke, Delete). Dashboard-only so far.
 
 Markup pattern: every button gets `class="btn btn-{variant}"`. Layout-only
 classes (`.save-btn`, `.login-button` etc.) can coexist on the same element
@@ -190,8 +192,9 @@ changes rarely. Colours and app-specific extensions diverge freely.
   calendar's Gruvbox palette; calendar keeps monospace inputs as its one
   primitive override.
 - 🟡 **Dashboard** — colour tokens + `.btn`/`.input` in its React global CSS;
-  LoginPage + SettingsPage migrated, HomePage + MonitorPage still on Tailwind
-  utilities (palette flows through the same tokens). Heading conventions not yet
+  buttons on primitives across Login/Settings/Users/Monitor (row actions via
+  `.btn-link`). HomePage tiles and general layout still Tailwind utilities
+  (palette flows through the same tokens). Heading conventions not yet
   enforced.
 
 ## Open questions
