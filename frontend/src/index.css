@@ -27,6 +27,7 @@
   --grid-major: rgba(148, 163, 184, 0.10);
   --grid-cell: 26px;
 
+  --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-5: 20px;
@@ -144,7 +145,7 @@ body {
     align-items: center;
     justify-content: center;
     gap: var(--space-2);
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-1) var(--space-3);
     font: inherit;
     border: 1px solid transparent;
     border-radius: var(--radius-md);

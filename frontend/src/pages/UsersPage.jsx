@@ -160,7 +160,7 @@ export default function UsersPage() {
         <button
           type="submit"
           disabled={creating}
-          className="btn btn-primary w-full text-sm sm:w-auto"
+          className="btn btn-primary w-full text-sm sm:ml-auto sm:w-auto"
         >
           {creating ? 'Adding…' : 'Add user'}
         </button>
