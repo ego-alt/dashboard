@@ -212,6 +212,17 @@ Notable knobs: `SESSION_COOKIE_SECURE`, `DOCKER_GID`,
 stop/restart — default `dashboard,home-nginx`), and `DASHBOARD_API_TARGET`
 (Vite dev-proxy upstream).
 
+## AI assistants (MCP)
+
+[`mcp/`](mcp/) is a Model Context Protocol server, the `mcp` container, that lets
+any MCP client (Claude, ChatGPT, Gemini, Cursor, local models) use the calendar,
+music and library as the signed-in user. Remote clients connect to
+`https://home.local/mcp` and sign in through the dashboard login with OAuth.
+Desktop clients can instead run it locally over stdio with an API token from
+Settings. Connected apps and their activity are listed at `/oauth/connections`.
+Setup: [`mcp/README.md`](mcp/README.md). Design: [`docs/mcp-plan.md`](docs/mcp-plan.md).
+Open findings: [`mcp/AUDIT.md`](mcp/AUDIT.md).
+
 ## Backups
 
 Nightly off-site backup of the whole stack to Google Cloud Storage via

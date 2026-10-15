@@ -110,8 +110,27 @@ restart_service() {
   compose build "$service" && compose up -d "$service" || return 1
   if [[ $name == dashboard ]]; then
     # The dashboard repo also carries docker-compose.yml and the nginx config:
-    # apply compose changes to the other services and reload nginx.
-    compose up -d && docker exec home-nginx nginx -s reload || return 1
+    # apply compose changes to the other services and reload nginx. mcp is
+    # left out here and handled by restart_mcp.
+    local others
+    others=$(compose config --services | grep -vx mcp | tr '\n' ' ')
+    # shellcheck disable=SC2086
+    compose up -d $others && docker exec home-nginx nginx -s reload || return 1
+    restart_mcp
+  fi
+}
+
+# The MCP server lives in the dashboard repo but is its own container. Best
+# effort: a broken mcp build is logged and recorded, never a reason to roll
+# the dashboard back (nginx resolves mcp per request, so nothing else needs it).
+restart_mcp() {
+  local sha
+  sha=$(git -C "$STACK_DIR/dashboard" rev-parse HEAD)
+  if compose build mcp && compose up -d mcp && wait_healthy mcp; then
+    record mcp "$sha" "deployed"
+  else
+    log mcp "${sha:0:7}: mcp didn't build or start healthy; the rest of the stack is unaffected"
+    record mcp "$sha" "failed"
   fi
 }
 

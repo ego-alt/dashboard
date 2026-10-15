@@ -162,3 +162,34 @@ services:
       retries: 3
       start_period: 20s
 
+
+  # MCP server: lets AI assistants (any MCP client) use calendar, music and
+  # library as the signed-in user. See docs/mcp-plan.md and mcp/README.md.
+  # Not in nginx's depends_on: nginx resolves it per request, so a broken
+  # mcp build never takes the rest of the stack down.
+  mcp:
+    build: ./mcp
+    image: mcp:dev
+    container_name: mcp
+    restart: unless-stopped
+    environment:
+      # How clients reach nginx; the OAuth issuer and resource URLs derive from it.
+      MCP_PUBLIC_URL: ${MCP_PUBLIC_URL:-https://home.local}
+      DASHBOARD_URL: http://dashboard:8000
+      CALENDAR_URL: http://calendar:5002
+      TAPES_URL: http://music:5003
+      LIBRARY_URL: http://library:5001
+      TZ: ${TZ:-Europe/London}
+    volumes:
+      # Named volume: Docker seeds it from the image's /data, already owned by
+      # the app user (uid 10001). Holds OAuth grants + the activity log only;
+      # losing it just means reconnecting assistants.
+      - mcp-data:/data
+    expose:
+      - "8100"
+    depends_on:
+      dashboard:
+        condition: service_healthy
+
+volumes:
+  mcp-data:

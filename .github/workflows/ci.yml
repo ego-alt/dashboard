@@ -34,6 +34,26 @@ jobs:
         continue-on-error: true
         run: uvx ruff@0.9.7 check . --output-format github
 
+  mcp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"   # matches mcp/Dockerfile
+          enable-cache: true
+          cache-dependency-glob: mcp/uv.lock
+      - name: Install dependencies
+        run: uv sync --frozen --all-groups
+      - name: Tests
+        run: uv run pytest -q
+      - name: Lint
+        run: uvx ruff@0.9.7 check .
+
   frontend:
     runs-on: ubuntu-latest
     timeout-minutes: 10
