@@ -96,8 +96,8 @@ Tool results include text that you didn't write:
 - track titles from YouTube metadata;
 - book metadata from EPUBs.
 
-A malicious feed could carry instructions aimed at the assistant, which holds
-delete tools.
+A malicious feed could carry instructions aimed at the assistant, which can
+edit your data.
 
 What limits the damage:
 - assistants have **no delete tools** (removed 2026-10-15), so the worst an
@@ -264,8 +264,9 @@ Still open (L):
 - **Setup:** each app ran in proxy mode with throwaway data, behind the full
   OAuth flow.
 - **Coverage:** every tool was exercised, plus as a standard user via an API
-  token. That run confirmed that restricted books stay hidden, delete is
-  refused and each user's diary is separate.
+  token. That run confirmed that restricted books stay hidden, that
+  delete tools don't exist ("Unknown tool") while restores still work, and
+  that each user's diary is separate.
 - **Result:** 0 failures.
 - **stdio:** a smoke test through a stand-in for nginx, with a bad token
   giving a readable error.

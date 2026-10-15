@@ -94,8 +94,11 @@ The Pi **pulls** its deploys; nothing pushes to it. A systemd timer runs
 
 1. fetches the deploy branch (`main` for tapes, `master` for the rest);
 2. stops unless there's a new commit **and** that commit's CI run passed;
-3. fast-forwards, rebuilds and restarts only that service (a dashboard change
-   also re-applies `docker-compose.yml` to the other services and reloads nginx);
+3. fast-forwards, rebuilds and restarts only that service. A dashboard change
+   also re-applies `docker-compose.yml` to the other services, reloads nginx,
+   and rebuilds the `mcp` container. That last step is best-effort: a broken
+   `mcp` shows as `"mcp": "failed"` in the status file and never rolls the
+   dashboard back;
 4. waits for the container's health check. If it doesn't come up healthy, it
    rolls back to the previous commit, rebuilds that, and won't retry the bad
    commit until a newer one lands.
@@ -272,12 +275,13 @@ app/                FastAPI application
   main.py           routes + lifespan + protected-container guard
   cli.py            operator CLI (users, sessions)
 frontend/           React 19 + Vite SPA: login, service-tile home, admin monitor
+mcp/                MCP server for AI assistants (own package + container; see mcp/README.md)
 nginx/conf.d/       Reverse-proxy + auth_request config
 scripts/            dev-certs.sh, sync_household_users.py, restic-backup.sh
   systemd/          restic-backup.{service,timer} for the nightly backup
-docs/               MIGRATION.md, BACKUPS.md (restic → GCS runbook)
+docs/               MIGRATION.md, BACKUPS.md (restic → GCS runbook), mcp-plan.md (MCP design)
 tests/              pytest
 Dockerfile          Multi-stage (Vite build + uv) for the FastAPI service
-docker-compose.yml  nginx + dashboard + library + calendar + music (tapes)
+docker-compose.yml  nginx + dashboard + library + calendar + music (tapes) + mcp
 PLAN.md             Full design rationale + migration roadmap
 ```

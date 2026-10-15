@@ -13,7 +13,9 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 import httpx
+from starlette.responses import PlainTextResponse
 
+from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions, RevocationOptions
 from mcp.server.context import CallNext, HandlerResult, ServerRequestContext
 from mcp.server.mcpserver import MCPServer
@@ -86,8 +88,6 @@ def _first_text(result: Any) -> str | None:
 
 
 def _client_name(store: Store) -> str | None:
-    from mcp.server.auth.middleware.auth_context import get_access_token
-
     token = get_access_token()
     if token is None:
         return None
@@ -161,8 +161,6 @@ def build_server(
 
         @server.custom_route("/healthz", methods=["GET"])
         async def healthz(_request):
-            from starlette.responses import PlainTextResponse
-
             return PlainTextResponse("ok")
 
     return server

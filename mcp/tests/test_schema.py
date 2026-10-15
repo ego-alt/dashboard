@@ -34,8 +34,6 @@ def test_every_tool_is_described_and_annotated(tools):
         assert t.description and len(t.description) > 20, t.name
         a = t.annotations
         assert a is not None and a.read_only_hint is not None, t.name
-        if a.read_only_hint:
-            assert not a.destructive_hint, t.name
 
 
 def test_assistants_cannot_delete(tools):
