@@ -10,7 +10,7 @@ from pydantic import Field
 from mcp.server.mcpserver import MCPServer
 
 from ..backend import AppError
-from ..common import DESTRUCTIVE, FETCH, IDEMPOTENT, READ, WRITE, Deps, capped, current_user, duration
+from ..common import FETCH, IDEMPOTENT, READ, WRITE, Deps, capped, current_user, duration
 
 LIST_LIMIT = 80
 
@@ -129,16 +129,20 @@ def register(server: MCPServer, deps: Deps) -> None:
     async def tapes_get_playlist(
         key: Annotated[str, Field(description="A playlist id like '12', or 'all' / 'singles' / 'tidy'.")],
     ) -> str:
-        tracks = await call("GET", f"/api/playlists/{key.strip()}/tracks")
+        # One past the cap tells us whether there's more, without fetching it all.
+        tracks = await call("GET", f"/api/playlists/{key.strip()}/tracks",
+                            params={"limit": LIST_LIMIT + 1})
         if not tracks:
             return "That playlist is empty."
         lines = []
-        for t in tracks:
+        for t in tracks[:LIST_LIMIT]:
             line = _track(t)
             if t.get("issues"):
                 line += f" · needs: {', '.join(t['issues'])}"
             lines.append(line)
-        return capped(lines, LIST_LIMIT, "Use tapes_search_tracks to find specific songs.")
+        if len(tracks) > LIST_LIMIT:
+            lines.append(f"… more after the first {LIST_LIMIT}. Use tapes_search_tracks to find specific songs.")
+        return "\n".join(lines)
 
     @server.tool(name="tapes_create_playlist", annotations=WRITE,
                  description="Make a new, empty playlist. Returns its id.")
@@ -153,18 +157,6 @@ def register(server: MCPServer, deps: Deps) -> None:
     ) -> str:
         p = await call("PATCH", f"/api/playlists/{playlist_id}", json={"name": name})
         return f"Renamed playlist {p['key']} to '{p['name']}'."
-
-    @server.tool(
-        name="tapes_delete_playlist",
-        annotations=DESTRUCTIVE,
-        description=(
-            "Delete one of the user's playlists. The songs stay in the library. This can't "
-            "be undone, so confirm with the user first."
-        ),
-    )
-    async def tapes_delete_playlist(playlist_id: int) -> str:
-        await call("DELETE", f"/api/playlists/{playlist_id}")
-        return f"Deleted playlist {playlist_id}. Its songs are still in the library."
 
     @server.tool(
         name="tapes_add_to_playlist",
@@ -229,20 +221,8 @@ def register(server: MCPServer, deps: Deps) -> None:
         t = await call("PATCH", f"/api/tracks/{track_id}", json=changes)
         return "Updated " + _track(t)
 
-    @server.tool(
-        name="tapes_delete_track",
-        annotations=DESTRUCTIVE,
-        description=(
-            "Move a song to the trash for everyone (admins only). Undo with "
-            "tapes_restore_track. Confirm with the user first."
-        ),
-    )
-    async def tapes_delete_track(track_id: int) -> str:
-        await call("DELETE", f"/api/tracks/{track_id}")
-        return f"Moved track #{track_id} to the trash. Undo with tapes_restore_track({track_id})."
-
     @server.tool(name="tapes_restore_track", annotations=IDEMPOTENT,
-                 description="Bring a song back from the trash (admins only).")
+                 description="Bring back a song deleted in the music app (admins only, within 30 days).")
     async def tapes_restore_track(track_id: int) -> str:
         t = await call("POST", f"/api/tracks/{track_id}/restore")
         return "Restored " + _track(t)

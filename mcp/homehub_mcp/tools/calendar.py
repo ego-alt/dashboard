@@ -18,7 +18,6 @@ from mcp.server.mcpserver import MCPServer
 
 from ..backend import AppError
 from ..common import (
-    DESTRUCTIVE,
     IDEMPOTENT,
     READ,
     WRITE,
@@ -90,6 +89,22 @@ def _payload(name, start_date, start_time, end_date, end_time, notes, with_who, 
         "notes": notes,
         "with_who": with_who,
         "where": where,
+    }
+
+
+def _as_saved(entry_id: int, body: dict) -> dict:
+    """The entry as the app stores it, built from the body it just accepted:
+    a missing start time is 00:00, a missing end time 23:59 (``read_entry``).
+    Saves a read-back round trip after every write."""
+    end_date = body.get("end_date") or body["start_date"]
+    return {
+        "id": entry_id,
+        "name": body["name"].strip(),
+        "start_time": f"{body['start_date']} {body.get('start_time') or '00:00'}",
+        "end_time": f"{end_date} {body.get('end_time') or '23:59'}",
+        "notes": body.get("notes"),
+        "with_who": body.get("with_who"),
+        "where": body.get("where"),
     }
 
 
@@ -222,10 +237,10 @@ def register(server: MCPServer, deps: Deps) -> None:
         body = _payload(name, start_date, start_time, end_date, end_time, notes, with_who, where)
         if parent_id:
             res = await call("POST", f"/events/{parent_id}/subevents", json=body)
-            e = await fetch(res["id"], "moment")
+            e = _as_saved(res["id"], body)
             return "Added " + _entry_line(e, prefix="moment #") + f" to entry #{parent_id}."
         res = await call("POST", "/events/", json=body)
-        return "Added " + _entry_line(await fetch(res["id"], "entry"))
+        return "Added " + _entry_line(_as_saved(res["id"], body))
 
     @server.tool(
         name="calendar_update_entry",
@@ -291,31 +306,16 @@ def register(server: MCPServer, deps: Deps) -> None:
             body["move_moments"] = True
         path = f"/events/subevents/{id}" if kind == "moment" else f"/events/{id}"
         await call("PUT", path, json=body)
-        e = await fetch(id, kind)
+        e = _as_saved(id, body)
         return "Updated " + (_entry_line(e, prefix="moment #") if kind == "moment" else _entry_line(e))
-
-    @server.tool(
-        name="calendar_delete_entry",
-        annotations=DESTRUCTIVE,
-        description=(
-            "Delete an entry (with its moments) or a single moment. It goes to the trash for "
-            "30 days and can be brought back with calendar_restore_entry. Confirm with the "
-            "user first unless they clearly asked for this deletion."
-        ),
-    )
-    async def calendar_delete_entry(id: int, kind: KindArg = "entry") -> str:
-        cur = await fetch(id, kind)
-        path = f"/events/subevents/{id}" if kind == "moment" else f"/events/{id}"
-        await call("DELETE", path)
-        return (
-            f"Deleted {kind} #{id} ({cur['name']}). Undo within 30 days with "
-            f"calendar_restore_entry(id={id}, kind='{kind}')."
-        )
 
     @server.tool(
         name="calendar_restore_entry",
         annotations=IDEMPOTENT,
-        description="Bring back a deleted entry or moment (within 30 days of deleting it).",
+        description=(
+            "Bring back an entry or moment deleted in the calendar app (within 30 days). "
+            "Assistants can't delete; the user does that in the app."
+        ),
     )
     async def calendar_restore_entry(id: int, kind: KindArg = "entry") -> str:
         path = f"/events/subevents/{id}/restore" if kind == "moment" else f"/events/{id}/restore"

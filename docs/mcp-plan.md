@@ -24,9 +24,10 @@ is in [`mcp/README.md`](../mcp/README.md); findings and missing endpoints are in
   too, at `/oauth/connections`. The dashboard needed no migration.
 - **Results are short text only**, with no `structuredContent`. That is the
   form every client handles the same way.
-- **There are 35 tools.** Compared with §3:
+- **There are 31 tools, with no delete tools** (decided 2026-10-15: deleting
+  stays in the apps; the restore tools remain). Compared with §3:
   - added: `calendar_get_entry`, `tapes_update_track`,
-    `tapes_delete_track` / `tapes_restore_track`, and `homehub_now` (today's
+    `tapes_restore_track`, and `homehub_now` (today's
     date, for models that don't know it);
   - renamed: `tapes_cancel_download` is now `tapes_dismiss_download` (that is
     what the endpoint does);

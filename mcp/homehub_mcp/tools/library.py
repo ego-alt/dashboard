@@ -3,6 +3,7 @@ reading status. Books are identified by their filename."""
 
 from __future__ import annotations
 
+import asyncio
 from typing import Annotated, Literal
 from urllib.parse import quote
 
@@ -10,7 +11,7 @@ from pydantic import Field
 
 from mcp.server.mcpserver import MCPServer
 
-from ..common import DESTRUCTIVE, IDEMPOTENT, READ, Deps, current_user
+from ..common import IDEMPOTENT, READ, Deps, current_user
 
 PAGE = 30  # books per library_list_books page (the app's own batch is 30 too)
 STATUS = {"unread": "Unread", "reading": "In Progress", "finished": "Finished"}
@@ -76,8 +77,9 @@ def register(server: MCPServer, deps: Deps) -> None:
         description="A book's details: title, author, genre, the user's tags, reading status and place.",
     )
     async def library_get_book(filename: FilenameArg) -> str:
-        m = await call("GET", f"/book_metadata/{_f(filename)}")
-        b = await call("GET", f"/bookmark/{_f(filename)}")
+        m, b = await asyncio.gather(
+            call("GET", f"/book_metadata/{_f(filename)}"), call("GET", f"/bookmark/{_f(filename)}")
+        )
         lines = [
             f"{m['title']} · {m.get('author_display') or m['author']}",
             f"filename={m['filename']} · added {m['created_at'][:10]}",
@@ -124,7 +126,12 @@ def register(server: MCPServer, deps: Deps) -> None:
         if genre:
             body["genre"] = genre
         await call("POST", f"/book_metadata/{_f(filename)}", json=body)
-        new = await call("GET", f"/book_metadata/{_f(filename)}")
+        if title or author or genre:
+            # Shared fields are admin-only and silently kept for others: read
+            # back to tell the model which happened.
+            new = await call("GET", f"/book_metadata/{_f(filename)}")
+        else:
+            new = {**cur, "tags": tags, "status": STATUS.get(status, cur["status"])}
         note = ""
         if (title and new["title"] != title) or (author and new["author"] != author):
             note = " (Title/author unchanged: only admins can edit them.)"
@@ -139,23 +146,8 @@ def register(server: MCPServer, deps: Deps) -> None:
         tags = await call("GET", "/tags")
         return ", ".join(tags) or "No tags yet."
 
-    @server.tool(
-        name="library_delete_book",
-        annotations=DESTRUCTIVE,
-        description=(
-            "Move a book to the trash for everyone (admins only). It can be restored with "
-            "library_restore_book for 30 days. Confirm with the user first."
-        ),
-    )
-    async def library_delete_book(filename: FilenameArg) -> str:
-        res = await call("DELETE", f"/book/{_f(filename)}")
-        return (
-            f"Moved '{res.get('title', filename)}' to the trash. Undo within 30 days with "
-            f"library_restore_book('{filename}')."
-        )
-
     @server.tool(name="library_restore_book", annotations=IDEMPOTENT,
-                 description="Bring a book back from the trash (admins only).")
+                 description="Bring back a book someone deleted in the library app (admins only, within 30 days).")
     async def library_restore_book(filename: FilenameArg) -> str:
         res = await call("POST", f"/book/{_f(filename)}/restore")
         return f"Restored '{res.get('title', filename)}'."

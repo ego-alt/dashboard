@@ -80,7 +80,7 @@ Two caveats:
 - **Cloud clients** (claude.ai connectors, ChatGPT) connect from the vendor's
   servers, so they can't reach `home.local`. See AUDIT.md §1 for the options.
 
-## Tools (35)
+## Tools (31)
 
 The day marker is intentionally absent: it is never read, shown or set.
 
@@ -91,14 +91,12 @@ The day marker is intentionally absent: it is never read, shown or set.
 | `calendar_get_entry` | `tapes_dismiss_download` | `library_get_book` |
 | `calendar_search` | `tapes_search_tracks` | `library_update_book` |
 | `calendar_create_entry` | `tapes_list_playlists` | `library_list_tags` |
-| `calendar_update_entry` | `tapes_get_playlist` | `library_delete_book` ⚠ |
-| `calendar_delete_entry` ⚠ | `tapes_create_playlist` | `library_restore_book` |
-| `calendar_restore_entry` | `tapes_rename_playlist` | |
-| `calendar_set_mood` | `tapes_delete_playlist` ⚠ | |
+| `calendar_update_entry` | `tapes_get_playlist` | `library_restore_book` |
+| `calendar_restore_entry` | `tapes_create_playlist` | |
+| `calendar_set_mood` | `tapes_rename_playlist` | |
 | `calendar_stats` | `tapes_add_to_playlist` | |
 | | `tapes_remove_from_playlist` | |
 | | `tapes_update_track` | |
-| | `tapes_delete_track` ⚠ | |
 | | `tapes_restore_track` | |
 | | `tapes_list_podcasts` | |
 | | `tapes_add_podcast` | |
@@ -107,10 +105,11 @@ The day marker is intentionally absent: it is never read, shown or set.
 There is also `homehub_now`, which gives today's date and time at home, for
 models that don't know it.
 
-⚠ marks a tool flagged `destructiveHint`, so clients that confirm before
-destructive calls will ask. All deletes go to a 30-day trash and have a
-restore tool, **except `tapes_delete_playlist`**, which is permanent (the app
-has no playlist trash yet).
+**There are no delete tools.** Deleting stays with you, in the apps. Text the
+model reads, such as podcast titles from RSS feeds or YouTube metadata, comes
+from strangers, so an instruction planted there must not be able to remove
+anything. The restore tools stay: they can bring back what you deleted in an
+app within its 30-day trash, and restoring can't destroy anything.
 
 ### Why the tools look the way they do
 

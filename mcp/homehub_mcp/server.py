@@ -34,8 +34,8 @@ Tools for one person's self-hosted home apps: a diary calendar (entries, moments
 mood), a music library called Tapes (downloads from links, playlists, podcasts) and an
 EPUB library. Everything acts as the signed-in user, on their data only.
 Conventions: dates are YYYY-MM-DD, times 24-hour HH:MM in the home's local time zone.
-Call homehub_now when you need today's date. Deletes go to a 30-day trash with a
-matching restore tool, except deleting a playlist; confirm deletions with the user.
+Call homehub_now when you need today's date. There are no delete tools: the user
+deletes things in the apps themselves. Things they deleted can be restored for 30 days.
 """
 
 

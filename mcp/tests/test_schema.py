@@ -16,7 +16,7 @@ def tools(config, backend):
 
 
 def test_tool_names_are_prefixed_and_short(tools):
-    assert len(tools) == 35
+    assert len(tools) == 31
     for t in tools:
         assert t.name.split("_")[0] in {"calendar", "tapes", "library", "homehub"}, t.name
         assert len(t.name) <= 64 and t.name.replace("_", "").isalnum() and t.name.islower()
@@ -38,11 +38,11 @@ def test_every_tool_is_described_and_annotated(tools):
             assert not a.destructive_hint, t.name
 
 
-def test_deletes_are_marked_destructive(tools):
-    destructive = {t.name for t in tools if t.annotations.destructive_hint}
-    assert destructive == {
-        "calendar_delete_entry", "tapes_delete_playlist", "tapes_delete_track", "library_delete_book",
-    }
+def test_assistants_cannot_delete(tools):
+    """Deleting is left to the user, in the apps (prompt-injected text in a feed
+    title must not be able to remove anything)."""
+    assert not [t.name for t in tools if t.annotations.destructive_hint]
+    assert not [t.name for t in tools if "delete" in t.name]
 
 
 def test_the_day_marker_is_never_exposed(tools):
