@@ -1,8 +1,21 @@
-import { useState } from 'react';
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { login, verifyTotp } from '../api';
 import { useAuth } from '../auth.jsx';
 import { passkeysSupported, signInWithPasskey } from '../webauthn';
+
+// Paths this SPA renders itself; anything else under the host (/calendar/,
+// /oauth/consent, …) is another app behind nginx and needs a full page load.
+const SPA_PATHS = new Set(['/', '/monitor', '/users', '/settings', '/login']);
+
+// Only same-origin paths: "//evil.example" and "/\\evil.example" are
+// protocol-relative URLs to another host.
+export function safeNext(raw) {
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\')) {
+    return '/';
+  }
+  return raw;
+}
 
 export default function LoginPage() {
   const { user, refresh } = useAuth();
@@ -15,11 +28,24 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const next = params.get('next') || '/';
+  const next = safeNext(params.get('next'));
 
-  if (user) {
-    return <Navigate to={next} replace />;
+  function goNext() {
+    const path = next.split(/[?#]/)[0];
+    if (SPA_PATHS.has(path)) {
+      navigate(next, { replace: true });
+    } else {
+      window.location.replace(next);
+    }
   }
+
+  // Already signed in (e.g. sent here by nginx for a page that then worked).
+  useEffect(() => {
+    if (user) goNext();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  if (user) return null;
 
   async function onCredentialsSubmit(e) {
     e.preventDefault();
@@ -32,8 +58,7 @@ export default function LoginPage() {
         setBusy(false);
         return;
       }
-      await refresh();
-      navigate(next, { replace: true });
+      await refresh(); // sets `user`; the effect above moves on
     } catch (err) {
       setError(
         err.status === 401
@@ -51,8 +76,7 @@ export default function LoginPage() {
     setError('');
     try {
       await signInWithPasskey();
-      await refresh();
-      navigate(next, { replace: true });
+      await refresh(); // sets `user`; the effect above moves on
     } catch (err) {
       // NotAllowedError is the browser saying "user cancelled" — quiet.
       if (err?.name !== 'NotAllowedError') {
@@ -68,8 +92,7 @@ export default function LoginPage() {
     setError('');
     try {
       await verifyTotp(code);
-      await refresh();
-      navigate(next, { replace: true });
+      await refresh(); // sets `user`; the effect above moves on
     } catch (err) {
       setError(
         err.status === 401
