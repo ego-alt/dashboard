@@ -102,3 +102,34 @@ def test_tokens_are_scoped_to_owner(client, make_user):
     _login(mallory, "mallory")
     assert mallory.get("/auth/tokens").json() == []
     assert mallory.delete(f"/auth/tokens/{other_id}").status_code == 404
+
+
+def test_last_used_is_touched_at_most_once_a_minute(client, make_user, monkeypatch):
+    """Every app request with a token passes through /auth/verify; refreshing
+    last_used_at each time would be a DB write per request."""
+    from datetime import datetime, timedelta, timezone
+
+    from app import auth
+
+    make_user()
+    _login(client)
+    token = _mint(client)
+    bare = _bare_client()
+    verify = lambda: bare.get("/auth/verify", headers={"Authorization": f"Bearer {token}"})  # noqa: E731
+
+    assert verify().status_code == 200
+    first = client.get("/auth/tokens").json()[0]["last_used_at"]
+    assert first is not None
+    assert verify().status_code == 200
+    assert client.get("/auth/tokens").json()[0]["last_used_at"] == first  # no write
+
+    later = datetime.now(timezone.utc) + timedelta(minutes=2)
+
+    class _Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return later
+
+    monkeypatch.setattr(auth, "datetime", _Clock)
+    assert verify().status_code == 200
+    assert client.get("/auth/tokens").json()[0]["last_used_at"] != first

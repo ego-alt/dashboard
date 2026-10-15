@@ -195,9 +195,16 @@ def mint_api_token(db: DbSession, user: User, *, name: str) -> str:
     return raw
 
 
+# How stale last_used_at may get before a lookup refreshes it. Every app call
+# made with a token passes through /auth/verify, so writing on each one would
+# be a SQLite write per request (the MCP server's stdio mode makes several per
+# tool call). Same idea as the session's bounded sliding expiry.
+API_TOKEN_TOUCH_INTERVAL = timedelta(minutes=1)
+
+
 def lookup_api_token(db: DbSession, raw: str) -> Optional[User]:
-    """Resolve a raw Bearer token to its user, updating last_used_at. Returns
-    None if the token is unknown."""
+    """Resolve a raw Bearer token to its user, refreshing last_used_at at most
+    once per ``API_TOKEN_TOUCH_INTERVAL``. Returns None if the token is unknown."""
     from .models import ApiToken
 
     tok = (
@@ -207,11 +214,16 @@ def lookup_api_token(db: DbSession, raw: str) -> Optional[User]:
     )
     if tok is None:
         return None
-    tok.last_used_at = datetime.now(timezone.utc)
-    try:
-        db.commit()
-    except Exception:
-        db.rollback()
+    now = datetime.now(timezone.utc)
+    last = tok.last_used_at
+    if last is not None and last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)  # SQLite hands back naive datetimes
+    if last is None or now - last >= API_TOKEN_TOUCH_INTERVAL:
+        tok.last_used_at = now
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
     return tok.user
 
 
