@@ -77,21 +77,11 @@ services:
       homehub.route: "/library/"
       homehub.icon: "book"
       homehub.description: "EPUB library + reader"
+    # Apply any new database migrations, then serve (same pattern as calendar).
     command:
-      - uv
-      - run
-      - gunicorn
-      - app:create_app()
-      - --bind
-      - 0.0.0.0:5001
-      - --workers
-      - "2"
-      - --threads
-      - "4"
-      - --timeout
-      - "120"
-      - --worker-class
-      - gthread
+      - sh
+      - -c
+      - uv run flask db upgrade && exec uv run gunicorn 'app:create_app()' --bind 0.0.0.0:5001 --workers 2 --threads 4 --timeout 120 --worker-class gthread
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5001/healthz')"]
       interval: 30s
