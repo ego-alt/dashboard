@@ -90,8 +90,10 @@ role-style tokens for unique surfaces (calendar adds `--color-bg-overlay-strong`
 enter the spec.
 
 Library additionally defines a semantic status token `--color-success` (used by
-toast notifications). Treat as an app-local extension until a second app needs
-the same role.
+toast notifications), plus app-local surface tokens with night variants:
+`--color-text-selection` (reader highlight), `--color-scrim` (image overlays)
+and `--wood` / `--wood-edge` (bookshelf view). Treat these as app-local
+extensions until a second app needs the same role.
 
 Inter is loaded via Google Fonts in each app's HTML entry point with the
 preconnect pair + a `wght@400..700` variable subset. Falls back to Arial when
@@ -189,8 +191,11 @@ changes rarely. Colours and app-specific extensions diverge freely.
 
 - ✅ **Calendar / Library / Tapes** — shared `structural.css` (tokens +
   primitives + motion) + per-app `tokens.css`. Library's dark mode unifies to
-  calendar's Gruvbox palette; calendar keeps monospace inputs as its one
-  primitive override.
+  calendar's Gruvbox palette. Primitive overrides, one each: calendar keeps
+  monospace inputs; library's `.btn-primary` is ink-on-paper
+  (`--color-text-secondary` fill, `--color-bg-base` text) instead of the accent
+  fill, which read as a link colour on its palette. Library uses the 640px
+  breakpoint throughout.
 - 🟡 **Dashboard** — colour tokens + `.btn`/`.input` in its React global CSS;
   buttons on primitives across Login/Settings/Users/Monitor (row actions via
   `.btn-link`). HomePage tiles and general layout still Tailwind utilities
@@ -199,11 +204,9 @@ changes rarely. Colours and app-specific extensions diverge freely.
 
 ## Open questions
 
-- **Library still loads Bootstrap CDN** for grid utilities (`.container`,
-  `.row`, `.col-md-*`) on the index page and additional utilities on the reader
-  page. Buttons + inputs are off Bootstrap now; only the grid + a handful of
-  spacing utilities remain. If those are replaced with vanilla flex/grid, the
-  CDN load can go.
+- ~~**Library still loads Bootstrap CDN**~~ — resolved (Oct 2026): Bootstrap is
+  gone; library ships `static/css/base.css` with only the reset, container,
+  grid columns and utilities it used, coloured from its tokens.
 - **Dashboard primitive coverage**. HomePage / MonitorPage are still
   Tailwind-styled. Migrating means rewriting utility-class chains to `.btn`
   variants on a per-component basis. Worth it for consistency, awkward for
