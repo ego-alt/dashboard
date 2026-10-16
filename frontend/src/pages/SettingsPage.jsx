@@ -91,6 +91,9 @@ export default function SettingsPage() {
   );
 }
 
+// Same field sizing as the Users add form.
+const FIELD = 'flex w-full flex-col text-xs text-[var(--color-text-muted)] sm:w-44';
+
 function PasswordSection() {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
@@ -124,30 +127,33 @@ function PasswordSection() {
 
   return (
     <Panel title="Password">
-      <form onSubmit={onSubmit} className="space-y-3">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block text-xs text-[var(--color-text-muted)]">
-            Current password
-            <input
-              type={show ? 'text' : 'password'}
-              autoComplete="current-password"
-              value={current}
-              onChange={(e) => setCurrent(e.target.value)}
-              className="input mt-1"
-            />
-          </label>
-          <label className="block text-xs text-[var(--color-text-muted)]">
-            New password <span className="text-[var(--color-text-muted)]">(8+ characters)</span>
-            <input
-              type={show ? 'text' : 'password'}
-              autoComplete="new-password"
-              value={next}
-              onChange={(e) => setNext(e.target.value)}
-              className="input mt-1"
-            />
-          </label>
-        </div>
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-[var(--color-text-secondary)]">
+      {/* One row, like the Users add form: fields, options, button. */}
+      <form
+        onSubmit={onSubmit}
+        className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end"
+      >
+        <label className={FIELD}>
+          Current password
+          <input
+            type={show ? 'text' : 'password'}
+            autoComplete="current-password"
+            value={current}
+            onChange={(e) => setCurrent(e.target.value)}
+            className="input mt-1"
+          />
+        </label>
+        <label className={FIELD}>
+          New password
+          <input
+            type={show ? 'text' : 'password'}
+            autoComplete="new-password"
+            value={next}
+            onChange={(e) => setNext(e.target.value)}
+            placeholder="8+ characters"
+            className="input mt-1"
+          />
+        </label>
+        <span className="flex h-[30px] items-center gap-4 text-sm text-[var(--color-text-secondary)]">
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={show} onChange={(e) => setShow(e.target.checked)} />
             Show
@@ -158,18 +164,18 @@ function PasswordSection() {
               checked={signOutOthers}
               onChange={(e) => setSignOutOthers(e.target.checked)}
             />
-            Sign out my other devices
+            Sign out other devices
           </label>
-          <button
-            type="submit"
-            disabled={busy || !current || next.length < 8}
-            className="btn btn-primary text-sm sm:ml-auto"
-          >
-            {busy ? 'Changing…' : 'Change password'}
-          </button>
-        </div>
-        {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
-        {done && <p className="text-sm text-[var(--color-text-secondary)]">{done}</p>}
+        </span>
+        <button
+          type="submit"
+          disabled={busy || !current || next.length < 8}
+          className="btn btn-primary w-full text-sm sm:ml-auto sm:w-auto"
+        >
+          {busy ? 'Changing…' : 'Change password'}
+        </button>
+        {error && <p className="w-full text-sm text-[var(--color-danger)]">{error}</p>}
+        {done && <p className="w-full text-sm text-[var(--color-text-secondary)]">{done}</p>}
       </form>
     </Panel>
   );
