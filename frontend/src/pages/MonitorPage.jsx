@@ -1,12 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { apiJson, backupStatus } from '../api';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { apiJson, backupStatus, containerAction, uptime } from '../api';
 import { useAuth } from '../auth.jsx';
+import LogsDrawer from '../components/LogsDrawer.jsx';
+import { StateDot, UptimeStrip } from '../components/Status.jsx';
+import { PROBLEM_RANK, STATE, shownState } from '../lib/state';
+import { age, secondsSince, sentence } from '../lib/format';
+import { useNow, usePoll } from '../lib/usePoll';
 
 const POLL_MS = 5000;
 // On first load, take a second sample this soon after the first so CPU% and
 // rates (which need a delta between two reads) populate immediately instead of
 // waiting a full poll interval.
 const WARM_MS = 1000;
+// Data older than this many poll intervals is shown as stale.
+const STALE_AFTER = 3;
+const UPTIME_POLL_MS = 60_000;
 
 // Mirrors the backend PROTECTED_CONTAINERS default — controls are hidden for
 // these even for admins; the server is the real backstop (returns 409).
@@ -76,76 +85,38 @@ function Metric({ label, value, percent, tone = 'slate' }) {
   );
 }
 
-// Reflects + toggles the shared polling state; shown on both Host and
-// Containers since one `live` flag drives both cards.
-function LiveToggle({ live, onToggle }) {
-  return (
-    <button
-      onClick={onToggle}
-      className={`btn text-sm ${
-        live ? 'border-green-500/40 bg-green-500/10 text-green-300' : 'btn-secondary'
-      }`}
-      title={live ? `Live — refreshing every ${POLL_MS / 1000}s` : 'Paused'}
-    >
-      <span className={`h-2 w-2 rounded-full ${live ? 'bg-green-500' : 'bg-[var(--color-text-muted)]'}`} />
-      {live ? 'Live' : 'Paused'}
-    </button>
-  );
-}
-
-function HostSection({ live, hidden, onToggleLive }) {
+function HostSection({ live, stale }) {
   const [s, setS] = useState(null);
   const [err, setErr] = useState('');
-  const inFlight = useRef(false);
 
   const fetchStats = useCallback(async () => {
-    if (inFlight.current) return;
-    inFlight.current = true;
     try {
       setS(await apiJson('/stats/system'));
       setErr('');
     } catch (e) {
-      setErr(e.body?.detail || 'Failed to load host stats');
-    } finally {
-      inFlight.current = false;
+      setErr(e.body?.detail || 'Couldn\u2019t load host stats.');
     }
   }, []);
 
-  useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
-
-  useEffect(() => {
-    if (!live || hidden) return undefined;
-    const id = setInterval(fetchStats, POLL_MS);
-    return () => clearInterval(id);
-  }, [live, hidden, fetchStats]);
+  usePoll(fetchStats, POLL_MS, live);
 
   const heading = (
-    <div className="mb-3 flex items-center justify-between">
-      <h3 className="text-base font-semibold text-[var(--color-text-primary)]">Host</h3>
-      <LiveToggle live={live} onToggle={onToggleLive} />
-    </div>
+    <h3 className="mb-3 text-base font-semibold text-[var(--color-text-primary)]">Host</h3>
   );
 
-  if (err)
-    return (
-      <section className={`${CARD} mb-6 p-4`}>
-        {heading}
-        <p className="text-sm text-[var(--color-danger)]">{err}</p>
-      </section>
-    );
   if (!s)
     return (
       <section className={`${CARD} mb-6 p-4`}>
         {heading}
-        <p className="text-sm text-[var(--color-text-muted)]">Loading…</p>
+        <p className={`text-sm ${err ? 'text-[var(--color-danger)]' : 'text-[var(--color-text-muted)]'}`}>
+          {err || 'Loading…'}
+        </p>
       </section>
     );
 
   const memPct = s.memory_percent;
   return (
-    <section className={`${CARD} mb-6 p-4`}>
+    <section className={`${CARD} mb-6 p-4 transition-opacity ${stale || err ? 'opacity-50' : ''}`}>
       {heading}
       <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
         <Metric
@@ -298,235 +269,376 @@ function BackupsSection() {
   );
 }
 
+const VERBS = {
+  start: { pending: 'starting…', done: 'started' },
+  stop: { pending: 'stopping…', done: 'stopped' },
+  restart: { pending: 'restarting…', done: 'restarted' },
+};
+
+const CONFIRM = {
+  stop: (n) => `Stop ${n}? Anyone using it will be cut off until it's started again.`,
+  restart: (n) => `Restart ${n}? It will be unavailable for a few seconds.`,
+};
+
+/** Problems first, then the hub's services, then infrastructure. */
+function sortContainers(rows) {
+  return [...rows].sort(
+    (a, b) =>
+      (PROBLEM_RANK[a.state] ?? 2) - (PROBLEM_RANK[b.state] ?? 2) ||
+      (b.hub ? 1 : 0) - (a.hub ? 1 : 0) ||
+      a.name.localeCompare(b.name),
+  );
+}
+
+function uptimeText(c, now) {
+  if (c.state === 'down') {
+    const s = secondsSince(c.finished_at, now);
+    return s == null ? 'down' : `down ${age(s)}`;
+  }
+  const s = secondsSince(c.started_at, now);
+  return s == null ? '' : `up ${age(s)}`;
+}
+
+function cpuText(c) {
+  if (c.cpu_percent == null) return '—';
+  if (c.cpu_percent > 0 && c.cpu_percent < 0.1) return '<0.1 %';
+  return `${c.cpu_percent.toFixed(1)} %`;
+}
+
+function netText(c) {
+  if (c.state === 'down' || c.rx_rate_kbs == null) return '—';
+  return `↓ ${fmtRate(c.rx_rate_kbs)}  ↑ ${fmtRate(c.tx_rate_kbs)}`;
+}
+
+function StateCell({ c, pending }) {
+  if (pending)
+    return <span className="text-xs text-[var(--color-text-secondary)]">{VERBS[pending].pending}</span>;
+  const s = STATE[shownState(c)] || STATE.unknown;
+  return (
+    <span className={`flex items-center gap-1.5 text-xs ${s.text}`} title={c.health ? `health: ${c.health} · docker: ${c.status}` : `docker: ${c.status}`}>
+      <StateDot state={c.state} />
+      {s.label}
+    </span>
+  );
+}
+
+function Actions({ c, isAdmin, pending, onAction, onLogs }) {
+  const logs = (
+    <button onClick={() => onLogs(c)} className="btn-link text-xs">
+      Logs
+    </button>
+  );
+  if (!isAdmin) return logs;
+  if (PROTECTED.has(c.name))
+    return (
+      <span className="flex items-center justify-end gap-3">
+        {logs}
+        <span className="text-xs text-[var(--color-text-muted)]" title="Stopping this would cut off the dashboard itself">
+          protected
+        </span>
+      </span>
+    );
+  const busy = !!pending;
+  const btn = (verb, label) => (
+    <button onClick={() => onAction(c, verb)} disabled={busy} className="btn-link text-xs">
+      {label}
+    </button>
+  );
+  return (
+    <span className="flex items-center justify-end gap-3">
+      {logs}
+      {c.status === 'running' ? (
+        <>
+          {btn('stop', 'Stop')}
+          {btn('restart', 'Restart')}
+        </>
+      ) : (
+        btn('start', 'Start')
+      )}
+    </span>
+  );
+}
+
 export default function MonitorPage() {
   const { user } = useAuth();
   const isAdmin = !!user?.is_admin;
-  const [containers, setContainers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [statsPending, setStatsPending] = useState(true);
+  const [params, setParams] = useSearchParams();
+  const [containers, setContainers] = useState(null);
   const [error, setError] = useState('');
+  const [updatedAt, setUpdatedAt] = useState(null);
   const [live, setLive] = useState(true);
-  const [hidden, setHidden] = useState(false);
+  const [pending, setPending] = useState({}); // id → verb in flight
+  const [notice, setNotice] = useState('');
+  const [uptime24, setUptime24] = useState(null);
+  const now = useNow(1000);
   // Previous stats snapshot ({ ts, byId }) — successive reads are diffed into
-  // CPU% and network rate (the backend now returns raw cumulative counters).
+  // CPU% and network rate (the backend returns raw cumulative counters).
   const prevRef = useRef(null);
-  // Guards against overlapping requests: a slow poll on the Pi must not let the
-  // next interval tick stack a second in-flight fetch on top of it.
-  const inFlightRef = useRef(false);
 
   // One stats read → diff against the previous snapshot → update rows.
   const sampleStats = useCallback(async () => {
-    const withStats = await apiJson('/containers?stats=1');
-    const now = Date.now();
-    const prev = prevRef.current;
-    const dt = prev ? (now - prev.ts) / 1000 : 0;
-    const rows = withStats.map((c) => {
-      const p = prev?.byId?.[c.id];
-      if (p && dt > 0 && c.cpu_total != null) {
-        // CPU% from the delta, mirroring `docker stats`. Guards on positive
-        // deltas, so a container restart (counter reset) reads 0, not negative.
-        const cpuDelta = c.cpu_total - p.cpu;
-        const sysDelta = c.system_cpu - p.sys;
-        const cpuPct =
-          sysDelta > 0 && cpuDelta > 0
-            ? Math.round((cpuDelta / sysDelta) * (c.online_cpus || 1) * 10000) / 100
-            : 0;
-        return {
-          ...c,
-          cpu_percent: cpuPct,
-          rx_rate_kbs: Math.max(0, (c.network_rx_bytes - p.rx) / 1024 / dt),
-          tx_rate_kbs: Math.max(0, (c.network_tx_bytes - p.tx) / 1024 / dt),
-        };
-      }
-      return c;
-    });
-    prevRef.current = {
-      ts: now,
-      byId: Object.fromEntries(
-        withStats
-          .filter((c) => c.cpu_total != null)
-          .map((c) => [
-            c.id,
-            {
-              rx: c.network_rx_bytes,
-              tx: c.network_tx_bytes,
-              cpu: c.cpu_total,
-              sys: c.system_cpu,
-            },
-          ]),
-      ),
-    };
-    setContainers(rows);
-    setError('');
+    try {
+      const withStats = await apiJson('/containers?stats=1');
+      const ts = Date.now();
+      const prev = prevRef.current;
+      const dt = prev ? (ts - prev.ts) / 1000 : 0;
+      const rows = withStats.map((c) => {
+        const p = prev?.byId?.[c.id];
+        if (p && dt > 0 && c.cpu_total != null) {
+          // CPU% from the delta, mirroring `docker stats`. Guards on positive
+          // deltas, so a container restart (counter reset) reads 0, not negative.
+          const cpuDelta = c.cpu_total - p.cpu;
+          const sysDelta = c.system_cpu - p.sys;
+          const cpuPct =
+            sysDelta > 0 && cpuDelta > 0 ? (cpuDelta / sysDelta) * (c.online_cpus || 1) * 100 : 0;
+          return {
+            ...c,
+            cpu_percent: cpuPct,
+            rx_rate_kbs: Math.max(0, (c.network_rx_bytes - p.rx) / 1024 / dt),
+            tx_rate_kbs: Math.max(0, (c.network_tx_bytes - p.tx) / 1024 / dt),
+          };
+        }
+        return c;
+      });
+      prevRef.current = {
+        ts,
+        byId: Object.fromEntries(
+          withStats
+            .filter((c) => c.cpu_total != null)
+            .map((c) => [
+              c.id,
+              { rx: c.network_rx_bytes, tx: c.network_tx_bytes, cpu: c.cpu_total, sys: c.system_cpu },
+            ]),
+        ),
+      };
+      setContainers(rows);
+      setUpdatedAt(ts);
+      setError('');
+    } catch (err) {
+      setError(sentence(err.body?.detail, 'Couldn’t reach the dashboard.'));
+    }
   }, []);
 
-  const load = useCallback(
-    async (initial = false) => {
-      if (inFlightRef.current) return; // in-flight guard
-      inFlightRef.current = true;
-      try {
-        if (initial) {
-          // Fast first paint: metadata before the per-container stats.
-          setContainers(await apiJson('/containers'));
-          setLoading(false);
-        }
-        await sampleStats();
-        if (initial) {
-          // Warm second read so CPU%/rates show on first paint, not after 5s.
-          await new Promise((r) => setTimeout(r, WARM_MS));
-          await sampleStats();
-        }
-      } catch (err) {
-        setError(err.body?.detail || err.message || 'Failed to load containers');
-      } finally {
-        setLoading(false);
-        setStatsPending(false);
-        inFlightRef.current = false;
-      }
-    },
-    [sampleStats],
+  // Fast first paint: metadata before the per-container stats, then a warm
+  // second read so CPU% and rates show within a second, not after 5 s.
+  useEffect(() => {
+    apiJson('/containers')
+      .then((rows) => setContainers((cur) => cur ?? rows))
+      .catch(() => {});
+    const id = setTimeout(sampleStats, WARM_MS);
+    return () => clearTimeout(id);
+  }, [sampleStats]);
+
+  usePoll(sampleStats, POLL_MS, live);
+  usePoll(
+    () => uptime(1).then(setUptime24).catch(() => {}),
+    UPTIME_POLL_MS,
+    true,
+  );
+
+  const sorted = useMemo(() => (containers ? sortContainers(containers) : []), [containers]);
+
+  // ?logs=<name> (from a Services tile) opens that container's logs.
+  const logsName = params.get('logs');
+  const logsFor = logsName ? sorted.find((c) => c.name === logsName) : null;
+  const openLogs = useCallback(
+    (c) => setParams((p) => ({ ...Object.fromEntries(p), logs: c.name }), { replace: true }),
+    [setParams],
+  );
+  const closeLogs = useCallback(
+    () =>
+      setParams(
+        (p) => {
+          const next = Object.fromEntries(p);
+          delete next.logs;
+          return next;
+        },
+        { replace: true },
+      ),
+    [setParams],
   );
 
   useEffect(() => {
-    load(true);
-  }, [load]);
-
-  // Pause polling for a backgrounded tab — no point sampling the daemon for a
-  // page nobody's looking at.
-  useEffect(() => {
-    const onVis = () => setHidden(document.hidden);
-    document.addEventListener('visibilitychange', onVis);
-    return () => document.removeEventListener('visibilitychange', onVis);
-  }, []);
-
-  useEffect(() => {
-    if (!live || hidden) return undefined;
-    const id = setInterval(() => load(false), POLL_MS);
-    return () => clearInterval(id);
-  }, [live, hidden, load]);
+    if (!notice) return undefined;
+    const id = setTimeout(() => setNotice(''), 6000);
+    return () => clearTimeout(id);
+  }, [notice]);
 
   async function action(c, verb) {
-    if (
-      !window.confirm(
-        `${verb} container "${c.name}"? This affects the running service.`,
-      )
-    ) {
-      return;
-    }
+    if (CONFIRM[verb] && !window.confirm(CONFIRM[verb](c.name))) return;
+    setPending((p) => ({ ...p, [c.id]: verb }));
+    setNotice('');
     try {
-      await apiJson(`/containers/${c.id}/${verb}`, { method: 'POST' });
-      await load(true);
+      await containerAction(c.id, verb);
+      setNotice(`${c.name} ${VERBS[verb].done}.`);
+      setError('');
     } catch (err) {
-      setError(err.body?.detail || `Failed to ${verb} ${c.name}`);
+      setError(`Couldn’t ${verb} ${c.name}: ${err.body?.detail || 'no response'}`);
+    } finally {
+      await sampleStats();
+      setPending((p) => {
+        const next = { ...p };
+        delete next[c.id];
+        return next;
+      });
     }
   }
 
+  const ageS = updatedAt ? (now - updatedAt) / 1000 : null;
+  const stale = !!error || (live && ageS != null && ageS > (STALE_AFTER * POLL_MS) / 1000);
+  const freshness =
+    updatedAt == null
+      ? ''
+      : stale
+        ? `stale · last update ${age(ageS)} ago`
+        : live
+          ? `updated ${age(ageS)} ago`
+          : `paused · last update ${age(ageS)} ago`;
+
+  const rowProps = (c) => ({
+    c,
+    isAdmin,
+    pending: pending[c.id],
+    onAction: action,
+    onLogs: openLogs,
+  });
+
   return (
     <div>
-      <h2 className="mb-4 text-lg font-semibold text-[var(--color-text-primary)]">Monitor</h2>
+      <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">Monitor</h2>
+        <span
+          className={`ml-auto text-xs ${stale ? 'text-[var(--color-danger)]' : 'text-[var(--color-text-muted)]'}`}
+          aria-live="polite"
+        >
+          {freshness}
+        </span>
+        <button
+          onClick={() => setLive((v) => !v)}
+          className={`btn text-sm ${
+            stale
+              ? 'border-red-500/40 bg-red-500/10 text-red-300'
+              : live
+                ? 'border-green-500/40 bg-green-500/10 text-green-300'
+                : 'btn-secondary'
+          }`}
+          title={live ? `Live: refreshing every ${POLL_MS / 1000} s. Click to pause.` : 'Paused. Click to resume.'}
+        >
+          <span
+            className={`h-2 w-2 rounded-full ${
+              stale ? 'bg-red-500' : live ? 'bg-green-500' : 'bg-[var(--color-text-muted)]'
+            }`}
+          />
+          {stale ? 'Stale' : live ? 'Live' : 'Paused'}
+        </button>
+      </div>
 
-      <HostSection live={live} hidden={hidden} onToggleLive={() => setLive((v) => !v)} />
+      <HostSection live={live} stale={stale} />
 
       <section className={`${CARD} overflow-hidden`}>
-        <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] px-4 py-3">
           <h3 className="text-base font-semibold text-[var(--color-text-primary)]">Containers</h3>
-          <LiveToggle live={live} onToggle={() => setLive((v) => !v)} />
+          {notice && <span className="text-xs text-[var(--color-text-secondary)]">{notice}</span>}
         </div>
         {error && <p className="px-4 pt-3 text-sm text-[var(--color-danger)]">{error}</p>}
-        {loading ? (
-          <p className="px-4 py-6 text-[var(--color-text-muted)]">Loading containers…</p>
+        {containers === null ? (
+          <p className="px-4 py-6 text-[var(--color-text-muted)]">{error ? '' : 'Loading containers…'}</p>
+        ) : sorted.length === 0 ? (
+          <p className="px-4 py-6 text-center text-[var(--color-text-muted)]">No containers</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
+          <div className={`transition-opacity ${stale ? 'opacity-50' : ''}`}>
+            {/* Desktop: one table row per container. */}
+            <table className="hidden min-w-full text-sm sm:table">
               <thead className="bg-[var(--color-bg-inset)] text-left text-[var(--color-text-muted)]">
                 <tr>
                   <th className="px-4 py-2 font-medium">Name</th>
-                  <th className="px-4 py-2 font-medium">Status</th>
-                  <th className="px-4 py-2 font-medium">CPU %</th>
-                  <th className="px-4 py-2 font-medium">Memory</th>
-                  <th className="px-4 py-2 font-medium">RX/s</th>
-                  <th className="px-4 py-2 font-medium">TX/s</th>
+                  <th className="px-3 py-2 font-medium">State</th>
+                  <th className="px-3 py-2 font-medium">Uptime</th>
+                  <th className="w-44 px-3 py-2 font-medium">Last 24 h</th>
+                  <th className="px-3 py-2 text-right font-medium">CPU</th>
+                  <th className="px-3 py-2 text-right font-medium">Memory</th>
+                  <th className="hidden px-3 py-2 text-right font-medium lg:table-cell">Network</th>
                   <th className="px-4 py-2"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--color-border)]">
-                {containers.map((c) => {
-                  const protectedC = PROTECTED.has(c.name);
-                  return (
-                    <tr key={c.id} className="hover:bg-[var(--color-highlight-soft)]">
-                      <td className="px-4 py-2 font-mono text-[var(--color-text-primary)]">{c.name}</td>
-                      <td className="px-4 py-2">
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                            c.status === 'running'
-                              ? 'bg-green-500/15 text-green-300'
-                              : 'bg-[var(--color-bg-inset)] text-[var(--color-text-secondary)]'
-                          }`}
-                        >
-                          {c.status}
+                {sorted.map((c) => (
+                  <tr key={c.id} className="hover:bg-[var(--color-highlight-soft)]">
+                    <td className="px-4 py-2">
+                      <button
+                        onClick={() => openLogs(c)}
+                        className="font-mono text-[var(--color-text-primary)] hover:underline"
+                        title="Show logs"
+                      >
+                        {c.name}
+                      </button>
+                    </td>
+                    <td className="px-3 py-2">
+                      <StateCell c={c} pending={pending[c.id]} />
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-[var(--color-text-secondary)]">
+                      {uptimeText(c, now)}
+                      {c.restart_count > 0 && (
+                        <span className="ml-2 text-xs text-[var(--color-text-muted)]" title={`Restarted ${c.restart_count} times by Docker`}>
+                          ↻{c.restart_count}
                         </span>
-                      </td>
-                      <td className="px-4 py-2 text-[var(--color-text-secondary)]">
-                        {statsPending && c.status === 'running' && c.cpu_percent == null
-                          ? '…'
-                          : (c.cpu_percent ?? '—')}
-                      </td>
-                      <td className="px-4 py-2 text-[var(--color-text-secondary)]">
-                        {statsPending && c.status === 'running' && c.mem_used_mb == null
-                          ? '…'
-                          : fmtMem(c)}
-                      </td>
-                      <td className="px-4 py-2 text-[var(--color-text-secondary)]">
-                        {statsPending && c.status === 'running' && c.rx_rate_kbs == null
-                          ? '…'
-                          : c.status === 'running'
-                            ? fmtRate(c.rx_rate_kbs)
-                            : '—'}
-                      </td>
-                      <td className="px-4 py-2 text-[var(--color-text-secondary)]">
-                        {statsPending && c.status === 'running' && c.tx_rate_kbs == null
-                          ? '…'
-                          : c.status === 'running'
-                            ? fmtRate(c.tx_rate_kbs)
-                            : '—'}
-                      </td>
-                      <td className="px-4 py-2 text-right whitespace-nowrap">
-                        {!isAdmin ? null : protectedC ? (
-                          <span className="text-xs text-[var(--color-text-muted)]">protected</span>
-                        ) : (
-                          <>
-                            <button
-                              onClick={() => action(c, 'stop')}
-                              className="btn-link mr-3 text-xs"
-                            >
-                              Stop
-                            </button>
-                            <button
-                              onClick={() => action(c, 'restart')}
-                              className="btn-link text-xs"
-                            >
-                              Restart
-                            </button>
-                          </>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-                {containers.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-6 text-center text-[var(--color-text-muted)]">
-                      No containers
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      <UptimeStrip data={uptime24} name={c.name} />
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono text-xs text-[var(--color-text-secondary)]">
+                      {c.state === 'down' ? '—' : cpuText(c)}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-xs text-[var(--color-text-secondary)]">
+                      {c.state === 'down' ? '—' : fmtMem(c)}
+                    </td>
+                    <td className="hidden whitespace-pre px-3 py-2 text-right font-mono text-xs text-[var(--color-text-secondary)] lg:table-cell">
+                      {netText(c)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2 text-right">
+                      <Actions {...rowProps(c)} />
                     </td>
                   </tr>
-                )}
+                ))}
               </tbody>
             </table>
+
+            {/* Phone: one compact card per container. */}
+            <ul className="divide-y divide-[var(--color-border)] sm:hidden">
+              {sorted.map((c) => (
+                <li key={c.id} className="space-y-2 px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => openLogs(c)} className="font-mono text-sm text-[var(--color-text-primary)]">
+                      {c.name}
+                    </button>
+                    <StateCell c={c} pending={pending[c.id]} />
+                    <span className="ml-auto text-xs text-[var(--color-text-muted)]">
+                      {uptimeText(c, now)}
+                      {c.restart_count > 0 && ` · ↻${c.restart_count}`}
+                    </span>
+                  </div>
+                  <UptimeStrip data={uptime24} name={c.name} />
+                  <div className="flex items-center gap-3 font-mono text-xs text-[var(--color-text-secondary)]">
+                    {c.state !== 'down' && (
+                      <span>
+                        {cpuText(c)} · {fmtMem(c)}
+                      </span>
+                    )}
+                    <span className="ml-auto font-sans">
+                      <Actions {...rowProps(c)} />
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </section>
 
       <BackupsSection />
+
+      {logsFor && <LogsDrawer key={logsFor.id} container={logsFor} onClose={closeLogs} />}
     </div>
   );
 }

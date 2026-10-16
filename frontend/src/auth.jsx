@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { apiJson, logout as apiLogout } from './api';
+import { AUTH_EXPIRED, apiJson, logout as apiLogout } from './api';
 
 const AuthCtx = createContext(null);
 
@@ -8,16 +8,26 @@ export function AuthProvider({ children }) {
   // undefined = not yet resolved, null = anonymous, object = logged in.
   const [user, setUser] = useState(undefined);
 
-  const refresh = useCallback(() => {
-    setUser(undefined);
-    return apiJson('/me')
-      .then(setUser)
-      .catch(() => setUser(null));
-  }, []);
+  // Re-reads /me while keeping the current user on screen: only the very
+  // first load shows "Loading…". (Blanking the user here used to unmount the
+  // whole page, which threw away the 2FA recovery codes before they showed.)
+  const refresh = useCallback(
+    () =>
+      apiJson('/me')
+        .then(setUser)
+        .catch(() => setUser(null)),
+    [],
+  );
 
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    const onExpired = () => setUser((u) => (u ? null : u));
+    window.addEventListener(AUTH_EXPIRED, onExpired);
+    return () => window.removeEventListener(AUTH_EXPIRED, onExpired);
+  }, []);
 
   const logout = useCallback(async () => {
     await apiLogout();

@@ -1,7 +1,13 @@
 /** Same-origin API helpers (session cookie auth). */
 
+// Fired when a request comes back 401: the session ended (expired, revoked
+// from another device, or the password changed). AuthProvider listens and
+// sends the user to sign in, so no page sits there showing stale data.
+export const AUTH_EXPIRED = 'auth:expired';
+
 export async function apiJson(path, options = {}) {
   const res = await fetch(path, { credentials: 'include', ...options });
+  if (res.status === 401) window.dispatchEvent(new Event(AUTH_EXPIRED));
   if (!res.ok) {
     const err = new Error(res.statusText || `HTTP ${res.status}`);
     err.status = res.status;
@@ -144,6 +150,52 @@ export async function resetUser2fa(id) {
 
 export async function deleteUser(id) {
   return apiJson(`/users/${id}`, { method: 'DELETE' });
+}
+
+// ---------- Your own account ----------
+
+export async function changePassword(currentPassword, newPassword, signOutOthers) {
+  return postForm('/me/password', {
+    current_password: currentPassword,
+    new_password: newPassword,
+    sign_out_others: signOutOthers ? 'true' : 'false',
+  });
+}
+
+export async function listSessions() {
+  return apiJson('/auth/sessions');
+}
+
+export async function revokeSession(id) {
+  return apiJson(`/auth/sessions/${id}`, { method: 'DELETE' });
+}
+
+export async function revokeOtherSessions() {
+  return apiJson('/auth/sessions/revoke-others', { method: 'POST' });
+}
+
+export async function loginEvents() {
+  return apiJson('/auth/login-events');
+}
+
+export async function regenerateRecoveryCodes(code) {
+  return postForm('/auth/totp/recovery-codes', { code });
+}
+
+// ---------- Monitor ----------
+
+/** Uptime strips: `days=1` → 24 hourly buckets, else one per local day. */
+export async function uptime(days) {
+  const tz = -new Date().getTimezoneOffset();
+  return apiJson(`/uptime?days=${days}&tz=${tz}`);
+}
+
+export async function containerAction(id, verb) {
+  return apiJson(`/containers/${id}/${verb}`, { method: 'POST' });
+}
+
+export async function containerLogs(id, tail = 200) {
+  return apiJson(`/containers/${id}/logs?tail=${tail}`);
 }
 
 // ---------- Backups (admin) ----------

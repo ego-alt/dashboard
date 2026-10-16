@@ -6,7 +6,7 @@ import { passkeysSupported, signInWithPasskey } from '../webauthn';
 
 // Paths this SPA renders itself; anything else under the host (/calendar/,
 // /oauth/consent, …) is another app behind nginx and needs a full page load.
-const SPA_PATHS = new Set(['/', '/monitor', '/users', '/settings', '/login']);
+const SPA_PATHS = new Set(['/', '/admin/monitor', '/admin/users', '/settings', '/login']);
 
 // Only same-origin paths: "//evil.example" and "/\\evil.example" are
 // protocol-relative URLs to another host.

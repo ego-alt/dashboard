@@ -1,75 +1,197 @@
-import { useEffect, useState } from 'react';
-import { apiJson } from '../api';
+import { useCallback, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { apiJson, backupStatus, containerAction, uptime } from '../api';
+import { useAuth } from '../auth.jsx';
 import ServiceIcon from '../components/ServiceIcon.jsx';
+import { StateDot, UptimeStrip } from '../components/Status.jsx';
+import { age, clock, secondsSince } from '../lib/format';
+import { STATE, shownState } from '../lib/state';
+import { usePoll } from '../lib/usePoll';
 
-const STATUS = {
-  running: { dot: 'bg-green-500', label: 'running' },
-  stopped: { dot: 'bg-amber-500', label: 'stopped' },
-};
+const SERVICES_POLL_MS = 30_000;
+const UPTIME_POLL_MS = 5 * 60_000;
+const UPTIME_DAYS = 30;
+
+function sinceText(s) {
+  const label = STATE[shownState(s)]?.label ?? s.state;
+  if (!s.since) return label;
+  if (s.state === 'up') return `up ${age(secondsSince(s.since))}`;
+  return `${label} since ${clock(s.since)}`;
+}
+
+/** One line under the heading: everything fine, or what needs you. Admins
+ * also see the last backup and the fullest disk. */
+function StatusLine({ services, dockerDown, host, backup }) {
+  const problems = services.filter((s) => s.state === 'down' || s.state === 'degraded');
+  const parts = [];
+  let bad = dockerDown || problems.length > 0;
+
+  if (dockerDown) parts.push('can’t reach Docker on the Pi; service links still work');
+  else if (problems.length === 0) parts.push(`all ${services.length} services up`);
+  else
+    for (const s of problems)
+      parts.push(`${s.display_name} ${shownState(s)}${s.since ? ` since ${clock(s.since)}` : ''}`);
+
+  if (backup) {
+    if (!backup.available) parts.push('no backup yet');
+    else if (!backup.ok) {
+      parts.push('last backup failed');
+      bad = true;
+    } else if (backup.stale) {
+      parts.push(`backup stale (${age(backup.age_seconds)} ago)`);
+      bad = true;
+    } else parts.push(`backup ${age(backup.age_seconds)} ago`);
+  }
+  if (host) {
+    const disks = [host.disk_percent, host.data_disk_percent].filter((p) => p != null);
+    if (disks.length) {
+      const fullest = Math.max(...disks);
+      if (fullest >= 90) bad = true;
+      parts.push(`disk ${Math.round(fullest)} %`);
+    }
+  }
+
+  return (
+    <p
+      className={`mb-5 flex items-center gap-2 text-sm ${
+        bad ? 'text-[var(--color-danger)]' : 'text-[var(--color-text-muted)]'
+      }`}
+      aria-live="polite"
+    >
+      <StateDot state={bad ? 'down' : 'up'} />
+      <span>{parts.join(' · ')}</span>
+    </p>
+  );
+}
+
+function Tile({ s, uptime30, isAdmin, onStart, busy }) {
+  const st = STATE[shownState(s)] || STATE.unknown;
+  const down = s.state === 'down';
+  const problem = down || s.state === 'degraded';
+  return (
+    <div
+      className={`bp-card bp-ticks relative flex h-full flex-col p-5 ${down ? '' : 'bp-card-link'}`}
+      title={down ? `${s.display_name} is down` : undefined}
+    >
+      {/* The whole tile links to the app, unless the app is down. */}
+      {!down && (
+        <a href={s.route_prefix} className="absolute inset-0 z-0" aria-label={`Open ${s.display_name}`} />
+      )}
+      <div className={`mb-3 flex items-center justify-between ${down ? 'opacity-60' : ''}`}>
+        <ServiceIcon icon={s.icon} name={s.display_name} slug={s.slug} />
+        <span className={`flex items-center gap-1.5 text-xs ${problem ? st.text : 'text-[var(--color-text-muted)]'}`}>
+          <StateDot state={s.state} />
+          {sinceText(s)}
+        </span>
+      </div>
+      <div className={down ? 'opacity-60' : ''}>
+        <div className="font-medium text-[var(--color-text-primary)]">{s.display_name}</div>
+        {s.description && (
+          <div className="mt-1 text-sm text-[var(--color-text-muted)]">{s.description}</div>
+        )}
+      </div>
+      {uptime30 && (
+        <UptimeStrip data={uptime30} name={s.container_name} className="mt-4" />
+      )}
+      {isAdmin && problem && s.state !== 'unknown' && (
+        <div className="relative z-10 mt-4 flex items-center gap-3 border-t border-[var(--color-border)] pt-3">
+          {down && (
+            <button onClick={() => onStart(s)} disabled={busy} className="btn btn-secondary text-xs">
+              {busy ? 'Starting…' : 'Start'}
+            </button>
+          )}
+          <Link
+            to={`/admin/monitor?logs=${encodeURIComponent(s.container_name)}`}
+            className="btn-link text-xs"
+          >
+            Logs
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function HomePage() {
+  const { user } = useAuth();
+  const isAdmin = !!user?.is_admin;
   const [services, setServices] = useState(null); // null = loading
+  const [dockerDown, setDockerDown] = useState(false);
   const [error, setError] = useState('');
+  const [uptime30, setUptime30] = useState(null);
+  const [host, setHost] = useState(null);
+  const [backup, setBackup] = useState(null);
+  const [starting, setStarting] = useState(null);
 
-  useEffect(() => {
-    apiJson('/services')
-      .then(setServices)
-      .catch((e) => {
-        setError(e.body?.detail || e.message || 'Failed to load services');
-        setServices([]);
-      });
-  }, []);
+  const loadServices = useCallback(async () => {
+    try {
+      setServices(await apiJson('/services'));
+      setDockerDown(false);
+      setError('');
+    } catch (e) {
+      if (e.status === 503 && Array.isArray(e.body?.services)) {
+        // Docker is unreachable: keep the last known tiles so links still work.
+        setDockerDown(true);
+        setServices((cur) => (e.body.services.length ? e.body.services : (cur ?? [])));
+      } else {
+        setError(e.body?.detail || 'Couldn’t load services.');
+        setServices((cur) => cur ?? []);
+      }
+    }
+    if (isAdmin) {
+      apiJson('/stats/system').then(setHost).catch(() => {});
+      backupStatus().then(setBackup).catch(() => {});
+    }
+  }, [isAdmin]);
+
+  usePoll(loadServices, SERVICES_POLL_MS);
+  usePoll(
+    () => uptime(UPTIME_DAYS).then(setUptime30).catch(() => {}),
+    UPTIME_POLL_MS,
+  );
+
+  async function start(s) {
+    setStarting(s.slug);
+    try {
+      await containerAction(s.container_name, 'start');
+      setError('');
+    } catch (e) {
+      setError(`Couldn’t start ${s.display_name}: ${e.body?.detail || 'no response'}`);
+    } finally {
+      await loadServices();
+      setStarting(null);
+    }
+  }
 
   if (services === null)
-    return <p className="bp-label text-sm text-[var(--color-text-muted)]">Loading…</p>;
+    return <p className="text-sm text-[var(--color-text-muted)]">Loading…</p>;
 
   return (
     <div>
-      <h2 className="bp-heading mb-5">Services</h2>
+      <h2 className="bp-heading mb-2">Services</h2>
+      {services.length > 0 || dockerDown ? (
+        <StatusLine services={services} dockerDown={dockerDown} host={host} backup={backup} />
+      ) : null}
       {error && <p className="mb-3 text-sm text-[var(--color-danger)]">{error}</p>}
       {services.length === 0 ? (
-        <p className="text-sm text-[var(--color-text-muted)]">
-          No services discovered. Add <code className="bp-code">homehub.*</code>{' '}
-          labels to a container in <code className="bp-code">docker-compose.yml</code>.
-        </p>
+        !dockerDown && (
+          <p className="text-sm text-[var(--color-text-muted)]">
+            No services discovered. Add <code className="bp-code">homehub.*</code>{' '}
+            labels to a container in <code className="bp-code">docker-compose.yml</code>.
+          </p>
+        )
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {services.map((s) => {
-            const st = STATUS[s.status] || { dot: 'bg-slate-400', label: s.status };
-            const reachable = s.status === 'running';
-            const tile = (
-              <div className={`bp-card bp-ticks flex h-full flex-col p-5 ${reachable ? 'bp-card-link' : ''}`}>
-                <div className="mb-3 flex items-center justify-between">
-                  <ServiceIcon
-                    icon={s.icon}
-                    name={s.display_name}
-                    slug={s.slug}
-                  />
-                  <span className="bp-label flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
-                    <span className={`h-2 w-2 rounded-full ${st.dot}`} />
-                    {st.label}
-                  </span>
-                </div>
-                <div className="font-medium text-[var(--color-text-primary)]">{s.display_name}</div>
-                {s.description && (
-                  <div className="mt-1 text-sm text-[var(--color-text-muted)]">{s.description}</div>
-                )}
-              </div>
-            );
-            return reachable ? (
-              <a key={s.slug} href={s.route_prefix} className="group block">
-                {tile}
-              </a>
-            ) : (
-              <div
-                key={s.slug}
-                className="cursor-not-allowed opacity-60"
-                title={`${s.display_name} is ${st.label}`}
-              >
-                {tile}
-              </div>
-            );
-          })}
+          {services.map((s) => (
+            <Tile
+              key={s.slug}
+              s={s}
+              uptime30={uptime30}
+              isAdmin={isAdmin}
+              onStart={start}
+              busy={starting === s.slug}
+            />
+          ))}
         </div>
       )}
     </div>

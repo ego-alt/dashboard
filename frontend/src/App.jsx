@@ -22,33 +22,30 @@ function DoorIcon() {
   );
 }
 
+function navItems(user) {
+  return [
+    { to: '/', label: 'Services', end: true },
+    user?.is_admin && { to: '/admin/monitor', label: 'Monitor' },
+    user?.is_admin && { to: '/admin/users', label: 'Users' },
+    { to: '/settings', label: 'Settings' },
+  ].filter(Boolean);
+}
+
 function TopBar() {
   const { user, logout } = useAuth();
   const linkCls = ({ isActive }) =>
     `bp-nav-link${isActive ? ' bp-nav-link-active' : ''}`;
   return (
     <header className="bp-topbar">
-      {/* Mobile: brand + account on row 1, nav drops to its own full-width row
-          below (order-last + w-full). Desktop: all inline on one row. */}
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+      {/* One row everywhere. On phones the nav moves to the bottom bar. */}
+      <div className="mx-auto flex max-w-5xl items-center gap-4 px-4 py-3">
         <span className="bp-brand">Home</span>
-        <nav className="order-last flex w-full flex-wrap gap-1 sm:order-none sm:w-auto">
-          <NavLink to="/" end className={linkCls}>
-            Services
-          </NavLink>
-          {user?.is_admin && (
-            <NavLink to="/monitor" className={linkCls}>
-              Monitor
+        <nav className="hidden gap-1 sm:flex">
+          {navItems(user).map((n) => (
+            <NavLink key={n.to} to={n.to} end={n.end} className={linkCls}>
+              {n.label}
             </NavLink>
-          )}
-          {user?.is_admin && (
-            <NavLink to="/users" className={linkCls}>
-              Users
-            </NavLink>
-          )}
-          <NavLink to="/settings" className={linkCls}>
-            Settings
-          </NavLink>
+          ))}
         </nav>
         <div className="ml-auto flex items-center gap-3">
           <span className="bp-label text-xs text-[var(--color-text-muted)]">
@@ -68,11 +65,38 @@ function TopBar() {
   );
 }
 
+// Phones: the page nav as a bar along the bottom, in thumb reach.
+function BottomNav() {
+  const { user } = useAuth();
+  return (
+    <nav
+      className="bp-topbar fixed inset-x-0 bottom-0 z-30 flex border-t border-b-0 sm:hidden"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
+      {navItems(user).map((n) => (
+        <NavLink
+          key={n.to}
+          to={n.to}
+          end={n.end}
+          className={({ isActive }) =>
+            `flex-1 py-3 text-center text-sm ${
+              isActive ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-muted)]'
+            }`
+          }
+        >
+          {n.label}
+        </NavLink>
+      ))}
+    </nav>
+  );
+}
+
 function Shell({ children }) {
   return (
     <div className="min-h-screen">
       <TopBar />
-      <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
+      <main className="mx-auto max-w-5xl px-4 pt-6 pb-24 sm:pb-6">{children}</main>
+      <BottomNav />
     </div>
   );
 }
@@ -96,8 +120,12 @@ export default function App() {
           </RequireAuth>
         }
       />
+      {/* Old paths. /users is also an API route, so the server redirects
+          browser visits to it (see list_users_endpoint). */}
+      <Route path="/monitor" element={<Navigate to="/admin/monitor" replace />} />
+      <Route path="/users" element={<Navigate to="/admin/users" replace />} />
       <Route
-        path="/monitor"
+        path="/admin/monitor"
         element={
           <RequireAuth>
             <AdminOnly>
@@ -109,7 +137,7 @@ export default function App() {
         }
       />
       <Route
-        path="/users"
+        path="/admin/users"
         element={
           <RequireAuth>
             <AdminOnly>
