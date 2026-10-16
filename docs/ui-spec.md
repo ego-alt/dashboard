@@ -86,14 +86,14 @@ Inter is loaded via Google Fonts in each app's HTML entry point with the preconn
 
 ### Reference values (current apps)
 
-| Role | Calendar (Gruvbox) | Library (Soft, light) | Library (dark) | Tapes (Gruvbox+orange) | Dashboard (Slate) |
+| Role | Calendar (Gruvbox) | Library / Shelves (day) | Library / Shelves (night) | Tapes (Gruvbox+orange) | Dashboard (Slate) |
 |---|---|---|---|---|---|
-| `--color-bg-base` | `#1d2021` | `#FFF1E5` | `#282828` | `#282828` | `#f8fafc` |
-| `--color-text-primary` | `#ebdbb2` | `#34495E` | `#ebdbb2` | `#ebdbb2` | `#0f172a` |
-| `--color-accent` | `#689d6a` | `#6AACFF` | `#689d6a` | `#fe8019` | `#0f172a` |
-| `--color-danger` | `#cc241d` | `#C0392B` | `#cc241d` | `#cc241d` | `#e11d48` |
+| `--color-bg-base` | `#1d2021` | `#f6f4ef` | `#141210` | `#282828` | `#182230` |
+| `--color-text-primary` | `#ebdbb2` | `#1f1d1a` | `#eadfca` | `#ebdbb2` | `#d4dde8` |
+| `--color-accent` | `#689d6a` | `#2d5b8a` | `#8fb0cf` | `#fe8019` | `#6f9bc4` |
+| `--color-danger` | `#cc241d` | `#a6352b` | `#cc241d` | `#cc241d` | `#e0697d` |
 
-Library's dark mode uses the Gruvbox values calendar started from, so the two apps converge at night (calendar's page has since gone a step darker, to Gruvbox's `#1d2021`); light mode keeps library's soft-academia identity.
+Each app has one accent: calendar green, tapes orange, library ink blue. Library ("Shelves") is a gallery wall in warm light: by day a pale wall lit through a paper blind, at night the same gallery under a lamp. The light (a glow, a paper grain and frosted panels) is app-local in its `index.css`; its reader deliberately drops all of it for a flat page with softened contrast (`--reader-bg` / `--reader-ink` in `reader.css`).
 
 ### Heading conventions (per-app, not spec tokens)
 
@@ -144,7 +144,7 @@ Keep `structural.css` in sync by copying it verbatim between the apps — it cha
 
 ## Current adoption
 
-- ✅ **Calendar / Library / Tapes** — shared `structural.css` (tokens + primitives + motion) + per-app `tokens.css`. Library's dark mode unifies to calendar's Gruvbox palette. Primitive overrides: calendar sets `.btn` and `.input` in 14px monospace and squares the corners (radii 0, except its mood tiles), for its terminal look; library's `.btn-primary` is ink-on-paper (`--color-text-secondary` fill, `--color-bg-base` text) instead of the accent fill, which read as a link colour on its palette. Library uses the 640px breakpoint throughout.
+- ✅ **Calendar / Library / Tapes** — shared `structural.css` (tokens + primitives + motion) + per-app `tokens.css`. Primitive overrides: calendar sets `.btn` and `.input` in 14px monospace and squares the corners (radii 0, except its mood tiles), for its terminal look; library's search and status controls are hairlines and underlines rather than fields and pills, and its covers have square corners. Library uses the 640px breakpoint throughout.
 - 🟡 **Dashboard** — colour tokens + `.btn`/`.input` in its React global CSS; buttons on primitives across Login/Settings/Users/Monitor (row actions via `.btn-link`). Every page opens with `PageHeader.jsx` (a 36px title row with optional controls on the right, then 16px to the first card). Cards on Monitor, Users and Settings share one recipe, `Panel.jsx` + `.bp-panel*`: 16px padding, a title whose line box is trimmed to the letters (`text-box: trim-both cap alphabetic`) so the space above it matches the padding, small right-hand asides, and a `flush` variant for tables. The top bar and phone nav use `--color-bg-chrome`, darker than the page, like calendar's and tapes' chrome. Services tiles are their own extension; layout inside pages is still Tailwind utilities on the same tokens.
 
 ## Open questions
