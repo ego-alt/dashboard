@@ -145,9 +145,9 @@ Keep `structural.css` in sync by copying it verbatim between the apps — it cha
 ## Current adoption
 
 - ✅ **Calendar / Library / Tapes** — shared `structural.css` (tokens + primitives + motion) + per-app `tokens.css`. Library's dark mode unifies to calendar's Gruvbox palette. Primitive overrides: calendar sets `.btn` and `.input` in 14px monospace and squares the corners (radii 0, except its mood tiles), for its terminal look; library's `.btn-primary` is ink-on-paper (`--color-text-secondary` fill, `--color-bg-base` text) instead of the accent fill, which read as a link colour on its palette. Library uses the 640px breakpoint throughout.
-- 🟡 **Dashboard** — colour tokens + `.btn`/`.input` in its React global CSS; buttons on primitives across Login/Settings/Users/Monitor (row actions via `.btn-link`). HomePage tiles and general layout still Tailwind utilities (palette flows through the same tokens). Heading conventions not yet enforced.
+- 🟡 **Dashboard** — colour tokens + `.btn`/`.input` in its React global CSS; buttons on primitives across Login/Settings/Users/Monitor (row actions via `.btn-link`). Cards on Monitor, Users and Settings share one recipe, `Panel.jsx` + `.bp-panel*`: 16px padding, a title whose line box is trimmed to the letters (`text-box: trim-both cap alphabetic`) so the space above it matches the padding, small right-hand asides, and a `flush` variant for tables. The top bar and phone nav use `--color-bg-chrome`, darker than the page, like calendar's and tapes' chrome. Services tiles are their own extension; layout inside pages is still Tailwind utilities on the same tokens.
 
 ## Open questions
 
 - ~~**Library still loads Bootstrap CDN**~~ — resolved (Oct 2026): Bootstrap is gone; library ships `static/css/base.css` with only the reset, container, grid columns and utilities it used, coloured from its tokens.
-- **Dashboard primitive coverage**. HomePage / MonitorPage are still Tailwind-styled. Migrating means rewriting utility-class chains to `.btn` variants on a per-component basis. Worth it for consistency, awkward for Tailwind-native devs.
+- **Dashboard primitive coverage**. Cards and buttons are on shared primitives; the layout inside pages is still Tailwind utilities. Status colours (up/degraded/down) are Tailwind's green/amber/red rather than tokens.

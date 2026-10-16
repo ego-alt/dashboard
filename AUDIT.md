@@ -299,3 +299,13 @@ I walked through it in Chrome at 1440×900 and at 390×844 with touch emulation:
 - Copy pass, including the outdated service descriptions (6, small).
 - Self-hosted Inter and an instant host-stats read (8.2, 8.3, small).
 - Keyboard shortcuts with a `?` sheet (8.4, small).
+
+---
+
+## Since the fixes (2026-10-16)
+
+Polish after trying the fixes in a browser:
+- Service tiles: a single header line (icon, name, description, state) over the uptime strip, 124px tall; they open the app in a new tab.
+- One card recipe (`Panel`) for Monitor, Users and Settings: 16px padding, the title trimmed to its letters so the space above it equals the space below the content, a small right-hand aside, and the description full width under the title row.
+- Password: one row like the Users form. Sessions: three shown, the rest behind "Show all".
+- Top bar: darker than the page (`--color-bg-chrome`), 55px, with the name and sign-out at the tabs' size.
