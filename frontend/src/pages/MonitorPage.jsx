@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { apiJson, backupStatus, containerAction, uptime } from '../api';
 import { useAuth } from '../auth.jsx';
 import LogsDrawer from '../components/LogsDrawer.jsx';
+import Panel from '../components/Panel.jsx';
 import { StateDot, UptimeStrip } from '../components/Status.jsx';
 import { PROBLEM_RANK, STATE, shownState } from '../lib/state';
 import { age, secondsSince, sentence } from '../lib/format';
@@ -20,8 +21,6 @@ const UPTIME_POLL_MS = 60_000;
 // Mirrors the backend PROTECTED_CONTAINERS default — controls are hidden for
 // these even for admins; the server is the real backstop (returns 409).
 const PROTECTED = new Set(['dashboard', 'home-nginx']);
-
-const CARD = 'bp-card';
 
 function fmtAge(s) {
   if (s == null) return '—';
@@ -100,24 +99,18 @@ function HostSection({ live, stale }) {
 
   usePoll(fetchStats, POLL_MS, live);
 
-  const heading = (
-    <h3 className="mb-3 text-base font-semibold text-[var(--color-text-primary)]">Host</h3>
-  );
-
   if (!s)
     return (
-      <section className={`${CARD} mb-6 p-4`}>
-        {heading}
+      <Panel title="Host" className="mb-6">
         <p className={`text-sm ${err ? 'text-[var(--color-danger)]' : 'text-[var(--color-text-muted)]'}`}>
           {err || 'Loading…'}
         </p>
-      </section>
+      </Panel>
     );
 
   const memPct = s.memory_percent;
   return (
-    <section className={`${CARD} mb-6 p-4 transition-opacity ${stale || err ? 'opacity-50' : ''}`}>
-      {heading}
+    <Panel title="Host" className={`mb-6 transition-opacity ${stale || err ? 'opacity-50' : ''}`}>
       <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
         <Metric
           label="CPU"
@@ -158,7 +151,7 @@ function HostSection({ live, stale }) {
           />
         )}
       </dl>
-    </section>
+    </Panel>
   );
 }
 
@@ -181,51 +174,37 @@ function BackupsSection() {
     load();
   }, [load]);
 
-  const heading = (extra) => (
-    <div className="mb-3 flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <h3 className="text-base font-semibold text-[var(--color-text-primary)]">Backups</h3>
-        {extra}
-      </div>
-      <button onClick={load} className="btn btn-primary text-sm">
-        Refresh
-      </button>
-    </div>
+  const card = (body, badge = null) => (
+    <Panel
+      title="Backups"
+      className="mt-6"
+      aside={
+        <>
+          {badge}
+          <button onClick={load} className="btn-link text-xs">
+            Refresh
+          </button>
+        </>
+      }
+    >
+      {body}
+    </Panel>
   );
 
   if (err)
-    return (
-      <section className={`mt-6 ${CARD} p-4`}>
-        {heading()}
-        <p className="text-sm text-[var(--color-danger)]">{err}</p>
-      </section>
-    );
+    return card(<p className="text-sm text-[var(--color-danger)]">{err}</p>);
   if (!s)
-    return (
-      <section className={`mt-6 ${CARD} p-4`}>
-        {heading()}
-        <p className="text-sm text-[var(--color-text-muted)]">Loading…</p>
-      </section>
-    );
+    return card(<p className="text-sm text-[var(--color-text-muted)]">Loading…</p>);
   if (!s.available)
-    return (
-      <section className={`mt-6 ${CARD} p-4`}>
-        {heading()}
-        <p className="text-sm text-[var(--color-text-muted)]">No backup has run yet.</p>
-      </section>
-    );
+    return card(<p className="text-sm text-[var(--color-text-muted)]">No backup has run yet.</p>);
 
   const healthy = s.ok && !s.stale;
   const label = !s.ok ? 'failed' : s.stale ? 'stale' : 'healthy';
   const pill = healthy ? 'bg-green-500/15 text-green-300' : 'bg-red-500/15 text-red-300';
 
   return (
-    <section className={`mt-6 ${CARD} p-4`}>
-      {heading(
-        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${pill}`}>
-          {label}
-        </span>,
-      )}
+    card(
+      <>
       {Array.isArray(s.databases) && s.databases.length > 0 && (
         <div className="mb-3 flex flex-wrap gap-2">
           {s.databases.map((d) => (
@@ -265,7 +244,9 @@ function BackupsSection() {
           {s.error || 'Last backup is stale — check the timer on the Pi.'}
         </p>
       )}
-    </section>
+      </>,
+      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${pill}`}>{label}</span>,
+    )
   );
 }
 
@@ -535,11 +516,11 @@ export default function MonitorPage() {
 
       <HostSection live={live} stale={stale} />
 
-      <section className={`${CARD} overflow-hidden`}>
-        <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] px-4 py-3">
-          <h3 className="text-base font-semibold text-[var(--color-text-primary)]">Containers</h3>
-          {notice && <span className="text-xs text-[var(--color-text-secondary)]">{notice}</span>}
-        </div>
+      <Panel
+        flush
+        title="Containers"
+        aside={notice && <span className="text-xs text-[var(--color-text-secondary)]">{notice}</span>}
+      >
         {error && <p className="px-4 pt-3 text-sm text-[var(--color-danger)]">{error}</p>}
         {containers === null ? (
           <p className="px-4 py-6 text-[var(--color-text-muted)]">{error ? '' : 'Loading containers…'}</p>
@@ -634,7 +615,7 @@ export default function MonitorPage() {
             </ul>
           </div>
         )}
-      </section>
+      </Panel>
 
       <BackupsSection />
 

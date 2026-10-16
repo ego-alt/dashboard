@@ -9,6 +9,7 @@ import {
   deleteUser,
 } from '../api';
 import { useAuth } from '../auth.jsx';
+import Panel from '../components/Panel.jsx';
 
 const BLANK = { username: '', display_name: '', password: '', is_admin: false };
 
@@ -212,9 +213,10 @@ export default function UsersPage() {
       <h2 className="mb-4 text-lg font-semibold text-[var(--color-text-primary)]">Users</h2>
       {error && <p className="mb-3 text-sm text-[var(--color-danger)]">{error}</p>}
 
-      <form
+      <Panel
+        as="form"
         onSubmit={onCreate}
-        className="mb-6 flex flex-col gap-3 bp-card p-4 sm:flex-row sm:flex-wrap sm:items-end"
+        className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end"
       >
         <label className={fieldCls}>
           Username
@@ -261,7 +263,7 @@ export default function UsersPage() {
         >
           {creating ? 'Adding…' : 'Add user'}
         </button>
-      </form>
+      </Panel>
 
       {notice && (
         <p className="mb-3 flex items-center gap-3 text-sm text-[var(--color-text-secondary)]">
@@ -284,7 +286,7 @@ export default function UsersPage() {
         </p>
       )}
 
-      <div className="bp-card">
+      <Panel flush>
         {/* Desktop table. */}
         <table className="hidden min-w-full text-sm sm:table">
           <thead className="bg-[var(--color-bg-inset)] text-left text-[var(--color-text-muted)]">
@@ -344,7 +346,7 @@ export default function UsersPage() {
         {users.length === 0 && (
           <p className="px-4 py-6 text-center text-[var(--color-text-muted)]">No users</p>
         )}
-      </div>
+      </Panel>
     </div>
   );
 }

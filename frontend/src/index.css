@@ -102,6 +102,48 @@ body {
   box-shadow: 0 0 24px -12px var(--color-accent);
 }
 
+/* Panels: the shared card for Monitor, Users and Settings (see Panel.jsx).
+ * The title's line box is trimmed to cap height and baseline, so the visible
+ * space above the title equals the padding instead of padding + half-leading.
+ * Browsers without text-box fall back to a tight line-height (~2px off). */
+.bp-panel { padding: 16px; }
+.bp-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.bp-panel-title {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--color-text-primary);
+  text-box: trim-both cap alphabetic;
+}
+.bp-panel-desc {
+  margin: 10px 0 0;
+  font-size: var(--text-sm);
+  line-height: 1.25rem;
+  color: var(--color-text-secondary);
+}
+/* Asides (badges, small links) are centred on the title's cap height. */
+.bp-panel-aside {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 12px;
+  height: 0.75rem;
+  overflow: visible;
+}
+.bp-panel-flush { padding: 0; overflow: hidden; }
+.bp-panel-flush > .bp-panel-head {
+  margin: 0;
+  padding: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
 .bp-heading {
   font-size: var(--text-lg);
   font-weight: 600;

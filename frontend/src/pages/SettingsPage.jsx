@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../auth.jsx';
+import Panel from '../components/Panel.jsx';
 import { age, clock, device, secondsSince } from '../lib/format';
 import {
   changePassword,
@@ -122,8 +123,7 @@ function PasswordSection() {
   }
 
   return (
-    <section className="bp-card p-6">
-      <h3 className="mb-4 text-base font-semibold text-[var(--color-text-primary)]">Password</h3>
+    <Panel title="Password">
       <form onSubmit={onSubmit} className="space-y-3">
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block text-xs text-[var(--color-text-muted)]">
@@ -171,7 +171,7 @@ function PasswordSection() {
         {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
         {done && <p className="text-sm text-[var(--color-text-secondary)]">{done}</p>}
       </form>
-    </section>
+    </Panel>
   );
 }
 
@@ -242,11 +242,9 @@ function TwoFactorSection() {
   const left = user?.totp_recovery_left;
 
   return (
-    <section className="bp-card p-6">
-      <div className="mb-4 flex items-baseline justify-between">
-        <h3 className="text-base font-semibold text-[var(--color-text-primary)]">
-          Two-factor authentication
-        </h3>
+    <Panel
+      title="Two-factor authentication"
+      aside={
         <span
           className={`rounded-full px-2 py-0.5 text-xs ${
             user?.totp_enabled
@@ -256,13 +254,14 @@ function TwoFactorSection() {
         >
           {user?.totp_enabled ? 'On' : 'Off'}
         </span>
-      </div>
+      }
+    >
 
       {recoveryCodes ? (
         <RecoveryCodes codes={recoveryCodes} onDone={() => setRecoveryCodes(null)} />
       ) : !user?.totp_enabled && !enrollment ? (
         <>
-          <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
+          <p className="mb-3 text-sm text-[var(--color-text-secondary)]">
             Add a second factor (TOTP) on top of your password. Use an authenticator app
             like 1Password, Bitwarden, or Google Authenticator.
           </p>
@@ -366,7 +365,7 @@ function TwoFactorSection() {
           )}
         </div>
       )}
-    </section>
+    </Panel>
   );
 }
 
@@ -414,12 +413,11 @@ function SessionsSection() {
   const others = (sessions || []).filter((s) => !s.current).length;
 
   return (
-    <section className="bp-card p-6">
-      <div className="mb-1 flex items-baseline justify-between gap-3">
-        <h3 className="text-base font-semibold text-[var(--color-text-primary)]">
-          Where you're signed in
-        </h3>
-        {others > 0 && (
+    <Panel
+      title="Where you're signed in"
+      description="Sign out a device you've lost or don't use any more."
+      aside={
+        others > 0 && (
           <button
             onClick={() => run(revokeOtherSessions)}
             disabled={busy}
@@ -427,15 +425,13 @@ function SessionsSection() {
           >
             Sign out all other devices
           </button>
-        )}
-      </div>
-      <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
-        Sign out a device you've lost or don't use any more.
-      </p>
+        )
+      }
+    >
       {sessions === null ? (
         <p className="text-sm text-[var(--color-text-muted)]">Loading…</p>
       ) : (
-        <ul className="mb-4 divide-y divide-[var(--color-border)]">
+        <ul className="mb-3 divide-y divide-[var(--color-border)]">
           {sessions.map((s) => (
             <li key={s.id} className="flex items-center justify-between gap-3 py-2 text-sm">
               <div>
@@ -483,7 +479,7 @@ function SessionsSection() {
           </ul>
         </details>
       )}
-    </section>
+    </Panel>
   );
 }
 
@@ -549,18 +545,13 @@ function ApiTokensSection() {
   }
 
   return (
-    <section className="bp-card p-6">
-      <h3 className="mb-1 text-base font-semibold text-[var(--color-text-primary)]">
-        API tokens
-      </h3>
-      <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
-        Let an app authenticate to your home stack without your password — for
-        example, the document scanner uploading a scan to your calendar. Paste
-        the token into the app once; revoke it here to cut access.
-      </p>
+    <Panel
+      title="API tokens"
+      description="Let an app authenticate to your home stack without your password — for example, the document scanner uploading a scan to your calendar. Paste the token into the app once; revoke it here to cut access."
+    >
 
       {freshToken && (
-        <div className="mb-4 space-y-2 rounded-lg bg-amber-500/15 p-3">
+        <div className="mb-3 space-y-2 rounded-lg bg-amber-500/15 p-3">
           <p className="text-sm font-medium text-amber-300">
             Copy this token now — it won't be shown again.
           </p>
@@ -584,9 +575,9 @@ function ApiTokensSection() {
       {tokens === null ? (
         <p className="text-sm text-[var(--color-text-muted)]">Loading…</p>
       ) : tokens.length === 0 ? (
-        <p className="mb-4 text-sm text-[var(--color-text-muted)]">No tokens yet.</p>
+        <p className="mb-3 text-sm text-[var(--color-text-muted)]">No tokens yet.</p>
       ) : (
-        <ul className="mb-4 divide-y divide-[var(--color-border)]">
+        <ul className="mb-3 divide-y divide-[var(--color-border)]">
           {tokens.map((t) => (
             <li
               key={t.id}
@@ -637,7 +628,7 @@ function ApiTokensSection() {
         </button>
       </form>
       {error && <p className="mt-2 text-sm text-[var(--color-danger)]">{error}</p>}
-    </section>
+    </Panel>
   );
 }
 
@@ -688,31 +679,25 @@ function PasskeysSection() {
 
   if (!passkeysSupported()) {
     return (
-      <section className="bp-card p-6">
-        <h3 className="mb-2 text-base font-semibold text-[var(--color-text-primary)]">Passkeys</h3>
-        <p className="text-sm text-[var(--color-text-secondary)]">
-          This browser doesn't support WebAuthn. Open the dashboard in a recent
-          browser to enroll a passkey.
-        </p>
-      </section>
+      <Panel
+        title="Passkeys"
+        description="This browser doesn't support WebAuthn. Open the dashboard in a recent browser to enroll a passkey."
+      />
     );
   }
 
   return (
-    <section className="bp-card p-6">
-      <h3 className="mb-1 text-base font-semibold text-[var(--color-text-primary)]">Passkeys</h3>
-      <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
-        Sign in without a password using your device's built-in authenticator
-        (Touch ID, Windows Hello, security key, etc.). A passkey alone is a
-        strong factor — 2FA isn't asked for again on top of it.
-      </p>
+    <Panel
+      title="Passkeys"
+      description="Sign in without a password using your device's built-in authenticator (Touch ID, Windows Hello, security key, etc.). A passkey alone is a strong factor — 2FA isn't asked for again on top of it."
+    >
 
       {passkeys === null ? (
         <p className="text-sm text-[var(--color-text-muted)]">Loading…</p>
       ) : passkeys.length === 0 ? (
-        <p className="mb-4 text-sm text-[var(--color-text-muted)]">No passkeys yet.</p>
+        <p className="mb-3 text-sm text-[var(--color-text-muted)]">No passkeys yet.</p>
       ) : (
-        <ul className="mb-4 divide-y divide-[var(--color-border)]">
+        <ul className="mb-3 divide-y divide-[var(--color-border)]">
           {passkeys.map((k) => (
             <li
               key={k.id}
@@ -763,6 +748,6 @@ function PasskeysSection() {
         </button>
       </form>
       {error && <p className="mt-2 text-sm text-[var(--color-danger)]">{error}</p>}
-    </section>
+    </Panel>
   );
 }
