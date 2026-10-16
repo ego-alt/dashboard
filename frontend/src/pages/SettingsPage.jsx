@@ -384,9 +384,13 @@ const LOGIN_REASONS = {
   passkey: 'with a passkey',
 };
 
+// This device plus the most recent others; the rest behind "Show all".
+const SESSIONS_SHOWN = 3;
+
 function SessionsSection() {
   const [sessions, setSessions] = useState(null);
   const [events, setEvents] = useState(null);
+  const [showAll, setShowAll] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -438,7 +442,7 @@ function SessionsSection() {
         <p className="text-sm text-[var(--color-text-muted)]">Loading…</p>
       ) : (
         <ul className="mb-3 divide-y divide-[var(--color-border)]">
-          {sessions.map((s) => (
+          {(showAll ? sessions : sessions.slice(0, SESSIONS_SHOWN)).map((s) => (
             <li key={s.id} className="flex items-center justify-between gap-3 py-2 text-sm">
               <div>
                 <div className="font-medium text-[var(--color-text-primary)]">
@@ -464,6 +468,13 @@ function SessionsSection() {
             </li>
           ))}
         </ul>
+      )}
+      {sessions?.length > SESSIONS_SHOWN && (
+        <div className="mb-3 text-xs">
+          <button onClick={() => setShowAll((v) => !v)} className="btn-link">
+            {showAll ? 'Show fewer' : `Show all ${sessions.length} sessions`}
+          </button>
+        </div>
       )}
       {error && <p className="mb-3 text-sm text-[var(--color-danger)]">{error}</p>}
       {events?.length > 0 && (
