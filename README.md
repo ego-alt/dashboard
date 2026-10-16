@@ -8,6 +8,15 @@ tapes) trust an `X-Forwarded-User` header that nginx injects after an
 
 The architecture rationale lives in [`PLAN.md`](PLAN.md).
 
+## Pages
+
+- **Services** (`/`): a tile per app with its state (up, degraded, down) and a 30-day uptime strip, plus one status line: all services up, or what's wrong, with the last backup and the fullest disk for admins. Admins can start a down service or open its logs from the tile.
+- **Monitor** (`/admin/monitor`, admins): host CPU, memory, disk and temperature; every container with its uptime, restarts, a 24-hour uptime strip, CPU, memory and network; Start, Stop, Restart and a logs drawer (`?logs=<name>` opens one); the last backup. It says when its data is stale.
+- **Users** (`/admin/users`, admins): add users, set passwords (which signs the user out everywhere), change roles with Undo, reset 2FA, delete.
+- **Settings** (`/settings`): change your password, 2FA with recovery codes, passkeys, where you're signed in (sign out other devices, recent sign-ins), API tokens.
+
+Uptime comes from a sampler thread in the dashboard: once a minute it records each container's state (Docker's `running`, plus its healthcheck when it has one) into hourly rows in `uptime_hours`, kept for 90 days. Minutes when the dashboard itself was down count as no data.
+
 ## Stack
 
 - **Backend**: FastAPI + uvicorn (Python 3.11+, managed by `uv`)
@@ -157,20 +166,27 @@ npm run dev                                                # vite on http://loca
 | `/ping`                              | GET    | public   | Healthcheck (Docker `HEALTHCHECK` target) |
 | `/login`                             | POST   | public   | Username + password → session cookie |
 | `/logout`                            | POST   | public   | Revoke current session |
-| `/me`                                | GET    | user     | Current-user info |
+| `/me`                                | GET    | user     | Current-user info (id, role, 2FA, recovery codes left) |
+| `/me/password`                       | POST   | user     | Change your password (`current_password`, `new_password`, `sign_out_others`) |
+| `/auth/sessions`                     | GET    | user     | Your sessions (public ids, device, last seen; never the cookie) |
+| `/auth/sessions/{id}`                | DELETE | user     | Sign out one of your other sessions |
+| `/auth/sessions/revoke-others`       | POST   | user     | Sign out everywhere else |
+| `/auth/login-events`                 | GET    | user     | Your recent sign-ins, including failed attempts |
 | `/auth/verify`                       | GET    | internal | nginx `auth_request`; session cookie **or** `Authorization: Bearer <api-token>`; returns `X-User` on 200 |
 | `/auth/totp/{setup,enable,disable}`  | POST   | user     | Enroll / manage TOTP 2FA (`enable` returns recovery codes) |
+| `/auth/totp/recovery-codes`          | POST   | user     | New recovery codes (needs a current authenticator code) |
 | `/auth/totp/verify`                  | POST   | pending  | Second-factor step during login |
 | `/auth/webauthn/register/*`, `/credentials` | varies | user | Register, list, remove passkeys |
 | `/auth/webauthn/login/{begin,finish}`| POST   | public   | Passkey login |
 | `/auth/tokens`                       | GET    | user     | List the caller's API tokens (no raw values) |
 | `/auth/tokens`                       | POST   | user     | Mint an API token (`name`); returns the raw token **once** |
 | `/auth/tokens/{id}`                  | DELETE | user     | Revoke an API token |
-| `/users`                             | GET/POST | admin  | List / create users |
-| `/users/{id}/{password,admin,reset-2fa}` | POST | admin   | Reset password, toggle admin, clear a user's 2FA |
+| `/users`                             | GET/POST | admin  | List / create users (a browser visit redirects to the page) |
+| `/users/{id}/{password,admin,reset-2fa}` | POST | admin   | Set password (ends the user's sessions), toggle admin, clear a user's 2FA |
 | `/users/{id}`                        | DELETE | admin    | Delete a user (purges their sessions, tokens, passkeys) |
-| `/services`                          | GET    | user     | Hub tiles discovered from `homehub.*` Docker labels + status (running/stopped) |
-| `/containers`                        | GET    | user     | List containers (`?stats=1` adds live CPU/network, ~1s per running container) |
+| `/services`                          | GET    | user     | Hub tiles discovered from `homehub.*` Docker labels, with state (up/degraded/down) and since when; 503 with the last known tiles when Docker is unreachable |
+| `/containers`                        | GET    | user     | List containers with state, health, start time and restart count (`?stats=1` adds live CPU/memory/network) |
+| `/uptime`                            | GET    | user     | Uptime strips: `days=1` → 24 hourly buckets, else daily; `tz` = viewer's UTC offset in minutes |
 | `/containers/{id}/start\|stop\|restart` | POST | admin   | Container lifecycle (refuses protected gateway containers, 409) |
 | `/containers/{id}/logs`              | GET    | user     | Recent logs |
 | `/stats/system`                      | GET    | user     | psutil CPU / mem / disk |
@@ -212,8 +228,8 @@ Copy [`.env.example`](.env.example) to `.env` and edit. Compose reads `.env`
 automatically; for `uv run`-based dev, `export` the vars or use `direnv`.
 Notable knobs: `SESSION_COOKIE_SECURE`, `DOCKER_GID`,
 `PROTECTED_CONTAINERS` (gateway containers the monitor refuses to
-stop/restart — default `dashboard,home-nginx`), and `DASHBOARD_API_TARGET`
-(Vite dev-proxy upstream).
+stop/restart — default `dashboard,home-nginx`), `DASHBOARD_API_TARGET`
+(Vite dev-proxy upstream), and `UPTIME_SAMPLER=0` to turn the uptime sampler off.
 
 ## AI assistants (MCP)
 
@@ -252,12 +268,7 @@ restore / disaster-recovery steps: [`docs/BACKUPS.md`](docs/BACKUPS.md).
 uv run pytest
 ```
 
-98 tests cover the auth surface (login lifecycle, session expiry, TOTP 2FA,
-WebAuthn passkeys, API tokens, HaveIBeenPwned checks, admin user management,
-authorization gates), label-based service discovery (filtering, status,
-daemon-down resilience, sort order), the protected-container anti-lockout guard,
-the backup-status endpoint (freshness/staleness), and a mocked-daemon layer for
-`app/docker_control.py`.
+The tests cover the auth surface (login lifecycle, session expiry, TOTP 2FA, recovery codes, WebAuthn passkeys, API tokens, HaveIBeenPwned checks, admin user management, your own password and sessions, authorization gates), label-based service discovery (filtering, state, Docker-down handling, sort order), container state and the uptime sampler, the protected-container anti-lockout guard, the backup-status endpoint (freshness/staleness), and a mocked-daemon layer for `app/docker_control.py`.
 
 ## Layout
 
@@ -268,13 +279,14 @@ app/                FastAPI application
   webauthn_helpers.py  passkey registration / assertion
   hibp.py           HaveIBeenPwned k-anonymity password check
   db.py             SQLAlchemy engine, get_db, session_scope
-  models.py         User, UserSession, ApiToken, WebauthnCredential, LoginEvent ORM
-  docker_control.py docker-py wrappers, parallelized stats
+  models.py         User, UserSession, ApiToken, WebauthnCredential, LoginEvent, UptimeHour ORM
+  docker_control.py docker-py wrappers, container state, parallelized stats
   services.py       service discovery from Docker homehub.* labels
   system_stats.py   psutil-only host stats
+  uptime.py         per-minute uptime sampler + the strips /uptime returns
   main.py           routes + lifespan + protected-container guard
   cli.py            operator CLI (users, sessions)
-frontend/           React 19 + Vite SPA: login, service-tile home, admin monitor
+frontend/           React 19 + Vite SPA: login, services, monitor, users, settings
 mcp/                MCP server for AI assistants (own package + container; see mcp/README.md)
 nginx/conf.d/       Reverse-proxy + auth_request config
 scripts/            dev-certs.sh, sync_household_users.py, restic-backup.sh
