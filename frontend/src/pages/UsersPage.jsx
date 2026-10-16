@@ -207,7 +207,8 @@ export default function UsersPage() {
   };
 
   const inputCls = 'input mt-1';
-  const fieldCls = 'flex w-full flex-col text-xs text-[var(--color-text-muted)] sm:w-44';
+  // Text fields share the row's spare width; the checkbox and button don't grow.
+  const fieldCls = 'flex w-full min-w-0 flex-col text-xs text-[var(--color-text-muted)] sm:flex-1';
 
   return (
     <div>
@@ -217,7 +218,7 @@ export default function UsersPage() {
       <Panel
         as="form"
         onSubmit={onCreate}
-        className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end"
+        className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end"
       >
         <label className={fieldCls}>
           Username
@@ -246,7 +247,7 @@ export default function UsersPage() {
             className={inputCls}
           />
         </label>
-        <label className={fieldCls}>
+        <label className="flex flex-col text-xs text-[var(--color-text-muted)]">
           <span aria-hidden="true" className="hidden sm:block">&nbsp;</span>
           <span className="mt-1 flex h-[30px] items-center gap-2 text-sm text-[var(--color-text-secondary)]">
             <input
@@ -260,7 +261,7 @@ export default function UsersPage() {
         <button
           type="submit"
           disabled={creating}
-          className="btn btn-primary w-full text-sm sm:ml-auto sm:w-auto"
+          className="btn btn-primary w-full text-sm sm:w-auto"
         >
           {creating ? 'Adding…' : 'Add user'}
         </button>

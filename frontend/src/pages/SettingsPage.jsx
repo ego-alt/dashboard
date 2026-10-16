@@ -94,8 +94,8 @@ export default function SettingsPage() {
   );
 }
 
-// Same field sizing as the Users add form.
-const FIELD = 'flex w-full flex-col text-xs text-[var(--color-text-muted)] sm:w-44';
+// Fields share the row's spare width, like the Users add form.
+const FIELD = 'flex w-full min-w-0 flex-col text-xs text-[var(--color-text-muted)] sm:flex-1';
 
 function PasswordSection() {
   const [current, setCurrent] = useState('');
@@ -173,7 +173,7 @@ function PasswordSection() {
         <button
           type="submit"
           disabled={busy || !current || next.length < 8}
-          className="btn btn-primary w-full text-sm sm:ml-auto sm:w-auto"
+          className="btn btn-primary w-full text-sm sm:w-auto"
         >
           {busy ? 'Changing…' : 'Change password'}
         </button>
