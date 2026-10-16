@@ -43,8 +43,8 @@ export function duration(seconds) {
 
 export function pct(p) {
   if (p == null) return '—';
-  if (p >= 99.995) return '100 %';
-  return `${p.toFixed(p >= 99 ? 2 : 1)} %`;
+  if (p >= 99.995) return '100\u00a0%';
+  return `${p.toFixed(p >= 99 ? 2 : 1)}\u00a0%`;
 }
 
 /** A server message ("can't reach Docker") as a sentence. */

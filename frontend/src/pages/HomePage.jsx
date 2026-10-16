@@ -47,7 +47,7 @@ function StatusLine({ services, dockerDown, host, backup }) {
     if (disks.length) {
       const fullest = Math.max(...disks);
       if (fullest >= 90) bad = true;
-      parts.push(`disk ${Math.round(fullest)} %`);
+      parts.push(`disk ${Math.round(fullest)}\u00a0%`);
     }
   }
 
@@ -68,46 +68,61 @@ function Tile({ s, uptime30, isAdmin, onStart, busy }) {
   const st = STATE[shownState(s)] || STATE.unknown;
   const down = s.state === 'down';
   const problem = down || s.state === 'degraded';
+  const actions = isAdmin && problem && s.state !== 'unknown';
   return (
     <div
-      className={`bp-card bp-ticks relative flex h-full flex-col p-5 ${down ? '' : 'bp-card-link'}`}
+      className={`bp-card bp-ticks relative flex h-full flex-col gap-5 px-5 py-5 ${down ? '' : 'bp-card-link'}`}
       title={down ? `${s.display_name} is down` : undefined}
     >
       {/* The whole tile links to the app, unless the app is down. */}
       {!down && (
         <a href={s.route_prefix} className="absolute inset-0 z-0" aria-label={`Open ${s.display_name}`} />
       )}
-      <div className={`mb-3 flex items-center justify-between ${down ? 'opacity-60' : ''}`}>
-        <ServiceIcon icon={s.icon} name={s.display_name} slug={s.slug} />
-        <span className={`flex items-center gap-1.5 text-xs ${problem ? st.text : 'text-[var(--color-text-muted)]'}`}>
+      <div className="flex items-start gap-3">
+        <span className={down ? 'opacity-60' : ''}>
+          <ServiceIcon icon={s.icon} name={s.display_name} slug={s.slug} />
+        </span>
+        <div className={`min-w-0 flex-1 ${down ? 'opacity-60' : ''}`}>
+          <div className="font-medium text-[var(--color-text-primary)]">{s.display_name}</div>
+          {s.description && (
+            <div className="mt-0.5 truncate text-sm text-[var(--color-text-muted)]" title={s.description}>
+              {s.description}
+            </div>
+          )}
+        </div>
+        <span
+          className={`flex shrink-0 items-center gap-1.5 self-start text-xs ${
+            problem ? st.text : 'text-[var(--color-text-muted)]'
+          }`}
+        >
           <StateDot state={s.state} />
           {sinceText(s)}
         </span>
       </div>
-      <div className={down ? 'opacity-60' : ''}>
-        <div className="font-medium text-[var(--color-text-primary)]">{s.display_name}</div>
-        {s.description && (
-          <div className="mt-1 text-sm text-[var(--color-text-muted)]">{s.description}</div>
+      {/* Strip, with admin actions in place of the % when something's wrong. */}
+      <div className="flex items-center gap-3">
+        <UptimeStrip
+          data={uptime30}
+          name={s.container_name}
+          showPct={!actions}
+          className="flex-1"
+        />
+        {actions && (
+          <span className="relative z-10 flex shrink-0 items-center gap-3 text-xs">
+            {down && (
+              <button onClick={() => onStart(s)} disabled={busy} className="btn-link text-xs">
+                {busy ? 'Starting…' : 'Start'}
+              </button>
+            )}
+            <Link
+              to={`/admin/monitor?logs=${encodeURIComponent(s.container_name)}`}
+              className="btn-link text-xs"
+            >
+              Logs
+            </Link>
+          </span>
         )}
       </div>
-      {uptime30 && (
-        <UptimeStrip data={uptime30} name={s.container_name} className="mt-4" />
-      )}
-      {isAdmin && problem && s.state !== 'unknown' && (
-        <div className="relative z-10 mt-4 flex items-center gap-3 border-t border-[var(--color-border)] pt-3">
-          {down && (
-            <button onClick={() => onStart(s)} disabled={busy} className="btn btn-secondary text-xs">
-              {busy ? 'Starting…' : 'Start'}
-            </button>
-          )}
-          <Link
-            to={`/admin/monitor?logs=${encodeURIComponent(s.container_name)}`}
-            className="btn-link text-xs"
-          >
-            Logs
-          </Link>
-        </div>
-      )}
     </div>
   );
 }
@@ -181,7 +196,7 @@ export default function HomePage() {
           </p>
         )
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {services.map((s) => (
             <Tile
               key={s.slug}
