@@ -9,7 +9,7 @@ import SettingsPage from './pages/SettingsPage.jsx';
 // Closed-door "sign out" glyph — matches the door icon the calendar/library apps use.
 function DoorIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden>
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden>
       <path
         d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16M4 21h16"
         stroke="currentColor"
@@ -38,7 +38,7 @@ function TopBar() {
   return (
     <header className="bp-topbar">
       {/* One row everywhere. On phones the nav moves to the bottom bar. */}
-      <div className="mx-auto flex max-w-5xl items-center gap-4 px-4 py-3">
+      <div className="mx-auto flex max-w-5xl items-center gap-4 px-4 py-[11.5px]">
         <span className="bp-brand">Home</span>
         <nav className="hidden gap-1 sm:flex">
           {navItems(user).map((n) => (
@@ -48,12 +48,13 @@ function TopBar() {
           ))}
         </nav>
         <div className="ml-auto flex items-center gap-3">
-          <span className="bp-label text-xs text-[var(--color-text-muted)]">
+          <span className="text-sm text-[var(--color-text-muted)]">
             {user?.display_name || user?.username}
           </span>
           <button
             onClick={logout}
             className="btn btn-ghost"
+            style={{ padding: 6 }}
             title="Sign out"
             aria-label="Sign out"
           >

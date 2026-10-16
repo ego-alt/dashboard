@@ -9,6 +9,7 @@
   --color-bg-base: #182230;            /* deep slate-blue drafting field */
   --color-bg-elevated: #1f2c3c;        /* panels / cards */
   --color-bg-inset: #141d28;
+  --color-bg-chrome: #111821;          /* top bar + phone nav: darker than the field */
   --color-bg-overlay: rgba(10, 16, 24, 0.72);
   --color-border: #35485e;             /* slate structural line */
   --color-text-primary: #d4dde8;       /* soft slate-200 */
@@ -136,6 +137,7 @@ body {
   gap: 12px;
   height: 0.75rem;
   overflow: visible;
+  font-size: 0.75rem; /* .btn-link sets font: inherit, so links here inherit this */
 }
 .bp-panel-flush { padding: 0; overflow: hidden; }
 .bp-panel-flush > .bp-panel-head {
@@ -161,8 +163,7 @@ body {
 /* Top bar + nav. */
 .bp-topbar {
   border-bottom: 1px solid var(--color-border);
-  background: color-mix(in srgb, var(--color-bg-elevated) 82%, transparent);
-  backdrop-filter: blur(6px);
+  background: var(--color-bg-chrome);
 }
 .bp-brand {
   font-weight: 600;
