@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiJson, backupStatus, containerAction, uptime } from '../api';
 import { useAuth } from '../auth.jsx';
+import PageHeader from '../components/PageHeader.jsx';
 import ServiceIcon from '../components/ServiceIcon.jsx';
 import { StateDot, UptimeStrip } from '../components/Status.jsx';
 import { age, clock, secondsSince } from '../lib/format';
@@ -53,7 +54,7 @@ function StatusLine({ services, dockerDown, host, backup }) {
 
   return (
     <p
-      className={`mb-5 flex items-center gap-2 text-sm ${
+      className={`flex items-center gap-2 text-sm ${
         bad ? 'text-[var(--color-danger)]' : 'text-[var(--color-text-muted)]'
       }`}
       aria-live="polite"
@@ -189,10 +190,11 @@ export default function HomePage() {
 
   return (
     <div>
-      <h2 className="bp-heading mb-2">Services</h2>
-      {services.length > 0 || dockerDown ? (
-        <StatusLine services={services} dockerDown={dockerDown} host={host} backup={backup} />
-      ) : null}
+      <PageHeader title="Services">
+        {(services.length > 0 || dockerDown) && (
+          <StatusLine services={services} dockerDown={dockerDown} host={host} backup={backup} />
+        )}
+      </PageHeader>
       {error && <p className="mb-3 text-sm text-[var(--color-danger)]">{error}</p>}
       {services.length === 0 ? (
         !dockerDown && (

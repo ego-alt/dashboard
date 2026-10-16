@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../auth.jsx';
+import PageHeader from '../components/PageHeader.jsx';
 import Panel from '../components/Panel.jsx';
 import { age, clock, device, secondsSince } from '../lib/format';
 import {
@@ -80,13 +81,15 @@ function RecoveryCodes({ codes, onDone }) {
  */
 export default function SettingsPage() {
   return (
-    <div className="space-y-6">
-      <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">Settings</h2>
+    <div>
+      <PageHeader title="Settings" />
+      <div className="space-y-6">
       <PasswordSection />
       <TwoFactorSection />
       <PasskeysSection />
       <SessionsSection />
       <ApiTokensSection />
+      </div>
     </div>
   );
 }

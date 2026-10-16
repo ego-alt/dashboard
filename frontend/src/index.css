@@ -156,11 +156,6 @@ body {
   body.logs-pane-open header.bp-topbar { padding-right: var(--side-pane-w); }
 }
 
-.bp-heading {
-  font-size: var(--text-lg);
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
 .bp-code {
   font-family: var(--font-mono);
   background: var(--color-bg-inset);

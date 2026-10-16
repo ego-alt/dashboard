@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { apiJson, backupStatus, containerAction, uptime } from '../api';
 import { useAuth } from '../auth.jsx';
 import LogsDrawer from '../components/LogsDrawer.jsx';
+import PageHeader from '../components/PageHeader.jsx';
 import Panel from '../components/Panel.jsx';
 import { StateDot, UptimeStrip } from '../components/Status.jsx';
 import { PROBLEM_RANK, STATE, shownState } from '../lib/state';
@@ -489,33 +490,37 @@ export default function MonitorPage() {
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
-        <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">Monitor</h2>
-        <span
-          className={`ml-auto text-xs ${stale ? 'text-[var(--color-danger)]' : 'text-[var(--color-text-muted)]'}`}
-          aria-live="polite"
-        >
-          {freshness}
-        </span>
-        <button
-          onClick={() => setLive((v) => !v)}
-          className={`btn text-sm ${
-            stale
-              ? 'border-red-500/40 bg-red-500/10 text-red-300'
-              : live
-                ? 'border-green-500/40 bg-green-500/10 text-green-300'
-                : 'btn-secondary'
-          }`}
-          title={live ? `Live: refreshing every ${POLL_MS / 1000} s. Click to pause.` : 'Paused. Click to resume.'}
-        >
-          <span
-            className={`h-2 w-2 rounded-full ${
-              stale ? 'bg-red-500' : live ? 'bg-green-500' : 'bg-[var(--color-text-muted)]'
-            }`}
-          />
-          {stale ? 'Stale' : live ? 'Live' : 'Paused'}
-        </button>
-      </div>
+      <PageHeader
+        title="Monitor"
+        aside={
+          <>
+            <span
+              className={`text-xs ${stale ? 'text-[var(--color-danger)]' : 'text-[var(--color-text-muted)]'}`}
+              aria-live="polite"
+            >
+              {freshness}
+            </span>
+            <button
+              onClick={() => setLive((v) => !v)}
+              className={`btn text-sm ${
+                stale
+                  ? 'border-red-500/40 bg-red-500/10 text-red-300'
+                  : live
+                    ? 'border-green-500/40 bg-green-500/10 text-green-300'
+                    : 'btn-secondary'
+              }`}
+              title={live ? `Live: refreshing every ${POLL_MS / 1000} s. Click to pause.` : 'Paused. Click to resume.'}
+            >
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  stale ? 'bg-red-500' : live ? 'bg-green-500' : 'bg-[var(--color-text-muted)]'
+                }`}
+              />
+              {stale ? 'Stale' : live ? 'Live' : 'Paused'}
+            </button>
+          </>
+        }
+      />
 
       <HostSection live={live} stale={stale} />
 

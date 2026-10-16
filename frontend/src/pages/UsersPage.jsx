@@ -9,6 +9,7 @@ import {
   deleteUser,
 } from '../api';
 import { useAuth } from '../auth.jsx';
+import PageHeader from '../components/PageHeader.jsx';
 import Panel from '../components/Panel.jsx';
 
 const BLANK = { username: '', display_name: '', password: '', is_admin: false };
@@ -210,7 +211,7 @@ export default function UsersPage() {
 
   return (
     <div>
-      <h2 className="mb-4 text-lg font-semibold text-[var(--color-text-primary)]">Users</h2>
+      <PageHeader title="Users" />
       {error && <p className="mb-3 text-sm text-[var(--color-danger)]">{error}</p>}
 
       <Panel
