@@ -80,6 +80,48 @@ def get_container_stats(container_id: str) -> Dict[str, Any]:
     return _stats_for(container)
 
 
+# Docker's "never happened" timestamp (e.g. FinishedAt of a container that has
+# never stopped).
+_ZERO_TIME = "0001-01-01"
+
+_HUB_TRUTHY = {"1", "true", "yes", "on"}
+
+
+def _ts(raw: Any) -> str | None:
+    return raw if isinstance(raw, str) and raw and not raw.startswith(_ZERO_TIME) else None
+
+
+def container_state(container) -> Dict[str, Any]:
+    """Up/degraded/down plus uptime facts, from the inspect data docker-py
+    already fetched for ``containers.list`` (no extra daemon call).
+
+    ``degraded`` = running but its healthcheck says unhealthy (or is still
+    starting): the container is there, the app inside isn't answering.
+    """
+    attrs = container.attrs or {}
+    st = attrs.get("State") or {}
+    health = (st.get("Health") or {}).get("Status")
+    running = container.status == "running"
+    if not running:
+        state = "down"
+    elif health in ("unhealthy", "starting"):
+        state = "degraded"
+    else:
+        state = "up"
+    return {
+        "state": state,
+        "health": health,
+        "started_at": _ts(st.get("StartedAt")) if running else None,
+        "finished_at": None if running else _ts(st.get("FinishedAt")),
+        "restart_count": attrs.get("RestartCount") or 0,
+    }
+
+
+def _is_hub(container) -> bool:
+    labels = container.labels or {}
+    return (labels.get("homehub.enable") or "").strip().lower() in _HUB_TRUTHY
+
+
 def resolve_container_name(id_or_name: str) -> str | None:
     """Canonical container name for an id-or-name, or None if unresolvable.
 
@@ -97,7 +139,7 @@ def list_service_candidates() -> List[Dict[str, Any]]:
     stats. Backs label-based service discovery.
     """
     return [
-        {"name": c.name, "status": c.status, "labels": c.labels or {}}
+        {"name": c.name, "status": c.status, "labels": c.labels or {}, **container_state(c)}
         for c in _get_client().containers.list(all=True)
     ]
 
@@ -114,6 +156,8 @@ def _metadata_row(container) -> Dict[str, Any]:
         "ports": container.ports,
         "created": attrs.get("Created"),
         "command": attrs.get("Command"),
+        "hub": _is_hub(container),
+        **container_state(container),
     }
 
 

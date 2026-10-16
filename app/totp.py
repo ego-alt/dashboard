@@ -37,8 +37,12 @@ def provisioning_uri(secret: str, username: str) -> str:
 
 
 def render_qr_svg(uri: str) -> str:
-    """Return an SVG string for the provisioning URI. No external deps used."""
-    img = qrcode.make(uri, image_factory=qrcode.image.svg.SvgImage)
+    """Return an SVG string for the provisioning URI. No external deps used.
+
+    One path with a viewBox: the plain ``SvgImage`` factory writes namespaced
+    ``svg:rect`` elements, which don't render once the SVG is inserted into
+    the page's HTML, and has no viewBox, so it can't be scaled."""
+    img = qrcode.make(uri, image_factory=qrcode.image.svg.SvgPathImage)
     buf = io.BytesIO()
     img.save(buf)
     return buf.getvalue().decode("utf-8")

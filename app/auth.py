@@ -27,6 +27,8 @@ SESSION_TTL = timedelta(days=14)
 # the TOTP verify step. Long enough for fumbling, short enough to be useless to
 # steal the cookie before second factor.
 MFA_PENDING_TTL = timedelta(minutes=5)
+# How stale a session's last_seen_at may get before a request refreshes it.
+SESSION_SEEN_INTERVAL = timedelta(minutes=5)
 
 # Single PasswordHasher instance: argon2-cffi recommends reuse so memory/time
 # parameters are amortized. ``hash`` produces ``$argon2id$v=19$...`` which is
@@ -145,10 +147,35 @@ def lookup_session(db: DbSession, token: str) -> Optional[UserSession]:
     # Sliding extension only for fully-authenticated sessions; pending-2FA
     # sessions keep their short fixed TTL so a stolen first-factor cookie
     # can't be kept alive without ever completing the second factor.
+    dirty = False
     if not sess.mfa_pending and exp - now < SESSION_TTL / 2:
         sess.expires_at = now + SESSION_TTL
+        dirty = True
+    seen = sess.last_seen_at
+    if seen is not None and seen.tzinfo is None:
+        seen = seen.replace(tzinfo=timezone.utc)
+    if seen is None or now - seen >= SESSION_SEEN_INTERVAL:
+        sess.last_seen_at = now
+        dirty = True
+    if dirty:
         db.commit()
     return sess
+
+
+def session_public_id(token: str) -> str:
+    """A stable, non-secret id for a session, so the UI can list and revoke
+    sessions without ever seeing another session's cookie value."""
+    return hashlib.sha256(token.encode()).hexdigest()[:16]
+
+
+def revoke_user_sessions(db: DbSession, user_id: int, *, keep_token: Optional[str] = None) -> int:
+    """End every session of a user, except ``keep_token`` (the caller's own)."""
+    q = db.query(UserSession).filter(UserSession.user_id == user_id)
+    if keep_token:
+        q = q.filter(UserSession.token != keep_token)
+    n = q.delete(synchronize_session=False)
+    db.commit()
+    return n
 
 
 def revoke_session(db: DbSession, token: str) -> None:

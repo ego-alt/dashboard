@@ -64,6 +64,11 @@ class UserSession(Base):
     mfa_pending: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="0"
     )
+    # Refreshed at most every few minutes (see lookup_session), for the
+    # sessions list in Settings.
+    last_seen_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     user: Mapped["User"] = relationship(back_populates="sessions")
 
@@ -165,6 +170,20 @@ class LoginEvent(Base):
         nullable=False,
         index=True,
     )
+
+
+class UptimeHour(Base):
+    """Minutes each container spent up / degraded / down in one UTC hour,
+    counted by the sampler in ``app/uptime.py`` (one sample a minute). Minutes
+    with no sample (the dashboard itself was down) count as nothing."""
+
+    __tablename__ = "uptime_hours"
+
+    name: Mapped[str] = mapped_column(String(128), primary_key=True)
+    hour: Mapped[datetime] = mapped_column(DateTime, primary_key=True, index=True)
+    up: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    degraded: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    down: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
 #: Services are discovered from Docker container labels (``homehub.*``), not

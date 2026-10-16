@@ -43,6 +43,9 @@ def test_enabled_service_discovered(client, make_user, monkeypatch):
         "description": None,
         "container_name": "library",
         "status": "running",
+        "health": None,
+        "state": "up",
+        "since": None,
     }
 
 
@@ -91,14 +94,47 @@ def test_stopped_container_reported_stopped_and_name_default(client, make_user, 
     assert svc["icon"] is None
 
 
-def test_daemon_down_returns_empty(client, make_user, monkeypatch):
+def test_unhealthy_running_container_is_degraded(client, make_user, monkeypatch):
+    monkeypatch.setattr(
+        services,
+        "list_service_candidates",
+        lambda: [
+            {
+                **_candidate(
+                    "music", **{"homehub.enable": "true", "homehub.route": "/music/"}
+                ),
+                "state": "degraded",
+                "started_at": "2026-10-16T01:00:00Z",
+            }
+        ],
+    )
+    make_user(username="al", password="hunter2-pass")
+    client.post("/login", data={"username": "al", "password": "hunter2-pass"})
+    svc = client.get("/services").json()[0]
+    assert svc["state"] == "degraded"
+    assert svc["since"] == "2026-10-16T01:00:00Z"
+
+
+def test_daemon_down_is_503_with_last_known_services(client, make_user, monkeypatch):
+    monkeypatch.setattr(
+        services,
+        "list_service_candidates",
+        lambda: [_candidate("library", **{"homehub.enable": "1", "homehub.route": "/library/"})],
+    )
+    make_user(username="al", password="hunter2-pass")
+    client.post("/login", data={"username": "al", "password": "hunter2-pass"})
+    assert client.get("/services").status_code == 200
+
     def boom():
         raise RuntimeError("docker socket missing")
 
     monkeypatch.setattr(services, "list_service_candidates", boom)
-    make_user(username="al", password="hunter2-pass")
-    client.post("/login", data={"username": "al", "password": "hunter2-pass"})
-    assert client.get("/services").json() == []
+    r = client.get("/services")
+    assert r.status_code == 503
+    body = r.json()
+    assert body["detail"] == "can't reach Docker"
+    assert [s["slug"] for s in body["services"]] == ["library"]
+    assert body["services"][0]["state"] == "unknown"
 
 
 def test_results_sorted_by_display_name(client, make_user, monkeypatch):

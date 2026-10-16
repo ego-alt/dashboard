@@ -27,6 +27,7 @@ _ADDITIVE_MIGRATIONS: list[tuple[str, str, str]] = [
     ("users", "totp_enabled", "BOOLEAN NOT NULL DEFAULT 0"),
     ("users", "totp_recovery_codes", "TEXT"),
     ("user_sessions", "mfa_pending", "BOOLEAN NOT NULL DEFAULT 0"),
+    ("user_sessions", "last_seen_at", "DATETIME"),
 ]
 
 

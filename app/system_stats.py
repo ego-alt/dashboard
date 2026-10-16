@@ -33,11 +33,16 @@ def _disk(path: str) -> Optional[Dict[str, float]]:
         return None
 
 
+psutil.cpu_percent(interval=None)
+
+
 def get_system_stats() -> Dict[str, Any]:
     vm = psutil.virtual_memory()
     root = _disk("/") or {}
     stats: Dict[str, Any] = {
-        "cpu_percent": psutil.cpu_percent(interval=0.5),
+        # Since the previous call (primed at import), so the read is instant
+        # instead of sleeping for a sampling window on every poll.
+        "cpu_percent": psutil.cpu_percent(interval=None),
         "memory_percent": vm.percent,
         "memory_used": vm.used / _MB,
         "memory_total": vm.total / _MB,

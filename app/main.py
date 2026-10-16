@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, Response
+from fastapi.responses import JSONResponse, RedirectResponse
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
@@ -27,12 +28,14 @@ from app.auth import (
     mint_session,
     record_login_event,
     revoke_session,
+    revoke_user_sessions,
+    session_public_id,
     set_session_cookie,
     timing_safe_no_such_user,
     verify_password,
     SESSION_COOKIE,
 )
-from app.db import get_db, init_db
+from app.db import SessionLocal, get_db, init_db
 from app.hibp import password_breach_count
 from app.docker_control import (
     get_container_logs,
@@ -44,9 +47,10 @@ from app.docker_control import (
     stop_container,
 )
 from app.models import ApiToken, LoginEvent, User, UserSession, WebauthnCredential
-from app.services import list_services
+from app.services import DockerUnavailable, list_services
 from app.spa import register_spa
 from app.system_stats import get_system_stats
+from app.uptime import start_sampler, uptime_summary
 from app.totp import (
     generate_recovery_codes,
     generate_secret,
@@ -93,7 +97,13 @@ def _reject_if_protected(container_id: str, action: str) -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()
+    # One sampler per process; the dashboard runs a single uvicorn worker.
+    stop = None
+    if os.environ.get("UPTIME_SAMPLER", "1") != "0":
+        stop = start_sampler(SessionLocal)
     yield
+    if stop is not None:
+        stop.set()
 
 
 app = FastAPI(title="Dashboard API", lifespan=lifespan)
@@ -252,11 +262,128 @@ def logout(request: Request, response: Response, db: DbSession = Depends(get_db)
 @app.get("/me")
 def me(user: User = Depends(current_user)):
     return {
+        "id": user.id,
         "username": user.username,
         "display_name": user.display_name,
         "is_admin": bool(user.is_admin),
         "totp_enabled": bool(user.totp_enabled),
+        "totp_recovery_left": _recovery_left(user),
     }
+
+
+def _recovery_left(user: User) -> Optional[int]:
+    if not user.totp_enabled or not user.totp_recovery_codes:
+        return None
+    try:
+        return len(json.loads(user.totp_recovery_codes))
+    except ValueError:
+        return None
+
+
+# ---------- your own account: password, sessions, sign-in history ----------
+
+
+@app.post("/me/password")
+@limiter.limit(_LOGIN_RATE_LIMIT)
+def change_own_password(
+    request: Request,
+    current_password: str = Form(...),
+    new_password: str = Form(...),
+    sign_out_others: bool = Form(True),
+    user: User = Depends(current_user),
+    db: DbSession = Depends(get_db),
+):
+    # 400, not 401: a wrong current password isn't a lost session.
+    if not verify_password(current_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="current password is wrong")
+    _validate_new_password(new_password)
+    user.password_hash = hash_password(new_password)
+    db.commit()
+    ended = 0
+    if sign_out_others:
+        ended = revoke_user_sessions(
+            db, user.id, keep_token=request.cookies.get(SESSION_COOKIE)
+        )
+    return {"ok": True, "sessions_ended": ended}
+
+
+@app.get("/auth/sessions")
+def list_own_sessions(
+    request: Request, user: User = Depends(current_user), db: DbSession = Depends(get_db)
+):
+    mine = request.cookies.get(SESSION_COOKIE)
+    now = datetime.now(timezone.utc)
+    rows = (
+        db.query(UserSession)
+        .filter(UserSession.user_id == user.id, UserSession.mfa_pending.is_(False))
+        .all()
+    )
+
+    def iso(d):
+        return d.replace(tzinfo=d.tzinfo or timezone.utc).isoformat() if d else None
+
+    out = [
+        {
+            "id": session_public_id(s.token),
+            "current": s.token == mine,
+            "created_at": iso(s.created_at),
+            "last_seen_at": iso(s.last_seen_at or s.created_at),
+            "ip": s.ip,
+            "user_agent": s.user_agent,
+        }
+        for s in rows
+        if s.expires_at.replace(tzinfo=s.expires_at.tzinfo or timezone.utc) > now
+    ]
+    return sorted(out, key=lambda s: (s["current"], s["last_seen_at"] or ""), reverse=True)
+
+
+@app.delete("/auth/sessions/{session_id}")
+def revoke_own_session(
+    session_id: str,
+    request: Request,
+    user: User = Depends(current_user),
+    db: DbSession = Depends(get_db),
+):
+    if session_id == session_public_id(request.cookies.get(SESSION_COOKIE) or ""):
+        raise HTTPException(status_code=400, detail="use sign out to end this session")
+    for s in db.query(UserSession).filter(UserSession.user_id == user.id).all():
+        if session_public_id(s.token) == session_id:
+            db.delete(s)
+            db.commit()
+            return {"ok": True}
+    raise HTTPException(status_code=404, detail="no such session")
+
+
+@app.post("/auth/sessions/revoke-others")
+def revoke_other_sessions(
+    request: Request, user: User = Depends(current_user), db: DbSession = Depends(get_db)
+):
+    n = revoke_user_sessions(db, user.id, keep_token=request.cookies.get(SESSION_COOKIE))
+    return {"ok": True, "sessions_ended": n}
+
+
+@app.get("/auth/login-events")
+def own_login_events(
+    limit: int = 10, user: User = Depends(current_user), db: DbSession = Depends(get_db)
+):
+    """Your recent sign-ins, including failed attempts against your username."""
+    rows = (
+        db.query(LoginEvent)
+        .filter(LoginEvent.username == user.username)
+        .order_by(LoginEvent.at.desc())
+        .limit(max(1, min(limit, 50)))
+        .all()
+    )
+    return [
+        {
+            "at": e.at.replace(tzinfo=e.at.tzinfo or timezone.utc).isoformat(),
+            "success": e.success,
+            "reason": e.reason,
+            "ip": e.ip,
+            "user_agent": e.user_agent,
+        }
+        for e in rows
+    ]
 
 
 @app.get("/auth/verify")
@@ -317,6 +444,24 @@ def totp_disable(
     user.totp_recovery_codes = None
     db.commit()
     return {"ok": True}
+
+
+@app.post("/auth/totp/recovery-codes")
+def totp_regenerate_recovery(
+    code: str = Form(...),
+    user: User = Depends(current_user),
+    db: DbSession = Depends(get_db),
+):
+    """Replace the recovery codes (the old ones stop working). Needs a current
+    authenticator code, so a borrowed session can't mint fresh ones."""
+    if not user.totp_enabled or not user.totp_secret:
+        raise HTTPException(status_code=409, detail="2FA not enabled")
+    if not verify_totp_code(user.totp_secret, code):
+        raise HTTPException(status_code=400, detail="bad code")
+    recovery = generate_recovery_codes()
+    user.totp_recovery_codes = hash_recovery_codes(recovery)
+    db.commit()
+    return {"ok": True, "recovery_codes": recovery}
 
 
 @app.post("/auth/totp/verify")
@@ -653,7 +798,15 @@ def _admin_count(db: DbSession) -> int:
 
 
 @app.get("/users")
-def list_users_endpoint(_: User = Depends(current_admin), db: DbSession = Depends(get_db)):
+def list_users_endpoint(
+    request: Request,
+    user: Optional[User] = Depends(current_user_optional),
+    db: DbSession = Depends(get_db),
+):
+    # A browser opening /users (an old bookmark) gets the page, not the JSON.
+    if "text/html" in request.headers.get("accept", ""):
+        return RedirectResponse("/admin/users", status_code=307)
+    current_admin(current_user(user))
     return [_user_dto(u) for u in db.query(User).order_by(User.id).all()]
 
 
@@ -687,15 +840,19 @@ def create_user_endpoint(
 @app.post("/users/{user_id}/password")
 def set_user_password_endpoint(
     user_id: int,
+    request: Request,
     password: str = Form(...),
     _: User = Depends(current_admin),
     db: DbSession = Depends(get_db),
 ):
+    """Set a user's password and end their sessions (a reset usually means a
+    lost device or a leaked password). Your own current session survives."""
     user = _require_user(db, user_id)
     _validate_new_password(password)
     user.password_hash = hash_password(password)
     db.commit()
-    return {"ok": True}
+    ended = revoke_user_sessions(db, user.id, keep_token=request.cookies.get(SESSION_COOKIE))
+    return {"ok": True, "sessions_ended": ended}
 
 
 @app.post("/users/{user_id}/admin")
@@ -763,7 +920,25 @@ def delete_user_endpoint(
 
 @app.get("/services", response_model=List[Dict[str, Any]])
 def list_services_endpoint(_: User = Depends(current_user)):
-    return list_services()
+    try:
+        return list_services()
+    except DockerUnavailable as e:
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "can't reach Docker", "services": e.last_known},
+        )
+
+
+@app.get("/uptime")
+def uptime_endpoint(
+    days: int = 1,
+    tz: int = 0,
+    _: User = Depends(current_user),
+    db: DbSession = Depends(get_db),
+):
+    """Uptime strips: ``days=1`` gives 24 hourly buckets, otherwise one bucket
+    per day. ``tz`` is the viewer's UTC offset in minutes (east positive)."""
+    return uptime_summary(db, days=max(1, min(days, 90)), tz_offset_min=tz)
 
 
 # ---------- Docker monitor (auth-gated) ----------
@@ -771,7 +946,10 @@ def list_services_endpoint(_: User = Depends(current_user)):
 
 @app.get("/containers", response_model=List[Dict[str, Any]])
 def list_containers(stats: bool = False, _: User = Depends(current_user)):
-    return get_containers(include_stats=stats)
+    try:
+        return get_containers(include_stats=stats)
+    except Exception:
+        raise HTTPException(status_code=503, detail="can't reach Docker")
 
 
 @app.post("/containers/{container_id}/start", response_model=Dict[str, str])

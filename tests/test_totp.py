@@ -41,6 +41,9 @@ def test_totp_setup_returns_secret_and_qr(client, make_user, TestSession):
     assert body["secret"]
     assert body["uri"].startswith("otpauth://totp/")
     assert body["qr_svg"].startswith("<?xml") or body["qr_svg"].startswith("<svg")
+    # Renders inside the page: plain (not svg:-prefixed) elements, scalable.
+    assert "<path" in body["qr_svg"] and "viewBox" in body["qr_svg"]
+    assert "svg:rect" not in body["qr_svg"]
 
     # Secret is persisted; enabled flag is NOT — abandoned setup is harmless.
     user = _user_row(TestSession)
