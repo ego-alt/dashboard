@@ -74,9 +74,15 @@ function Tile({ s, uptime30, isAdmin, onStart, busy }) {
       className={`bp-card bp-ticks relative flex h-full flex-col gap-5 px-5 py-5 ${down ? '' : 'bp-card-link'}`}
       title={down ? `${s.display_name} is down` : undefined}
     >
-      {/* The whole tile links to the app, unless the app is down. */}
+      {/* The whole tile opens the app in a new tab, unless the app is down. */}
       {!down && (
-        <a href={s.route_prefix} className="absolute inset-0 z-0" aria-label={`Open ${s.display_name}`} />
+        <a
+          href={s.route_prefix}
+          target="_blank"
+          rel="noopener"
+          className="absolute inset-0 z-0"
+          aria-label={`Open ${s.display_name} in a new tab`}
+        />
       )}
       <div className="flex items-start gap-3">
         <span className={down ? 'opacity-60' : ''}>
