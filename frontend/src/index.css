@@ -108,12 +108,12 @@ body {
  * space above the title equals the padding instead of padding + half-leading.
  * Browsers without text-box fall back to a tight line-height (~2px off). */
 .bp-panel { padding: 16px; }
-.bp-panel-head {
+.bp-panel-head { margin-bottom: 16px; }
+.bp-panel-row {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 16px;
 }
 .bp-panel-title {
   margin: 0;

@@ -85,7 +85,7 @@ export default function LogsDrawer({ container, onClose }) {
     >
       <header className="flex items-center gap-3 border-b border-[var(--color-border)] px-4 py-3">
         <h3 className="font-mono text-sm text-[var(--color-text-primary)]">{container.name}</h3>
-        <span className="text-xs text-[var(--color-text-muted)]">last {TAIL} lines</span>
+        <span className="hidden text-xs text-[var(--color-text-muted)] sm:inline">last {TAIL} lines</span>
         <div className="ml-auto flex items-center gap-2">
           <button
             onClick={() => setFollow((f) => !f)}

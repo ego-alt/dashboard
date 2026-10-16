@@ -20,11 +20,12 @@ export default function Panel({
     <Tag className={`bp-card bp-panel ${flush ? 'bp-panel-flush' : ''} ${className}`} {...rest}>
       {(title || aside) && (
         <div className="bp-panel-head">
-          <div className="min-w-0">
+          <div className="bp-panel-row">
             {title && <h3 className="bp-panel-title">{title}</h3>}
-            {description && <p className="bp-panel-desc">{description}</p>}
+            {aside && <div className="bp-panel-aside">{aside}</div>}
           </div>
-          {aside && <div className="bp-panel-aside">{aside}</div>}
+          {/* Full width under the title row, even when there's an aside. */}
+          {description && <p className="bp-panel-desc">{description}</p>}
         </div>
       )}
       {children}

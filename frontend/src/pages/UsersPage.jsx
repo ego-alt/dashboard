@@ -20,7 +20,7 @@ function generatePassword(n = 18) {
   return Array.from(bytes, (b) => ALPHABET[b % ALPHABET.length]).join('');
 }
 
-/** Inline "set a new password" form for one user, replacing window.prompt. */
+/** Inline "set a new password" form for one user. */
 function PasswordForm({ user, onDone, onCancel }) {
   const [pw, setPw] = useState('');
   const [show, setShow] = useState(false);

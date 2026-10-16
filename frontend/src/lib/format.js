@@ -31,16 +31,6 @@ export function clock(iso, now = new Date()) {
   return d.toLocaleDateString([], { day: 'numeric', month: 'short' });
 }
 
-/** "4 min 1 s", "52 s", "1 h 3 min". */
-export function duration(seconds) {
-  if (seconds == null) return '—';
-  const s = Math.round(seconds);
-  if (s < MIN) return `${s} s`;
-  if (s < HOUR) return `${Math.floor(s / MIN)} min${s % MIN ? ` ${s % MIN} s` : ''}`;
-  const m = Math.round((s % HOUR) / MIN);
-  return `${Math.floor(s / HOUR)} h${m ? ` ${m} min` : ''}`;
-}
-
 export function pct(p) {
   if (p == null) return '—';
   if (p >= 99.995) return '100\u00a0%';

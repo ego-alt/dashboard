@@ -135,7 +135,8 @@ def resolve_container_name(id_or_name: str) -> str | None:
 
 
 def list_service_candidates() -> List[Dict[str, Any]]:
-    """Lightweight (name, status, labels) for every container — no per-container
+    """Name, status, labels and state (see ``container_state``) for every
+    container — no per-container
     stats. Backs label-based service discovery.
     """
     return [

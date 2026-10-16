@@ -167,7 +167,7 @@ function BackupsSection() {
         setS(data);
         setErr('');
       })
-      .catch((e) => setErr(e.body?.detail || 'Failed to load backup status'));
+      .catch((e) => setErr(e.body?.detail || 'Couldn’t load the backup status.'));
   }, []);
 
   useEffect(() => {
@@ -205,45 +205,45 @@ function BackupsSection() {
   return (
     card(
       <>
-      {Array.isArray(s.databases) && s.databases.length > 0 && (
-        <div className="mb-3 flex flex-wrap gap-2">
-          {s.databases.map((d) => (
-            <span
-              key={d.app}
-              className={`rounded-full px-2 py-0.5 text-xs ${
-                d.ok ? 'bg-[var(--color-bg-inset)] text-[var(--color-text-secondary)]' : 'bg-red-500/15 text-red-300'
-              }`}
-            >
-              {d.app} {d.ok ? '✓' : '✗'}
-            </span>
-          ))}
-        </div>
-      )}
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-4">
-        <div>
-          <dt className="text-[var(--color-text-muted)]">Last run</dt>
-          <dd className="text-[var(--color-text-primary)]">{fmtAge(s.age_seconds)}</dd>
-        </div>
-        <div>
-          <dt className="text-[var(--color-text-muted)]">Duration</dt>
-          <dd className="text-[var(--color-text-primary)]">
-            {s.duration_seconds != null ? `${s.duration_seconds}s` : '—'}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-[var(--color-text-muted)]">Snapshots</dt>
-          <dd className="text-[var(--color-text-primary)]">{s.snapshot_count ?? '—'}</dd>
-        </div>
-        <div>
-          <dt className="text-[var(--color-text-muted)]">Repo size</dt>
-          <dd className="text-[var(--color-text-primary)]">{fmtBytes(s.repo_bytes)}</dd>
-        </div>
-      </dl>
-      {!healthy && (
-        <p className="mt-3 text-sm text-[var(--color-danger)]">
-          {s.error || 'Last backup is stale — check the timer on the Pi.'}
-        </p>
-      )}
+        {Array.isArray(s.databases) && s.databases.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-2">
+            {s.databases.map((d) => (
+              <span
+                key={d.app}
+                className={`rounded-full px-2 py-0.5 text-xs ${
+                  d.ok ? 'bg-[var(--color-bg-inset)] text-[var(--color-text-secondary)]' : 'bg-red-500/15 text-red-300'
+                }`}
+              >
+                {d.app} {d.ok ? '✓' : '✗'}
+              </span>
+            ))}
+          </div>
+        )}
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-4">
+          <div>
+            <dt className="text-[var(--color-text-muted)]">Last run</dt>
+            <dd className="text-[var(--color-text-primary)]">{fmtAge(s.age_seconds)}</dd>
+          </div>
+          <div>
+            <dt className="text-[var(--color-text-muted)]">Duration</dt>
+            <dd className="text-[var(--color-text-primary)]">
+              {s.duration_seconds != null ? `${s.duration_seconds}s` : '—'}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[var(--color-text-muted)]">Snapshots</dt>
+            <dd className="text-[var(--color-text-primary)]">{s.snapshot_count ?? '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-[var(--color-text-muted)]">Repo size</dt>
+            <dd className="text-[var(--color-text-primary)]">{fmtBytes(s.repo_bytes)}</dd>
+          </div>
+        </dl>
+        {!healthy && (
+          <p className="mt-3 text-sm text-[var(--color-danger)]">
+            {s.error || 'Last backup is stale — check the timer on the Pi.'}
+          </p>
+        )}
       </>,
       <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${pill}`}>{label}</span>,
     )
