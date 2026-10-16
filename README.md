@@ -82,4 +82,4 @@ Inside compose: `docker compose exec dashboard python -m app.cli <command>`.
 - [`docs/BACKUPS.md`](docs/BACKUPS.md): backups and restores.
 - [`docs/ui-spec.md`](docs/ui-spec.md): the design system the four apps share.
 - [`mcp/README.md`](mcp/README.md): the MCP server.
-- [`AUDIT.md`](AUDIT.md): the product audit and what's been fixed.
+- [`docs/roadmap.md`](docs/roadmap.md): what's left to do.
