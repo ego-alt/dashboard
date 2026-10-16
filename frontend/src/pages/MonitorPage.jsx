@@ -72,7 +72,7 @@ function Metric({ label, value, percent, tone = 'slate' }) {
     <div>
       <div className="flex items-baseline justify-between gap-2">
         <dt className="text-xs text-[var(--color-text-muted)]">{label}</dt>
-        <dd className="font-mono text-sm text-[var(--color-text-primary)]">{value}</dd>
+        <dd className="whitespace-nowrap font-mono text-sm text-[var(--color-text-primary)]">{value}</dd>
       </div>
       <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-bg-inset)]">
         <div
@@ -111,46 +111,49 @@ function HostSection({ live, stale }) {
   const memPct = s.memory_percent;
   return (
     <Panel title="Host" className={`mb-6 transition-opacity ${stale || err ? 'opacity-50' : ''}`}>
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
-        <Metric
-          label="CPU"
-          value={`${Math.round(s.cpu_percent)}%`}
-          percent={s.cpu_percent}
-          tone={pctTone(s.cpu_percent)}
-        />
-        <Metric
-          label="Memory"
-          value={`${(s.memory_used / 1024).toFixed(1)}/${(s.memory_total / 1024).toFixed(1)} GB`}
-          percent={memPct}
-          tone={pctTone(memPct)}
-        />
-        <Metric
-          label="Disk /"
-          value={
-            s.disk_percent != null
-              ? `${s.disk_used}/${s.disk_total} GB`
-              : '—'
-          }
-          percent={s.disk_percent}
-          tone={pctTone(s.disk_percent)}
-        />
-        {s.cpu_temp_c != null && (
+      {/* Four across when the card is wide enough, else two (phones, or beside the logs pane). */}
+      <div className="@container">
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-3 @2xl:grid-cols-4">
           <Metric
-            label="CPU temp"
-            value={`${s.cpu_temp_c.toFixed(1)} °C`}
-            percent={(s.cpu_temp_c / 85) * 100}
-            tone={tempTone(s.cpu_temp_c)}
+            label="CPU"
+            value={`${Math.round(s.cpu_percent)}%`}
+            percent={s.cpu_percent}
+            tone={pctTone(s.cpu_percent)}
           />
-        )}
-        {s.data_mount && (
           <Metric
-            label={`Data ${s.data_mount}`}
-            value={`${s.data_disk_used}/${s.data_disk_total} GB`}
-            percent={s.data_disk_percent}
-            tone={pctTone(s.data_disk_percent)}
+            label="Memory"
+            value={`${(s.memory_used / 1024).toFixed(1)}/${(s.memory_total / 1024).toFixed(1)} GB`}
+            percent={memPct}
+            tone={pctTone(memPct)}
           />
-        )}
-      </dl>
+          <Metric
+            label="Disk /"
+            value={
+              s.disk_percent != null
+                ? `${s.disk_used}/${s.disk_total} GB`
+                : '—'
+            }
+            percent={s.disk_percent}
+            tone={pctTone(s.disk_percent)}
+          />
+          {s.cpu_temp_c != null && (
+            <Metric
+              label="CPU temp"
+              value={`${s.cpu_temp_c.toFixed(1)} °C`}
+              percent={(s.cpu_temp_c / 85) * 100}
+              tone={tempTone(s.cpu_temp_c)}
+            />
+          )}
+          {s.data_mount && (
+            <Metric
+              label={`Data ${s.data_mount}`}
+              value={`${s.data_disk_used}/${s.data_disk_total} GB`}
+              percent={s.data_disk_percent}
+              tone={pctTone(s.data_disk_percent)}
+            />
+          )}
+        </dl>
+      </div>
     </Panel>
   );
 }
@@ -527,9 +530,11 @@ export default function MonitorPage() {
         ) : sorted.length === 0 ? (
           <p className="px-4 py-6 text-center text-[var(--color-text-muted)]">No containers</p>
         ) : (
-          <div className={`transition-opacity ${stale ? 'opacity-50' : ''}`}>
-            {/* Desktop: one table row per container. */}
-            <table className="hidden min-w-full text-sm sm:table">
+          <div className={`@container transition-opacity ${stale ? 'opacity-50' : ''}`}>
+            {/* Wide card: one table row per container. Chosen by the card's
+                width, not the screen's, so it also switches when the logs
+                pane takes room. */}
+            <table className="hidden min-w-full text-sm @4xl:table">
               <thead className="bg-[var(--color-bg-inset)] text-left text-[var(--color-text-muted)]">
                 <tr>
                   <th className="px-4 py-2 font-medium">Name</th>
@@ -538,14 +543,14 @@ export default function MonitorPage() {
                   <th className="w-44 px-3 py-2 font-medium">Last 24 h</th>
                   <th className="px-3 py-2 text-right font-medium">CPU</th>
                   <th className="px-3 py-2 text-right font-medium">Memory</th>
-                  <th className="hidden px-3 py-2 text-right font-medium lg:table-cell">Network</th>
+                  <th className="hidden px-3 py-2 text-right font-medium @5xl:table-cell">Network</th>
                   <th className="px-4 py-2"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--color-border)]">
                 {sorted.map((c) => (
                   <tr key={c.id} className="hover:bg-[var(--color-highlight-soft)]">
-                    <td className="px-4 py-2">
+                    <td className="whitespace-nowrap px-4 py-2">
                       <button
                         onClick={() => openLogs(c)}
                         className="font-mono text-[var(--color-text-primary)] hover:underline"
@@ -568,13 +573,13 @@ export default function MonitorPage() {
                     <td className="px-3 py-2">
                       <UptimeStrip data={uptime24} name={c.name} />
                     </td>
-                    <td className="px-3 py-2 text-right font-mono text-xs text-[var(--color-text-secondary)]">
+                    <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-xs text-[var(--color-text-secondary)]">
                       {c.state === 'down' ? '—' : cpuText(c)}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-xs text-[var(--color-text-secondary)]">
                       {c.state === 'down' ? '—' : fmtMem(c)}
                     </td>
-                    <td className="hidden whitespace-pre px-3 py-2 text-right font-mono text-xs text-[var(--color-text-secondary)] lg:table-cell">
+                    <td className="hidden whitespace-pre px-3 py-2 text-right font-mono text-xs text-[var(--color-text-secondary)] @5xl:table-cell">
                       {netText(c)}
                     </td>
                     <td className="whitespace-nowrap px-4 py-2 text-right">
@@ -585,8 +590,8 @@ export default function MonitorPage() {
               </tbody>
             </table>
 
-            {/* Phone: one compact card per container. */}
-            <ul className="divide-y divide-[var(--color-border)] sm:hidden">
+            {/* Narrow card (phones, or beside the logs pane): one compact card per container. */}
+            <ul className="divide-y divide-[var(--color-border)] @4xl:hidden">
               {sorted.map((c) => (
                 <li key={c.id} className="space-y-2 px-4 py-3">
                   <div className="flex items-center gap-3">
@@ -619,7 +624,7 @@ export default function MonitorPage() {
 
       <BackupsSection />
 
-      {logsFor && <LogsDrawer key={logsFor.id} container={logsFor} onClose={closeLogs} />}
+      {logsFor && <LogsDrawer container={logsFor} onClose={closeLogs} />}
     </div>
   );
 }

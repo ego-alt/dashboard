@@ -3,6 +3,9 @@ import { containerLogs } from '../api';
 import { usePoll } from '../lib/usePoll';
 
 const TAIL = 200;
+// Wide screens get a side pane that pushes the page over (see .logs-pane in
+// index.css); narrower ones a full-screen overlay.
+const PANE_QUERY = '(min-width: 1024px)';
 const FOLLOW_MS = 3000;
 
 // Docker prefixes each line with an RFC 3339 timestamp (timestamps=True).
@@ -29,8 +32,10 @@ function parse(text) {
     });
 }
 
-/** The last lines of a container's log in a right-hand drawer, optionally
- * following new lines. Escape or a click outside closes it. */
+/** The last lines of a container's log, optionally following new lines: a
+ * side pane on desktop (the page moves over; you can keep using it), a
+ * full-screen overlay on phones. Escape or × closes it, and on phones a tap
+ * outside too. */
 export default function LogsDrawer({ container, onClose }) {
   const [lines, setLines] = useState(null);
   const [error, setError] = useState('');
@@ -49,8 +54,9 @@ export default function LogsDrawer({ container, onClose }) {
     }
   }, [container.id]);
 
+  // Switching containers keeps the old lines up until the new ones arrive,
+  // rather than flashing "Loading…".
   useEffect(() => {
-    setLines(null);
     stick.current = true;
     load();
   }, [load]);
@@ -63,9 +69,16 @@ export default function LogsDrawer({ container, onClose }) {
     if (el && stick.current) el.scrollTop = el.scrollHeight;
   }, [lines]);
 
+  // Make room for the pane while it's open.
+  useEffect(() => {
+    document.body.classList.add('logs-pane-open');
+    return () => document.body.classList.remove('logs-pane-open');
+  }, []);
+
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose();
     const onDown = (e) => {
+      if (window.matchMedia(PANE_QUERY).matches) return; // a pane, not a modal
       if (panelRef.current && !panelRef.current.contains(e.target)) onClose();
     };
     document.addEventListener('keydown', onKey);
@@ -79,11 +92,12 @@ export default function LogsDrawer({ container, onClose }) {
   return (
     <aside
       ref={panelRef}
-      role="dialog"
       aria-label={`Logs for ${container.name}`}
-      className="fixed inset-y-0 right-0 z-40 flex w-full max-w-[640px] flex-col border-l border-[var(--color-border)] bg-[var(--color-bg-elevated)] shadow-2xl"
+      className="logs-pane fixed inset-y-0 right-0 z-40 flex w-full flex-col border-l border-[var(--color-border)] bg-[var(--color-bg-elevated)]"
     >
-      <header className="flex items-center gap-3 border-b border-[var(--color-border)] px-4 py-3">
+      {/* Same height and rule as the top bar, so the two line up; lighter
+          than the log body below it. */}
+      <header className="flex h-[55px] shrink-0 items-center gap-3 border-b border-[var(--color-border)] px-4">
         <h3 className="font-mono text-sm text-[var(--color-text-primary)]">{container.name}</h3>
         <span className="hidden text-xs text-[var(--color-text-muted)] sm:inline">last {TAIL} lines</span>
         <div className="ml-auto flex items-center gap-2">

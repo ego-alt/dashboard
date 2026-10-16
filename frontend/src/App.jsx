@@ -37,8 +37,9 @@ function TopBar() {
     `bp-nav-link${isActive ? ' bp-nav-link-active' : ''}`;
   return (
     <header className="bp-topbar">
-      {/* One row everywhere. On phones the nav moves to the bottom bar. */}
-      <div className="mx-auto flex max-w-5xl items-center gap-4 px-4 py-[11.5px]">
+      {/* One row: tabs at the left edge, account at the right edge. On phones
+          the tabs move to the bottom bar. */}
+      <div className="flex items-center gap-4 px-4 py-[11.5px] sm:px-6">
         <span className="bp-brand">Home</span>
         <nav className="hidden gap-1 sm:flex">
           {navItems(user).map((n) => (
@@ -96,7 +97,10 @@ function Shell({ children }) {
   return (
     <div className="min-h-screen">
       <TopBar />
-      <main className="mx-auto max-w-5xl px-4 pt-6 pb-24 sm:pb-6">{children}</main>
+      {/* Narrows to make room when a side pane (the logs) is open. */}
+      <div className="bp-main-wrap">
+        <main className="mx-auto max-w-5xl px-4 pt-6 pb-24 sm:pb-6">{children}</main>
+      </div>
       <BottomNav />
     </div>
   );

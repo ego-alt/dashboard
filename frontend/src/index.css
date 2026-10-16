@@ -146,6 +146,16 @@ body {
   border-bottom: 1px solid var(--color-border);
 }
 
+/* Side pane (container logs). Below 1024px it's a full-screen overlay; from
+ * 1024px it runs the window's full height on the right, and the top bar and
+ * the page both narrow beside it, so scrolling never moves it. */
+:root { --side-pane-w: 480px; }
+@media (min-width: 1024px) {
+  .logs-pane { width: var(--side-pane-w); z-index: 20; }
+  body.logs-pane-open .bp-main-wrap,
+  body.logs-pane-open header.bp-topbar { padding-right: var(--side-pane-w); }
+}
+
 .bp-heading {
   font-size: var(--text-lg);
   font-weight: 600;

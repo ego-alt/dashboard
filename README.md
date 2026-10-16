@@ -11,7 +11,7 @@ The front door and control room of the home stack: one sign-in for Library, Cale
 ## Features
 
 - **Services**: a tile per app with its state (up, degraded, down) and a 30-day uptime strip, plus one status line saying whether anything needs you. Tiles open the app in a new tab; admins can start a down service or read its logs from the tile.
-- **Monitor** (admins): host CPU, memory, disk and temperature; every container's uptime, restarts, 24-hour strip, CPU, memory and network; Start, Stop, Restart and a logs drawer; the last backup. It shows when its data is stale.
+- **Monitor** (admins): host CPU, memory, disk and temperature; every container's uptime, restarts, 24-hour strip, CPU, memory and network; Start, Stop, Restart and a logs pane beside the page; the last backup. It shows when its data is stale.
 - **Uptime history**: a sampler records each container once a minute (Docker's state plus its healthcheck) into hourly rows kept for 90 days.
 - **One sign-in**: passwords (breach-checked), TOTP 2FA with recovery codes, passkeys, and API tokens for native apps. nginx asks the dashboard who you are before serving any app.
 - **Your account**: change your password, see where you're signed in and sign other devices out, review recent sign-ins.
