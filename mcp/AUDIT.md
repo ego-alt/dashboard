@@ -129,12 +129,10 @@ Recommendation:
 
 ### Data safety
 
-**3.6 Deleting a playlist is permanent.** *(L, app-only now)*
+**3.6 Deleting a playlist is permanent.** *(Fixed, October 2026)*
 
-It's the only delete with no trash. Assistants can no longer delete anything,
-so this only affects the music app's own UI.
-
-Fix: soft-delete playlists like tracks (`deleted_at` + restore).
+Tapes now go to the trash like songs (`deleted_at`, `POST
+/api/playlists/<id>/restore`, purged after 30 days), with Undo in the app.
 
 **3.7 No way to list the trash.** *(M)*
 
