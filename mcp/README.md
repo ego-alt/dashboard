@@ -80,7 +80,7 @@ Two caveats:
 - **Cloud clients** (claude.ai connectors, ChatGPT) connect from the vendor's
   servers, so they can't reach `home.local`. See AUDIT.md §1 for the options.
 
-## Tools (31)
+## Tools (32)
 
 The day marker is intentionally absent: it is never read, shown or set.
 
@@ -94,8 +94,8 @@ The day marker is intentionally absent: it is never read, shown or set.
 | `calendar_update_entry` | `tapes_get_playlist` | `library_restore_book` |
 | `calendar_restore_entry` | `tapes_create_playlist` | |
 | `calendar_set_mood` | `tapes_rename_playlist` | |
-| `calendar_stats` | `tapes_add_to_playlist` | |
-| | `tapes_remove_from_playlist` | |
+| `calendar_add_to_day_note` | `tapes_add_to_playlist` | |
+| `calendar_stats` | `tapes_remove_from_playlist` | |
 | | `tapes_update_track` | |
 | | `tapes_restore_track` | |
 | | `tapes_list_podcasts` | |

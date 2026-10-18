@@ -16,7 +16,7 @@ def tools(config, backend):
 
 
 def test_tool_names_are_prefixed_and_short(tools):
-    assert len(tools) == 31
+    assert len(tools) == 32
     for t in tools:
         assert t.name.split("_")[0] in {"calendar", "tapes", "library", "homehub"}, t.name
         assert len(t.name) <= 64 and t.name.replace("_", "").isalnum() and t.name.islower()

@@ -123,14 +123,16 @@ def register(server: MCPServer, deps: Deps) -> None:
         name="calendar_get_day",
         annotations=READ,
         description=(
-            "Everything logged on one day: diary entries (with their moments) and the "
-            f"day's mood. Times are local ({tz})."
+            "Everything logged on one day: the day's mood and note, and its diary entries "
+            f"(with their moments). Times are local ({tz})."
         ),
     )
     async def calendar_get_day(date: DateArg) -> str:
         d = parse_date(date, "date")
         data = await call("GET", "/events/", params={"year": d.year, "month": d.month, "day": d.day})
         head = f"{d:%A %-d %B %Y} · mood: {data.get('mood') or 'not set'}"
+        if data.get("note"):
+            head += f"\nDay note: {data['note']}"
         if not data["events"]:
             return head + "\nNo entries."
         return head + "\n" + "\n".join(_entry_block(e) for e in data["events"])
@@ -202,6 +204,10 @@ def register(server: MCPServer, deps: Deps) -> None:
             return head + "No matching entries."
         lines = []
         for e in data["results"]:
+            if e.get("kind") == "note":
+                mood = f" · day mood {e['mood']['name'].lower()}" if e.get("mood") else ""
+                lines.append(f"day note {e['date']}{mood} · {e['note']}")
+                continue
             line = _entry_line(e)
             if e.get("mood"):
                 line = line.replace(" · ", f" · day mood {e['mood']['name'].lower()} · ", 1)
@@ -346,6 +352,27 @@ def register(server: MCPServer, deps: Deps) -> None:
         was = res.get("previous") or "not set"
         now = "cleared" if mood == "clear" else f"set to {mood}"
         return f"Mood for {d:%a %-d %b %Y} {now} (was {was})."
+
+    @server.tool(
+        name="calendar_add_to_day_note",
+        annotations=WRITE,
+        description=(
+            "Add text to a day's own note: free writing about the day itself, for when "
+            "there's no particular event to file it under (an event goes in "
+            "calendar_create_entry). Appends a new paragraph; never replaces or removes "
+            "what's already there."
+        ),
+    )
+    async def calendar_add_to_day_note(
+        date: DateArg,
+        text: Annotated[str, Field(min_length=1, max_length=5000, description="What to add.")],
+    ) -> str:
+        d = parse_date(date, "date")
+        day = {"year": d.year, "month": d.month, "day": d.day}
+        current = (await call("GET", "/events/", params=day)).get("note") or ""
+        note = f"{current.rstrip()}\n\n{text.strip()}" if current.strip() else text.strip()
+        await call("POST", "/mood/note", json={**day, "note": note})
+        return f"Added to the note for {d:%a %-d %b %Y}."
 
     @server.tool(
         name="calendar_stats",
