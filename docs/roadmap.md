@@ -8,7 +8,6 @@ Left over from the product audit (October 2026; the audit itself is in git histo
 **Feel**
 - **Loading skeletons**: each card drawn straight away with placeholder lines, instead of "Loading…".
 - **Keyboard shortcuts** like the other apps: `g s` / `g m` / `g u` to switch pages, `r` refresh, `l` live, `?` for the list.
-- **Self-host Inter**, so the dashboard keeps its font when the internet is down but the LAN isn't.
 
 **Copy**
 - The backup card: `241s` → `4 min 1 s`, and the time of day next to "9 h ago".
