@@ -214,7 +214,7 @@ def register(server: MCPServer, deps: Deps) -> None:
         annotations=WRITE,
         description=(
             "Add a diary entry, or a moment inside an existing entry when parent_id is given "
-            f"(a moment must fall within its entry's time span). Times are local ({tz}), "
+            f"(a moment dated outside its entry stretches the entry to fit). Times are local ({tz}), "
             "24-hour HH:MM. Leave start_time empty to start at the beginning of the day and "
             "end_time empty to run to the end of the end day; leave end_date empty for "
             "the same day. Check calendar_get_day first if the user may mean an existing "
@@ -238,7 +238,8 @@ def register(server: MCPServer, deps: Deps) -> None:
         if parent_id:
             res = await call("POST", f"/events/{parent_id}/subevents", json=body)
             e = _as_saved(res["id"], body)
-            return "Added " + _entry_line(e, prefix="moment #") + f" to entry #{parent_id}."
+            stretched = f" {res['stretched']}" if res.get("stretched") else ""
+            return "Added " + _entry_line(e, prefix="moment #") + f" to entry #{parent_id}.{stretched}"
         res = await call("POST", "/events/", json=body)
         return "Added " + _entry_line(_as_saved(res["id"], body))
 
@@ -305,9 +306,10 @@ def register(server: MCPServer, deps: Deps) -> None:
         if kind == "entry" and new_start != old_start:
             body["move_moments"] = True
         path = f"/events/subevents/{id}" if kind == "moment" else f"/events/{id}"
-        await call("PUT", path, json=body)
+        res = await call("PUT", path, json=body)
         e = _as_saved(id, body)
-        return "Updated " + (_entry_line(e, prefix="moment #") if kind == "moment" else _entry_line(e))
+        stretched = f" {res['stretched']}" if isinstance(res, dict) and res.get("stretched") else ""
+        return "Updated " + (_entry_line(e, prefix="moment #") if kind == "moment" else _entry_line(e)) + stretched
 
     @server.tool(
         name="calendar_restore_entry",
