@@ -19,7 +19,7 @@
 
 ## 1. Decisions still yours
 
-**1.1 Cloud clients (claude.ai, ChatGPT) can't reach `home.local`.** *(Open, M)*
+**1.1 Cloud clients (claude.ai, ChatGPT) can't reach `home.local`.** *(Decided: (b), October 2026)*
 
 These clients call MCP servers from the vendor's servers, so they need a
 public route.
@@ -32,6 +32,8 @@ Options:
 
 Everything already works for (b). For (a), set `MCP_PUBLIC_URL` to the public
 origin; the OAuth issuer follows from it.
+
+Decided: (b). The Pi is on Tailscale, so desktop and local clients work away from home too. Remote MCP clients over Tailscale need `MCP_PUBLIC_URL` set to the Pi's MagicDNS name, so the OAuth issuer matches the address they use.
 
 Recommendation: (b) until you actually want phone ChatGPT. If you do take (a),
 keep the dashboard and the apps off the tunnel.

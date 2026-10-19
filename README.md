@@ -46,6 +46,7 @@ Tests: `uv run pytest`. Lint: `uvx ruff check .` and `npm run lint` in `frontend
 - **Users**: apps create a user's account on their first visit. To create them up front, run `uv run python scripts/sync_household_users.py` after adding someone.
 - **Docker access**: set `DOCKER_GID` to the GID of `/var/run/docker.sock` (Pi/Debian: usually 999).
 - **Deploys**: commits to `master` that pass CI deploy to the Pi on their own; see [`docs/DEPLOY.md`](docs/DEPLOY.md).
+- **Away from home**: the Pi is on Tailscale, so any device on the tailnet reaches the stack at the Pi's MagicDNS name (`https://<pi>.<tailnet>.ts.net`). The certificate is still the self-signed `home.local` one, so browsers warn until it's replaced (see the roadmap).
 - **Backups**: a nightly restic backup of every app to Google Cloud Storage; the Monitor shows its last run. Setup and restores: [`docs/BACKUPS.md`](docs/BACKUPS.md).
 
 ## Settings

@@ -27,8 +27,9 @@ The pieces live in `dashboard/scripts/`:
 
 ## One-time setup
 
-Assumes the dashboard repo is at `/opt/home-stack/dashboard` (adjust paths
-to match your clone, including `ExecStart=` in the service unit).
+Assumes the four repos sit side by side in `~/Projects` on the Pi (so the
+dashboard is at `/home/<you>/Projects/dashboard`). Adjust the paths below,
+including `ExecStart=` in the service unit, if yours live elsewhere.
 
 ### 1. Install restic
 
@@ -60,7 +61,7 @@ own history; versioning just inflates cost).
 sudo mkdir -p /etc/restic
 sudo mv gcs-sa.json /etc/restic/gcs-sa.json
 openssl rand -base64 32 | sudo tee /etc/restic/password >/dev/null   # repo password
-sudo cp /opt/home-stack/dashboard/scripts/restic-backup.env.example /etc/restic/home-stack.env
+sudo cp /home/<you>/Projects/dashboard/scripts/restic-backup.env.example /etc/restic/home-stack.env
 sudo nano /etc/restic/home-stack.env                                 # fill in bucket + project
 sudo chmod 600 /etc/restic/password /etc/restic/gcs-sa.json /etc/restic/home-stack.env
 ```
@@ -80,10 +81,10 @@ restic init
 ```sh
 # manual first backup to confirm everything works (sources the env as root):
 sudo bash -c 'set -a; . /etc/restic/home-stack.env; set +a; \
-  /opt/home-stack/dashboard/scripts/restic-backup.sh'
+  /home/<you>/Projects/dashboard/scripts/restic-backup.sh'
 
 # install + enable the schedule:
-sudo cp /opt/home-stack/dashboard/scripts/systemd/restic-backup.* /etc/systemd/system/
+sudo cp /home/<you>/Projects/dashboard/scripts/systemd/restic-backup.* /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now restic-backup.timer
 ```
@@ -150,8 +151,8 @@ sudo scripts/restic-restore.sh --snapshot ab12cd34   # a specific one
 ```sh
 sudo scripts/restic-restore.sh --db library          # -> /var/tmp/restore/.../db/library.db
 # then put it back and fix ownership + restart the container:
-sudo cp /var/tmp/restore/**/db/library.db /opt/home-stack/library/instance/library.db
-sudo chown 10001:10001 /opt/home-stack/library/instance/library.db   # dashboard.db too; apps run as uid 10001
+sudo cp /var/tmp/restore/**/db/library.db /home/<you>/Projects/library/instance/library.db
+sudo chown 10001:10001 /home/<you>/Projects/library/instance/library.db   # dashboard.db too; apps run as uid 10001
 docker compose restart library
 ```
 
@@ -173,7 +174,7 @@ GCS service-account key back in place), then:
 ```sh
 set -a; . /etc/restic/home-stack.env; set +a
 restic snapshots                       # confirm access
-restic restore latest --target /opt/home-stack-restore
+restic restore latest --target /var/tmp/home-stack-restore
 ```
 
 Copy the DBs, `.env` files, attachments, books and music back into the rebuilt

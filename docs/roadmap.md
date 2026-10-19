@@ -2,6 +2,12 @@
 
 Left over from the product audit (October 2026; the audit itself is in git history). Everything else from it is done.
 
+**Urgent**
+- **Off-site backups are failing.** Every nightly restic run since 8 October 2026 has failed with "the billing account for the owning project is disabled": the Google Cloud billing account behind the backup bucket is closed. Re-enable billing, or point restic at another repository (Backblaze B2, another bucket, or a USB disk on the Pi). Until then, only local database copies exist.
+
+**Away from home**
+- **A trusted certificate over Tailscale.** The stack serves a self-signed `home.local` certificate, so browsers warn on the Pi's MagicDNS name and installed apps can't use their offline mode. With HTTPS enabled for the tailnet, `tailscale cert <pi>.<tailnet>.ts.net` issues a real certificate; mount it in nginx, renew it monthly with a timer, and set `MCP_PUBLIC_URL` to the same name. (The name then appears in public certificate logs.)
+
 **Monitoring**
 - **Down and recovered alerts.** When a service is down for 3+ minutes, or the backup goes stale, send one push (ntfy is the simplest; it works on Android), and one when it recovers. Builds on the uptime sampler.
 
