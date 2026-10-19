@@ -25,7 +25,7 @@ The rules live in `app/stack_manifest.py`; the Deploy tab and the Pi both use th
 
 ## Adding one
 
-1. Push the repo to GitHub, public, under the same account as the stack.
+1. Push the repo to GitHub under the same account as the stack. A private repo works once the dashboard has a `DEPLOY_GITHUB_TOKEN` that can read it (see [DEPLOY.md](DEPLOY.md)); the Pi clones it with the GitHub credential git already has.
 2. In the dashboard, open **Deploy → Add an app** and pick it. The checklist says what's missing, if anything.
 3. Click **Deploy**. The Pi:
    - clones the repo next to the others;

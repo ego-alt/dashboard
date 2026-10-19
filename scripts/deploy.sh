@@ -27,7 +27,8 @@
 #   DEPLOY_REQUIRE_CI   set to 0 to skip the CI check (testing only)
 #   DEPLOY_GITHUB_TOKEN optional read-only token; raises GitHub's API limit from
 #                       60 to 5,000 requests/hour (not needed for public repos
-#                       at this polling rate)
+#                       at this polling rate). Without it, the token git already
+#                       uses for github.com (if any) checks private repos' CI.
 
 set -euo pipefail
 
@@ -69,11 +70,21 @@ github_slug() {
   git -C "$1" remote get-url origin | sed -E 's#(\.git)?$##; s#^.*github\.com[:/]##'
 }
 
+# The token git has saved for github.com, which already clones and fetches
+# private repos; empty when there's none.
+git_token() {
+  printf 'protocol=https\nhost=github.com\n\n' \
+    | GIT_TERMINAL_PROMPT=0 git -c credential.interactive=never credential fill 2>/dev/null \
+    | sed -n 's/^password=//p'
+}
+
 # Prints the CI workflow's result for a commit: success | failure | pending | none
 ci_result() {
-  local slug=$1 sha=$2 json code auth=()
-  [[ -n ${DEPLOY_GITHUB_TOKEN:-} ]] && auth=(-H "Authorization: Bearer $DEPLOY_GITHUB_TOKEN")
-  json=$(curl -sS --max-time 20 -w '\n%{http_code}' ${auth[@]+"${auth[@]}"} \
+  local slug=$1 sha=$2 json code header="" token=${DEPLOY_GITHUB_TOKEN:-}
+  [[ -z $token ]] && token=$(git_token || true)
+  [[ -n $token ]] && header="Authorization: Bearer $token"
+  # The header comes in on stdin, so the token never shows up in ps.
+  json=$(curl -sS --max-time 20 -w '\n%{http_code}' -H @- <<<"$header" \
     "https://api.github.com/repos/$slug/actions/workflows/ci.yml/runs?head_sha=$sha&per_page=5" \
     2>/dev/null) || { echo pending; return; }   # API unreachable: try next tick
   code=${json##*$'\n'}

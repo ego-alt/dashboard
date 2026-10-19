@@ -66,10 +66,11 @@ def _cached(key: str, ttl: float, fetch):
     return value
 
 
-def _get(url: str, *, api: bool = True, timeout: int = 10) -> tuple[int, bytes]:
+def _get(url: str, *, api: bool = True, timeout: int = 10,
+         accept: str = "application/vnd.github+json") -> tuple[int, bytes]:
     headers = {"User-Agent": "home-stack-dashboard"}
     if api:
-        headers["Accept"] = "application/vnd.github+json"
+        headers["Accept"] = accept
         if TOKEN:
             headers["Authorization"] = f"Bearer {TOKEN}"
     try:
@@ -100,8 +101,11 @@ def _api(path: str):
 
 
 def _raw(repo: str, branch: str, path: str) -> tuple[int, str]:
-    # raw.githubusercontent.com doesn't count against the API's rate limit.
-    status, body = _get(f"https://raw.githubusercontent.com/{repo}/{branch}/{path}", api=False)
+    if TOKEN:   # through the API, so private repos work too
+        status, body = _get(f"https://api.github.com/repos/{repo}/contents/{path}?ref={branch}",
+                            accept="application/vnd.github.raw")
+    else:       # raw.githubusercontent.com doesn't count against the API's rate limit
+        status, body = _get(f"https://raw.githubusercontent.com/{repo}/{branch}/{path}", api=False)
     return status, body.decode("utf-8", "replace") if status == 200 else ""
 
 
@@ -158,9 +162,12 @@ def latest_commit(repo: str, branch: str) -> dict | None:
 
 def owner_repos() -> list[dict]:
     def fetch():
-        repos = _api(f"/users/{OWNER}/repos?per_page=100&sort=pushed")
+        # With a token, the owner's private repos too (those it's allowed to read).
+        repos = _api("/user/repos?affiliation=owner&per_page=100&sort=pushed" if TOKEN
+                     else f"/users/{OWNER}/repos?per_page=100&sort=pushed")
         if repos is None:
             return None
+        repos = [r for r in repos if r["full_name"].split("/")[0].lower() == OWNER.lower()]
         return [{"repo": r["full_name"], "name": app_name(r["full_name"]), "description": r.get("description") or "",
                  "branch": r.get("default_branch") or "main", "pushed_at": r.get("pushed_at"),
                  "private": r.get("private", False)}
@@ -268,8 +275,8 @@ def add_app(body: AddApp, user: User = Depends(current_admin)):
     if not result["ok"]:
         raise HTTPException(400, "This repo isn't ready yet: " + "; ".join(
             c["detail"] or c["label"] for c in result["checks"] if not c["ok"]))
-    if repo["private"]:
-        raise HTTPException(400, "Private repos need credentials on the Pi; make it public or add them first.")
+    if repo["private"] and not TOKEN:
+        raise HTTPException(400, "Private repos need DEPLOY_GITHUB_TOKEN in the dashboard's .env on the Pi.")
     folder = STATE_DIR / "apps"
     folder.mkdir(parents=True, exist_ok=True)
     entry = {"name": result["name"], "repo": repo["repo"], "branch": repo["branch"],

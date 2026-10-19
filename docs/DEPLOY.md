@@ -21,7 +21,7 @@ From the dashboard folder:
 sudo scripts/install-deploy-timer.sh
 ```
 
-It runs deploys as the user who owns the repos (who must be in the `docker` group), and prints two lines to add to the dashboard's `.env` (`DEPLOY_STATE_HOST_DIR`, `STACK_APPS_COMPOSE`) so compose and the Deploy tab find the deploy state. Optionally add `DEPLOY_GITHUB_TOKEN` there too: a GitHub token with no scopes lifts the limit of 60 API requests an hour, which the Deploy tab can otherwise use up. Then:
+It runs deploys as the user who owns the repos (who must be in the `docker` group), and prints two lines to add to the dashboard's `.env` (`DEPLOY_STATE_HOST_DIR`, `STACK_APPS_COMPOSE`) so compose and the Deploy tab find the deploy state. Optionally add `DEPLOY_GITHUB_TOKEN` there too: a read-only token lifts the limit of 60 API requests an hour, which the Deploy tab can otherwise use up, and lets it see private repos. Make it a fine-grained token for your account with read-only **Contents**, **Actions** and **Metadata**, on all repos or just the ones you'll deploy. It sits in a web-facing container, so don't reuse a broad token. Then:
 
 ```sh
 journalctl -u home-stack-deploy -f              # watch deploys
@@ -34,4 +34,4 @@ To pause auto-deploys: `sudo systemctl stop home-stack-deploy.timer` (`start` to
 
 ## Why pull, not a GitHub runner on the Pi?
 
-The repos are public, and GitHub advises against self-hosted runners on public repos: a pull request from anyone could run code on the Pi. Polling needs no inbound access and only reads public CI results. (Optional: set `DEPLOY_GITHUB_TOKEN` in the service for a higher API limit; the default 60 requests an hour is plenty at this rate.)
+The repos are public, and GitHub advises against self-hosted runners on public repos: a pull request from anyone could run code on the Pi. Polling needs no inbound access and only reads CI results. For a private repo, the script uses `DEPLOY_GITHUB_TOKEN` or, failing that, the token git has saved for github.com, the same one that clones and fetches it.

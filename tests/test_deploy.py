@@ -197,3 +197,22 @@ def test_an_added_app_brings_its_own_icon(client, make_user, state, monkeypatch)
     assert "sandbox" in r.headers["content-security-policy"]
     assert c.get("/services/library/icon.svg").status_code == 404
     assert c.get("/services/..%2Fstatus/icon.svg").status_code == 404
+
+
+def test_private_repos_need_the_dashboards_token(client, make_user, state, monkeypatch):
+    repos = deploy.owner_repos()
+    repos[0]["private"] = True
+    c = _admin(client, make_user)
+    r = c.post("/deploy/apps", json={"name": "situation"})
+    assert r.status_code == 400 and "DEPLOY_GITHUB_TOKEN" in r.json()["detail"]
+    monkeypatch.setattr(deploy, "TOKEN", "github_pat_test")
+    assert c.post("/deploy/apps", json={"name": "situation"}).status_code == 201
+
+
+def test_with_a_token_files_come_through_the_api(monkeypatch):
+    calls = []
+    monkeypatch.setattr(deploy, "TOKEN", "github_pat_test")
+    monkeypatch.setattr(deploy, "_get", lambda url, **kw: calls.append((url, kw)) or (200, b"title = 'x'"))
+    assert deploy._raw("ego-alt/situation", "main", "homestack.toml") == (200, "title = 'x'")
+    assert calls[0][0] == "https://api.github.com/repos/ego-alt/situation/contents/homestack.toml?ref=main"
+    assert calls[0][1]["accept"] == "application/vnd.github.raw"
