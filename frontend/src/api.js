@@ -210,6 +210,11 @@ export async function deployApps() {
   return apiJson('/deploy/apps');
 }
 
+/** Each app's latest commit on GitHub (slow: it asks GitHub; deployApps doesn't). */
+export async function deployLatest() {
+  return apiJson('/deploy/apps/latest');
+}
+
 export async function deployRepos() {
   return apiJson('/deploy/repos');
 }

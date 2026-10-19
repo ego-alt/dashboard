@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { addApp, checkRepo, deployApps, deployLog, deployNow, deployRepos, removeApp } from '../api';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { addApp, checkRepo, deployApps, deployLatest, deployLog, deployNow, deployRepos, removeApp } from '../api';
 import LogsDrawer from '../components/LogsDrawer.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import Panel from '../components/Panel.jsx';
@@ -25,11 +25,13 @@ const RESULT = {
 };
 
 /** One line saying where an app stands: what the Pi runs against what's on GitHub. */
-function standing(a) {
+function standing(a, checking) {
   if (a.queued) return { text: 'Queued: the Pi is on it', tone: 'text-[var(--color-accent)]' };
   const deployed = a.deployed?.sha;
   const latest = a.latest?.sha;
-  if (!a.latest) return { text: 'GitHub not reachable', tone: 'text-[var(--color-text-muted)]' };
+  if (!a.latest) {
+    return { text: checking ? 'Checking GitHub…' : 'GitHub not reachable', tone: 'text-[var(--color-text-muted)]' };
+  }
   if (!a.container && a.kind === 'app') return { text: 'Waiting for its first deploy', tone: 'text-[var(--color-accent)]' };
   if (latest && deployed && latest !== deployed) {
     if (a.latest.ci === 'running') return { text: 'New commit: CI running', tone: 'text-[var(--color-text-secondary)]' };
@@ -199,14 +201,34 @@ export default function DeployPage() {
   const [busy, setBusy] = useState({});
   const [logFor, setLogFor] = useState(null);
 
+  const [latest, setLatest] = useState({});        // name → latest commit, from GitHub
+  const [checking, setChecking] = useState(false);
+  const asking = useRef(false);
+
+  // The Pi's side first (instant), then GitHub's (seconds when not cached).
   const load = useCallback(async () => {
+    let r;
     try {
-      const r = await deployApps();
+      r = await deployApps();
       setApps(r.apps);
       setGithubProblem(r.github_problem || '');
       setError('');
     } catch (e) {
       setError(e.body?.detail || 'Couldn’t load the deploy status.');
+      return;
+    }
+    if (r.apps.every((a) => a.latest) || asking.current) return;
+    asking.current = true;
+    setChecking(true);
+    try {
+      const l = await deployLatest();
+      setLatest(l.latest || {});
+      setGithubProblem(l.github_problem || '');
+    } catch {
+      setGithubProblem('GitHub isn’t answering.');
+    } finally {
+      asking.current = false;
+      setChecking(false);
     }
   }, []);
 
@@ -232,8 +254,9 @@ export default function DeployPage() {
 
   const fetchLog = useCallback(async () => (await deployLog(logFor, 300)).lines.join('\n'), [logFor]);
 
-  const row = (a) => {
-    const s = standing(a);
+  const row = (app) => {
+    const a = { ...app, latest: app.latest || latest[app.name] || null };   // GitHub's answer, when it's in
+    const s = standing(a, checking);
     return { a, s, props: {
       a, busy: !!busy[a.name],
       onDeploy: (x) => run(x, deployNow, `Asked the Pi to deploy ${x.name}.`),

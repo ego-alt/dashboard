@@ -57,12 +57,44 @@ def test_admins_only(client, make_user, state):
     assert client.get("/deploy/apps").status_code == 403
 
 
-def test_lists_the_stack_with_deployed_and_latest(client, make_user, state):
+def test_lists_the_stack_without_waiting_for_github(client, make_user, state, monkeypatch):
+    """The list is the Pi's view and comes straight back; GitHub's side comes from /apps/latest."""
+    def no_github(*_):
+        raise AssertionError("the list mustn't ask GitHub")
+    monkeypatch.setattr(deploy, "latest_commit", no_github)
     apps = _admin(client, make_user).get("/deploy/apps").json()["apps"]
     assert [a["name"] for a in apps] == ["dashboard", "mcp", "library", "calendar", "tapes"]
     dash = apps[0]
-    assert dash["deployed"]["sha"] == "abc1234" and dash["latest"]["ci"] == "passed"
+    assert dash["deployed"]["sha"] == "abc1234" and dash["latest"] is None
     assert dash["container"]["state"] == "up" and dash["queued"] is False
+
+
+def test_latest_asks_github_about_every_repo_at_once(client, make_user, state, monkeypatch):
+    import threading
+    import time
+    lock, running, peak = threading.Lock(), [0], [0]
+
+    def slow(repo, branch):
+        with lock:
+            running[0] += 1
+            peak[0] = max(peak[0], running[0])
+        time.sleep(0.2)
+        with lock:
+            running[0] -= 1
+        return {"sha": "def5678", "message": f"{repo}@{branch}", "at": None, "ci": "passed"}
+    monkeypatch.setattr(deploy, "latest_commit", slow)
+    c = _admin(client, make_user)
+    started = time.monotonic()
+    latest = c.get("/deploy/apps/latest").json()["latest"]
+    assert set(latest) == {"dashboard", "mcp", "library", "calendar", "tapes"}
+    assert latest["mcp"]["message"] == latest["dashboard"]["message"]       # one repo, asked once
+    assert peak[0] >= 4 and time.monotonic() - started < 0.6                 # 4 repos side by side, not 0.8 s in a row
+
+
+def test_a_cached_latest_shows_in_the_list(client, make_user, state, monkeypatch):
+    monkeypatch.setattr(deploy, "_cache", {"commit:ego-alt/dashboard:master": (deploy.time.monotonic(), {"sha": "f00d"})})
+    apps = _admin(client, make_user).get("/deploy/apps").json()["apps"]
+    assert apps[0]["latest"] == {"sha": "f00d"} and apps[2]["latest"] is None
 
 
 def test_repos_on_offer_exclude_the_stack(client, make_user, state):

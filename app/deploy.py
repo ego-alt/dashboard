@@ -19,6 +19,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Any
 
@@ -143,6 +144,15 @@ def request_deploy(name: str):
 
 # ---------- GitHub ----------
 
+LATEST_TTL = 120
+
+
+def cached_latest(repo: str, branch: str) -> dict | None:
+    """The latest commit if it's already cached and fresh; never asks GitHub."""
+    hit = _cache.get(f"commit:{repo}:{branch}")
+    return hit[1] if hit and time.monotonic() - hit[0] < LATEST_TTL else None
+
+
 def latest_commit(repo: str, branch: str) -> dict | None:
     def fetch():
         commit = _api(f"/repos/{repo}/commits/{branch}")
@@ -159,7 +169,7 @@ def latest_commit(repo: str, branch: str) -> dict | None:
             ci = "passed" if all(r["conclusion"] == "success" for r in runs) else "failed"
         return {"sha": sha, "message": commit["commit"]["message"].splitlines()[0][:120],
                 "at": commit["commit"]["committer"]["date"], "ci": ci}
-    return _cached(f"commit:{repo}:{branch}", 120, fetch)
+    return _cached(f"commit:{repo}:{branch}", LATEST_TTL, fetch)
 
 
 def owner_repos() -> list[dict]:
@@ -215,6 +225,8 @@ def check_repo(repo: str, branch: str) -> dict:
 # ---------- endpoints ----------
 
 def _row(app: dict, status: dict, containers: dict, queued: set[str], kind: str) -> dict:
+    """An app as the Pi sees it. "Latest on GitHub" only if it's already cached:
+    asking GitHub takes seconds, so the page gets it from /deploy/apps/latest."""
     # What the Pi has checked out (written every run), with the last deploy's
     # outcome when it was for that same commit.
     head = status.get("_heads", {}).get(app.get("part_of") or app["name"])
@@ -229,7 +241,7 @@ def _row(app: dict, status: dict, containers: dict, queued: set[str], kind: str)
         "name": app["name"], "kind": kind, "repo": app["repo"], "branch": app["branch"],
         "title": app.get("title") or app["name"], "part_of": app.get("part_of"),
         "deployed": deployed,
-        "latest": latest_commit(app["repo"], app["branch"]),
+        "latest": cached_latest(app["repo"], app["branch"]),
         "container": {"state": container["state"], "status": container.get("status")} if container else None,
         "queued": app.get("part_of", app["name"]) in queued,
     }
@@ -247,6 +259,22 @@ def list_apps(_: User = Depends(current_admin)):
     for app in enabled_apps():
         rows.append(_row({**app, "container": app["name"]}, status, containers, queued, "app"))
     return {"apps": rows, "owner": OWNER, "github_problem": github_problem}
+
+
+def _stack() -> list[dict]:
+    return CORE + enabled_apps()
+
+
+@router.get("/apps/latest")
+def list_latest(_: User = Depends(current_admin)):
+    """Each app's latest commit on GitHub with its CI result, every repo asked
+    at once (one after another took several seconds)."""
+    apps = _stack()
+    repos = sorted({(a["repo"], a.get("branch", "main")) for a in apps})
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        found = dict(zip(repos, pool.map(lambda r: latest_commit(*r), repos), strict=True))
+    return {"latest": {a["name"]: found[(a["repo"], a.get("branch", "main"))] for a in apps},
+            "github_problem": github_problem}
 
 
 @router.get("/repos")
