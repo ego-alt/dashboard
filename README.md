@@ -41,7 +41,7 @@ Tests: `uv run pytest`. Lint: `uvx ruff check .` and `npm run lint` in `frontend
 
 ## Home stack
 
-- **New apps**: `scripts/stack.py new <name>` then `scripts/stack.py publish <name>`; the Pi clones, builds and routes it on its own. See [`docs/NEW-APP.md`](docs/NEW-APP.md).
+- **New apps**: push a repo with a `Dockerfile`, a `homestack.toml` and CI, then add it in the **Deploy** tab; the Pi clones, builds and routes it. See [`docs/APPS.md`](docs/APPS.md).
 - **Services are discovered, not registered.** A container with `homehub.enable=true` and `homehub.route` labels (plus optional `name`, `icon`, `description`) becomes a tile; see the `labels:` blocks in `docker-compose.yml`.
 - **Data**: the dashboard's database is `./data/dashboard.db`. The container runs as uid 10001, so after using the CLI on the host run `sudo chown -R 10001:10001 data/`.
 - **Users**: apps create a user's account on their first visit. To create them up front, run `uv run python scripts/sync_household_users.py` after adding someone.

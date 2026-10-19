@@ -1,3 +1,0 @@
-# Apps added with scripts/stack.py (the core apps are in docker-compose.yml).
-# Each becomes a compose service and an nginx route at /<name>/; run
-# `scripts/stack.py render` after editing by hand.

@@ -2,20 +2,24 @@
 # Pull-based deploy for the home stack. Run every few minutes by the
 # home-stack-deploy systemd timer (install with scripts/install-deploy-timer.sh).
 #
-# For each repo (dashboard, library, calendar, tapes, and every app added with
-# scripts/stack.py, listed in the dashboard's stack/apps.toml), sitting side by
-# side in one folder:
+# For each repo (dashboard, library, calendar, tapes, and every app enabled in
+# the dashboard's Deploy tab), sitting side by side in one folder:
 #   1. fetch its deploy branch; stop if nothing new
 #   2. only continue if the new commit's CI workflow passed on GitHub
 #   3. fast-forward, rebuild and restart that one service
 #   4. wait for its health check; if it fails, roll back to the previous
 #      commit and rebuild that, and don't retry the bad commit
 #
-# It never touches a repo with local changes or a diverged branch, and it
-# never takes instructions from outside: it only reads public CI results.
+# It never touches a repo with local changes or a diverged branch. Its only
+# inputs are public CI results and, from the Deploy tab (admins only), which
+# apps are enabled ($STATE_DIR/apps/*.json) and "deploy now" requests
+# ($STATE_DIR/requests/<name>; a systemd path unit starts a run when one
+# appears). Enabled apps are cloned, given a compose service and an nginx
+# route (scripts/stack_render.py), and deployed like the rest.
 #
-# Logs go to stdout (journald under systemd); the latest outcome per repo is
-# written to $DEPLOY_STATE_DIR/status.json.
+# Logs go to stdout (journald under systemd) and, per repo, to
+# $STATE_DIR/logs/<name>.log; the latest outcome per repo is written to
+# $STATE_DIR/status.json.
 #
 # Env:
 #   DEPLOY_STATE_DIR    state + status file   (default /var/lib/home-stack-deploy)
@@ -41,7 +45,11 @@ REPOS=(
   "tapes:main:music:music"
 )
 
-mkdir -p "$STATE_DIR"
+mkdir -p "$STATE_DIR"/{apps,requests,logs,generated/nginx}
+LOG_DIR="$STATE_DIR/logs"
+RENDER=(python3 "$COMPOSE_DIR/scripts/stack_render.py")
+export DEPLOY_STATE_DIR="$STATE_DIR"
+[[ -f $STATE_DIR/generated/compose.apps.yml ]] || "${RENDER[@]}" render >/dev/null
 
 # One run at a time (a slow build can outlast the timer interval).
 if command -v flock >/dev/null 2>&1; then
@@ -52,7 +60,7 @@ if command -v flock >/dev/null 2>&1; then
   fi
 fi
 
-log() { echo "[$1] ${*:2}"; }
+log() { echo "$(date '+%F %T') [$1] ${*:2}"; }
 
 compose() { (cd "$COMPOSE_DIR" && docker compose "$@"); }
 
@@ -90,14 +98,22 @@ else:
 }
 
 # Wait for the container's healthcheck. Containers without one count as
-# healthy once running.
+# healthy once running; apps from the Deploy tab must also answer their
+# manifest's health path over HTTP (probed from the nginx container, so it
+# works whatever the app is written in).
 wait_healthy() {
-  local container=$1 waited=0 health
+  local container=$1 waited=0 health probe=""
+  if is_app "$container"; then
+    probe=$("${RENDER[@]}" health "$container" 2>/dev/null) || probe=""
+  fi
   while (( waited < HEALTH_WAIT )); do
     health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
       "$container" 2>/dev/null || echo missing)
     case $health in
-      healthy|running) return 0 ;;
+      healthy|running)
+        [[ -z $probe ]] && return 0
+        docker exec home-nginx wget -q -O /dev/null -T 5 "http://$container:${probe% *}${probe#* }" 2>/dev/null \
+          && return 0 ;;
       unhealthy|exited|dead) return 1 ;;
     esac
     sleep 5
@@ -113,7 +129,7 @@ restart_service() {
     # The dashboard repo also carries docker-compose.yml and the nginx config:
     # apply compose changes to the other services and reload nginx. mcp is
     # left out here and handled by restart_mcp.
-    # Apps from the registry deploy on their own, after their own CI.
+    # Apps from the Deploy tab deploy on their own, after their own CI.
     local others
     others=$(compose config --services | grep -vxF -f <(printf '%s\n' mcp ${APP_NAMES[@]+"${APP_NAMES[@]}"}) | tr '\n' ' ')
     # shellcheck disable=SC2086
@@ -150,8 +166,14 @@ json.dump(data, open(path, "w"), indent=2)
 EOF
 }
 
+is_app() {
+  local n
+  for n in ${APP_NAMES[@]+"${APP_NAMES[@]}"}; do [[ $n == "$1" ]] && return 0; done
+  return 1
+}
+
 deploy_repo() {
-  local name=$1 branch=$2 service=$3 container=$4
+  local name=$1 branch=$2 service=$3 container=$4 force=${5:-0}
   local dir="$STACK_DIR/$name" current target result
   local bad_file="$STATE_DIR/$name.bad"
 
@@ -161,8 +183,12 @@ deploy_repo() {
   current=$(git -C "$dir" rev-parse HEAD)
   target=$(git -C "$dir" rev-parse "origin/$branch")
   if [[ $current == "$target" ]]; then
-    # Up to date, unless it was just cloned and has never run.
-    docker inspect "$container" >/dev/null 2>&1 && return
+    # Up to date, unless it was just cloned and has never run, or the Deploy
+    # tab asked for a fresh build.
+    if docker inspect "$container" >/dev/null 2>&1; then
+      (( force )) || return
+      rm -f "$bad_file"
+    fi
     first=1
   fi
 
@@ -191,7 +217,7 @@ deploy_repo() {
   fi
 
   if (( first )); then
-    log "$name" "first deploy of ${target:0:7}"
+    log "$name" "building and starting ${target:0:7}"
   else
     log "$name" "deploying ${current:0:7} -> ${target:0:7}"
     # Checked explicitly: set -e is off inside a function called with ||.
@@ -204,7 +230,7 @@ deploy_repo() {
     return
   fi
   if (( first )); then
-    log "$name" "${target:0:7} didn't start healthy on its first deploy; fix and push again"
+    log "$name" "${target:0:7} didn't start healthy; fix and push again"
     echo "$target" >"$bad_file"
     record "$name" "$target" "failed"
     return
@@ -221,28 +247,74 @@ deploy_repo() {
   fi
 }
 
-# Apps added with scripts/stack.py. The registry is read from the dashboard's
-# latest commit on GitHub, so a newly registered app is cloned before the
-# dashboard deploy that starts routing to it.
+# "Deploy now" from the Deploy tab: one file per repo name.
+declare -A FORCE=()
+for req in "$STATE_DIR"/requests/*; do
+  [[ -e $req ]] || continue
+  FORCE[$(basename "$req")]=1
+  rm -f "$req"
+done
+
+# Apps enabled in the Deploy tab: clone any that are new, then generate their
+# compose services and nginx routes before anything is restarted.
 APPS=()
 APP_NAMES=()
-if git -C "$COMPOSE_DIR" fetch -q origin master 2>/dev/null; then
-  while IFS= read -r line; do
-    [[ -n $line ]] && APPS+=("$line")
-  done < <(git -C "$COMPOSE_DIR" show origin/master:stack/apps.toml 2>/dev/null \
-             | python3 "$COMPOSE_DIR/scripts/stack.py" repos --registry - 2>/dev/null)
-fi
+while IFS= read -r line; do
+  [[ -n $line ]] && APPS+=("$line")
+done < <("${RENDER[@]}" apps 2>/dev/null)
 for entry in ${APPS[@]+"${APPS[@]}"}; do
   IFS=: read -r name branch service container slug <<<"$entry"
   APP_NAMES+=("$name")
   if [[ ! -d $STACK_DIR/$name/.git ]]; then
-    log "$name" "new app: cloning $slug"
-    git clone -q --branch "$branch" "https://github.com/$slug.git" "$STACK_DIR/$name" \
-      || log "$name" "clone failed; will try again next run"
+    log "$name" "new app: cloning $slug" | tee -a "$LOG_DIR/$name.log"
+    git clone -q --branch "$branch" "https://github.com/$slug.git" "$STACK_DIR/$name" 2>&1 | tee -a "$LOG_DIR/$name.log" \
+      || log "$name" "clone failed; will try again next run" | tee -a "$LOG_DIR/$name.log"
   fi
 done
 
+# Apps switched off in the Deploy tab: stop and remove their containers (their
+# folders and data stay on disk).
+touch "$STATE_DIR/generated/running-apps"
+while IFS= read -r gone; do
+  [[ -n $gone ]] || continue
+  log "$gone" "removed in the Deploy tab: stopping it" | tee -a "$LOG_DIR/$gone.log"
+  docker rm -f "$gone" >/dev/null 2>&1 || true
+done < <(grep -vxF -f <(printf '%s\n' "" ${APP_NAMES[@]+"${APP_NAMES[@]}"}) "$STATE_DIR/generated/running-apps" || true)
+printf '%s\n' ${APP_NAMES[@]+"${APP_NAMES[@]}"} >"$STATE_DIR/generated/running-apps"
+
+if [[ $("${RENDER[@]}" render) == changed ]]; then
+  if docker exec home-nginx nginx -t >/dev/null 2>&1; then
+    docker exec home-nginx nginx -s reload >/dev/null && log nginx "routes updated for the Deploy tab's apps"
+  else
+    log nginx "the generated routes don't pass nginx -t; keeping the old ones"
+  fi
+fi
+
 for entry in "${REPOS[@]}" ${APPS[@]+"${APPS[@]}"}; do
   IFS=: read -r name branch service container _ <<<"$entry"
-  deploy_repo "$name" "$branch" "$service" "$container" || log "$name" "deploy step errored"
+  {
+    deploy_repo "$name" "$branch" "$service" "$container" "${FORCE[$name]:-0}" || log "$name" "deploy step errored"
+  } 2>&1 | tee -a "$LOG_DIR/$name.log"
+  # Keep each log to its last 3,000 lines.
+  if [[ -f $LOG_DIR/$name.log ]] && (( $(wc -l <"$LOG_DIR/$name.log") > 3000 )); then
+    tail -n 2000 "$LOG_DIR/$name.log" >"$LOG_DIR/$name.log.tmp" && mv "$LOG_DIR/$name.log.tmp" "$LOG_DIR/$name.log"
+  fi
 done
+
+# What each repo has checked out right now, for the Deploy tab's "Running"
+# column (true even for repos no deploy has touched yet).
+heads=()
+for entry in "${REPOS[@]}" ${APPS[@]+"${APPS[@]}"}; do
+  IFS=: read -r name _ <<<"$entry"
+  sha=$(git -C "$STACK_DIR/$name" rev-parse HEAD 2>/dev/null) && heads+=("$name=$sha")
+done
+python3 - "$STATE_DIR/status.json" ${heads[@]+"${heads[@]}"} <<'EOF'
+import json, sys
+path, pairs = sys.argv[1], sys.argv[2:]
+try:
+    data = json.load(open(path))
+except (OSError, ValueError):
+    data = {}
+data["_heads"] = dict(p.split("=", 1) for p in pairs)
+json.dump(data, open(path, "w"), indent=2)
+EOF

@@ -1,6 +1,6 @@
 # Deploying
 
-All the repos (dashboard, library, calendar, tapes, and any app added with `scripts/stack.py`, listed in `stack/apps.toml`) sit side by side on the Pi, and each runs CI on GitHub (`.github/workflows/ci.yml`: tests, the frontend build here, and advisory lint) on every push and pull request.
+All the repos (dashboard, library, calendar, tapes, and any app added in the Deploy tab) sit side by side on the Pi, and each runs CI on GitHub (`.github/workflows/ci.yml`: tests, the frontend build here, and advisory lint) on every push and pull request.
 
 The Pi **pulls** its deploys; nothing pushes to it. A systemd timer runs `scripts/deploy.sh` every 5 minutes. For each repo it:
 
@@ -9,7 +9,7 @@ The Pi **pulls** its deploys; nothing pushes to it. A systemd timer runs `script
 3. fast-forwards, rebuilds and restarts only that service. A dashboard change also re-applies `docker-compose.yml` to the other services, reloads nginx, and rebuilds the `mcp` container. That last step is best-effort: a broken `mcp` shows as `"mcp": "failed"` in the status file and never rolls the dashboard back;
 4. waits for the container's health check. If it doesn't come up healthy, it rolls back to the previous commit, rebuilds that, and won't retry the bad commit until a newer one lands.
 
-Apps in `stack/apps.toml` are read from the dashboard's latest commit on GitHub at the start of each run. A newly listed app is cloned first, then deployed for the first time once its CI passes; a dashboard deploy never restarts them (see [`NEW-APP.md`](NEW-APP.md)).
+The **Deploy** tab in the dashboard shows each repo's running and latest commit, CI result and deploy log, with "Deploy now". Apps added there are cloned, given a compose service and an nginx route, and deployed once their CI passes; a dashboard deploy never restarts them (see [`APPS.md`](APPS.md)). "Deploy now" starts a run at once (a systemd path unit watches for the request).
 
 It skips any repo with local edits or a branch that has diverged from GitHub, so hand-made changes on the Pi are never overwritten. Database migrations run when containers start (library and calendar run `flask db upgrade`; the dashboard adds new tables and columns itself).
 
@@ -21,7 +21,7 @@ From the dashboard folder:
 sudo scripts/install-deploy-timer.sh
 ```
 
-It runs deploys as the user who owns the repos (who must be in the `docker` group). Then:
+It runs deploys as the user who owns the repos (who must be in the `docker` group), and prints two lines to add to the dashboard's `.env` (`DEPLOY_STATE_HOST_DIR`, `STACK_APPS_COMPOSE`) so compose and the Deploy tab find the deploy state. Optionally add `DEPLOY_GITHUB_TOKEN` there too: a GitHub token with no scopes lifts the limit of 60 API requests an hour, which the Deploy tab can otherwise use up. Then:
 
 ```sh
 journalctl -u home-stack-deploy -f              # watch deploys

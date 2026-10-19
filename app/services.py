@@ -9,10 +9,14 @@ Recognized labels (all under the ``homehub.`` prefix):
   enable       "true"/"1"/"yes" — opt in (required)
   route        nginx path to link the tile to, e.g. "/library/" (required)
   name         display name (defaults to the container name)
-  icon         icon key, e.g. book or calendar (optional; UI picks by slug or monogram)
+  icon         icon key, e.g. book or calendar (optional; UI picks by slug or monogram).
+               Apps added in the Deploy tab bring their own SVG instead (icon_url).
   description  one-line blurb (optional)
 """
 
+import os
+import pathlib
+import re
 from typing import Any, Dict, List
 
 from app.docker_control import list_service_candidates
@@ -20,6 +24,15 @@ from app.docker_control import list_service_candidates
 LABEL_PREFIX = "homehub."
 
 _TRUTHY = {"1", "true", "yes", "on"}
+
+# Icons of apps added in the Deploy tab, copied out of their repos on the Pi.
+ICON_DIR = pathlib.Path(os.environ.get("DEPLOY_STATE_DIR", "/deploy")) / "generated" / "icons"
+_SLUG = re.compile(r"^[a-z][a-z0-9-]{1,30}$")
+
+
+def app_icon_path(slug: str) -> pathlib.Path | None:
+    path = ICON_DIR / f"{slug}.svg"
+    return path if _SLUG.match(slug) and path.is_file() else None
 
 
 class DockerUnavailable(Exception):
@@ -70,6 +83,7 @@ def list_services() -> List[Dict[str, Any]]:
                 "display_name": _label(labels, "name") or c["name"],
                 "route_prefix": route,
                 "icon": _label(labels, "icon"),
+                "icon_url": f"/services/{c['name']}/icon.svg" if app_icon_path(c["name"]) else None,
                 "description": _label(labels, "description"),
                 "container_name": c["name"],
                 "status": "running" if c.get("status") == "running" else "stopped",

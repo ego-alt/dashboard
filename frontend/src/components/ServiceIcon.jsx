@@ -123,7 +123,20 @@ function Monogram({ name, slug }) {
   );
 }
 
-export default function ServiceIcon({ icon, name, slug }) {
+// An added app's own SVG, used as a mask so it takes the tile's ink colour.
+function UrlIcon({ url }) {
+  const mask = `url("${url}") center / contain no-repeat`;
+  return <span className="block h-5 w-5 bg-current" style={{ mask, WebkitMask: mask }} aria-hidden />;
+}
+
+export default function ServiceIcon({ icon, iconUrl, name, slug }) {
+  if (iconUrl) {
+    return (
+      <IconShell slug={slug}>
+        <UrlIcon url={iconUrl} />
+      </IconShell>
+    );
+  }
   const key = resolveIconKey(icon, slug);
   const Icon = key ? ICONS[key] : null;
   if (Icon) {

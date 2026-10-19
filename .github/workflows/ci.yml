@@ -28,8 +28,6 @@ jobs:
         run: uv sync --frozen --all-groups
       - name: Tests
         run: uv run pytest -q
-      - name: Stack files match stack/apps.toml
-        run: python3 scripts/stack.py render --check
       # Advisory until the existing warnings are cleaned up: shows issues
       # inline on the PR without failing the build.
       - name: Lint (advisory)

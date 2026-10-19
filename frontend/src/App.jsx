@@ -5,6 +5,7 @@ import HomePage from './pages/HomePage.jsx';
 import MonitorPage from './pages/MonitorPage.jsx';
 import UsersPage from './pages/UsersPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
+import DeployPage from './pages/DeployPage.jsx';
 
 // Closed-door "sign out" glyph — matches the door icon the calendar/library apps use.
 function DoorIcon() {
@@ -27,6 +28,7 @@ function navItems(user) {
     { to: '/', label: 'Services', end: true },
     user?.is_admin && { to: '/admin/monitor', label: 'Monitor' },
     user?.is_admin && { to: '/admin/users', label: 'Users' },
+    user?.is_admin && { to: '/admin/deploy', label: 'Deploy' },
     { to: '/settings', label: 'Settings' },
   ].filter(Boolean);
 }
@@ -129,6 +131,18 @@ export default function App() {
           browser visits to it (see list_users_endpoint). */}
       <Route path="/monitor" element={<Navigate to="/admin/monitor" replace />} />
       <Route path="/users" element={<Navigate to="/admin/users" replace />} />
+      <Route
+        path="/admin/deploy"
+        element={
+          <RequireAuth>
+            <AdminOnly>
+              <Shell>
+                <DeployPage />
+              </Shell>
+            </AdminOnly>
+          </RequireAuth>
+        }
+      />
       <Route
         path="/admin/monitor"
         element={

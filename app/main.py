@@ -47,7 +47,7 @@ from app.docker_control import (
     stop_container,
 )
 from app.models import ApiToken, LoginEvent, User, UserSession, WebauthnCredential
-from app.services import DockerUnavailable, list_services
+from app.services import DockerUnavailable, app_icon_path, list_services
 from app.spa import register_spa
 from app.system_stats import get_system_stats
 from app.uptime import start_sampler, uptime_summary
@@ -929,6 +929,18 @@ def list_services_endpoint(_: User = Depends(current_user)):
         )
 
 
+@app.get("/services/{slug}/icon.svg")
+def service_icon(slug: str, _: User = Depends(current_user)):
+    """An added app's icon, copied from its repo by the Pi's deploy script.
+    Served so it can't run anything even if opened directly."""
+    path = app_icon_path(slug)
+    if not path:
+        raise HTTPException(404, "No icon.")
+    return Response(path.read_bytes(), media_type="image/svg+xml", headers={
+        "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+        "X-Content-Type-Options": "nosniff", "Cache-Control": "private, max-age=300"})
+
+
 @app.get("/uptime")
 def uptime_endpoint(
     days: int = 1,
@@ -1026,5 +1038,11 @@ def backup_status_endpoint(_: User = Depends(current_admin)):
 
 
 # ---------- React SPA (built into app/static by Docker / manual npm run build) ----------
+
+# ---------- Deploy tab (admin; see app/deploy.py) ----------
+
+from app.deploy import router as deploy_router  # noqa: E402
+
+app.include_router(deploy_router)
 
 register_spa(app)

@@ -40,6 +40,7 @@ def test_enabled_service_discovered(client, make_user, monkeypatch):
         "display_name": "Library",
         "route_prefix": "/library/",
         "icon": "book",
+        "icon_url": None,
         "description": None,
         "container_name": "library",
         "status": "running",

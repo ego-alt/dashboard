@@ -12,7 +12,7 @@ const FOLLOW_MS = 3000;
 const TS = /^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(\.\d+)?(Z|[+-]\d\d:\d\d)?\s/;
 
 function lineTone(line) {
-  if (/\b(ERROR|CRITICAL|FATAL|Traceback|Exception)\b/i.test(line)) return 'text-[var(--color-danger)]';
+  if (/\b(ERROR|CRITICAL|FATAL|Traceback|Exception|failed|rolling back|not healthy)\b/i.test(line)) return 'text-[var(--color-danger)]';
   if (/\bWARN(ING)?\b/i.test(line)) return 'text-amber-300';
   return 'text-[var(--color-text-secondary)]';
 }
@@ -32,11 +32,13 @@ function parse(text) {
     });
 }
 
-/** The last lines of a container's log, optionally following new lines: a
- * side pane on desktop (the page moves over; you can keep using it), a
- * full-screen overlay on phones. Escape or × closes it, and on phones a tap
- * outside too. */
-export default function LogsDrawer({ container, onClose }) {
+/** The last lines of a log, optionally following new lines: a side pane on
+ * desktop (the page moves over; you can keep using it), a full-screen overlay
+ * on phones. Escape or × closes it, and on phones a tap outside too.
+ * A container's log by default; pass `title` and `fetchText` for another one
+ * (the Deploy tab's deploy logs). */
+export default function LogsDrawer({ container, title, fetchText, onClose }) {
+  const name = title || container?.name;
   const [lines, setLines] = useState(null);
   const [error, setError] = useState('');
   const [follow, setFollow] = useState(false);
@@ -46,13 +48,13 @@ export default function LogsDrawer({ container, onClose }) {
 
   const load = useCallback(async () => {
     try {
-      const r = await containerLogs(container.id, TAIL);
-      setLines(parse(r.logs || ''));
+      const text = fetchText ? await fetchText() : (await containerLogs(container.id, TAIL)).logs;
+      setLines(parse(text || ''));
       setError('');
     } catch (e) {
       setError(e.body?.detail || 'Couldn\u2019t load the logs.');
     }
-  }, [container.id]);
+  }, [container?.id, fetchText]);
 
   // Switching containers keeps the old lines up until the new ones arrive,
   // rather than flashing "Loading…".
@@ -92,13 +94,13 @@ export default function LogsDrawer({ container, onClose }) {
   return (
     <aside
       ref={panelRef}
-      aria-label={`Logs for ${container.name}`}
+      aria-label={`Logs for ${name}`}
       className="logs-pane fixed inset-y-0 right-0 z-40 flex w-full flex-col border-l border-[var(--color-border)] bg-[var(--color-bg-elevated)]"
     >
       {/* Same height and rule as the top bar, so the two line up; lighter
           than the log body below it. */}
       <header className="flex h-[55px] shrink-0 items-center gap-3 border-b border-[var(--color-border)] px-4">
-        <h3 className="font-mono text-sm text-[var(--color-text-primary)]">{container.name}</h3>
+        <h3 className="font-mono text-sm text-[var(--color-text-primary)]">{name}</h3>
         <span className="hidden text-xs text-[var(--color-text-muted)] sm:inline">last {TAIL} lines</span>
         <div className="ml-auto flex items-center gap-2">
           <button

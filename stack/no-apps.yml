@@ -1,0 +1,3 @@
+# No apps from the Deploy tab: the default when STACK_APPS_COMPOSE is unset
+# (e.g. developing on a laptop). On the Pi it points at the generated file.
+services: {}

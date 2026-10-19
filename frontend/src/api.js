@@ -203,3 +203,37 @@ export async function containerLogs(id, tail = 200) {
 export async function backupStatus() {
   return apiJson('/backups/status');
 }
+
+// ---------- Deploy tab (admin) ----------
+
+export async function deployApps() {
+  return apiJson('/deploy/apps');
+}
+
+export async function deployRepos() {
+  return apiJson('/deploy/repos');
+}
+
+export async function checkRepo(name) {
+  return apiJson(`/deploy/repos/${encodeURIComponent(name)}/check`);
+}
+
+export async function addApp(name) {
+  return apiJson('/deploy/apps', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function deployNow(name) {
+  return apiJson(`/deploy/apps/${encodeURIComponent(name)}/deploy`, { method: 'POST' });
+}
+
+export async function removeApp(name) {
+  return apiJson(`/deploy/apps/${encodeURIComponent(name)}`, { method: 'DELETE' });
+}
+
+export async function deployLog(name, tail = 300) {
+  return apiJson(`/deploy/apps/${encodeURIComponent(name)}/log?tail=${tail}`);
+}
