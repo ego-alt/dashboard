@@ -133,8 +133,21 @@ wait_healthy() {
   return 1
 }
 
+# Regenerate the apps' compose services and nginx routes from their checked-out
+# homestack.toml, and reload nginx if the routes changed.
+render_apps() {
+  [[ $("${RENDER[@]}" render) == changed ]] || return 0
+  if docker exec home-nginx nginx -t >/dev/null 2>&1; then
+    docker exec home-nginx nginx -s reload >/dev/null && log nginx "routes updated for the Deploy tab's apps"
+  else
+    log nginx "the generated routes don't pass nginx -t; keeping the old ones"
+  fi
+}
+
 restart_service() {
   local name=$1 service=$2
+  # An app's manifest (port, env, tile) may have changed in the commit just checked out.
+  if is_app "$name"; then render_apps; fi
   compose build "$service" && compose up -d "$service" || return 1
   if [[ $name == dashboard ]]; then
     # The dashboard repo also carries docker-compose.yml and the nginx config:
@@ -293,13 +306,7 @@ while IFS= read -r gone; do
 done < <(grep -vxF -f <(printf '%s\n' "" ${APP_NAMES[@]+"${APP_NAMES[@]}"}) "$STATE_DIR/generated/running-apps" || true)
 printf '%s\n' ${APP_NAMES[@]+"${APP_NAMES[@]}"} >"$STATE_DIR/generated/running-apps"
 
-if [[ $("${RENDER[@]}" render) == changed ]]; then
-  if docker exec home-nginx nginx -t >/dev/null 2>&1; then
-    docker exec home-nginx nginx -s reload >/dev/null && log nginx "routes updated for the Deploy tab's apps"
-  else
-    log nginx "the generated routes don't pass nginx -t; keeping the old ones"
-  fi
-fi
+render_apps
 
 for entry in "${REPOS[@]}" ${APPS[@]+"${APPS[@]}"}; do
   IFS=: read -r name branch service container _ <<<"$entry"
