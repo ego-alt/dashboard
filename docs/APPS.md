@@ -13,6 +13,7 @@ Any repo can join the stack, in any language or framework, if it has three files
 title = "Situation"              # its tile on Services, and its name in Deploy
 description = "World news on a map"
 icon = "icon.svg"                # an SVG in the repo, drawn in one colour (use currentColor)
+accent = "#ffb020"               # that colour; it must stand out on the dark tile (3:1 contrast)
 port = 8000                      # the port the container listens on (default 8000)
 health = "/healthz"              # answers 2xx when the app is up (default /healthz)
 data = "/app/instance"           # a folder kept across deploys, at <stack>/<name>/instance on the Pi

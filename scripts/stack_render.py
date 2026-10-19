@@ -71,6 +71,7 @@ def compose_yaml(apps: list[tuple[dict, dict]], stack_dir: pathlib.Path = STACK_
             f"      homehub.name: {json.dumps(m['title'])}",
             f'      homehub.route: "/{n}/"',
             f"      homehub.description: {json.dumps(m['description'])}",
+            *([f"      homehub.accent: {json.dumps(m['accent'])}"] if m["accent"] else []),
             "",
         ]
     return "\n".join(lines)

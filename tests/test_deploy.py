@@ -112,9 +112,10 @@ def test_manifest_rules():
     m = parse(GOOD_MANIFEST)
     assert (m["port"], m["health"], m["data"], m["env"]) == (8000, "/healthz", None, {"NTFY_TOPIC": "${NTFY_TOPIC}"})
     for bad in ('description = "no title"', 'title = "x"\nport = 70000', 'title = "x"\nhealth = "healthz"',
-                'title = "x"\ndata = "relative"', 'title = "x"\nicon = "globe"', 'title = "x"\nicon = "../x.svg"', 'title = "x"\n[env]\nlower = "1"', "not toml ["):
+                'title = "x"\ndata = "relative"', 'title = "x"\nicon = "globe"', 'title = "x"\naccent = "gold"', 'title = "x"\naccent = "#1a2030"', 'title = "x"\nicon = "../x.svg"', 'title = "x"\n[env]\nlower = "1"', "not toml ["):
         with pytest.raises(ManifestError):
             parse(bad)
+    assert parse('title = "x"\naccent = "#FFB020"')["accent"] == "#ffb020"
     assert name_problem("situation") is None
     assert name_problem("library") and name_problem("Bad_Name") and name_problem("login")
 
@@ -132,7 +133,7 @@ def test_render_compose_and_routes(tmp_path):
     r = _renderer()
     stack, state_dir = tmp_path / "stack", tmp_path / "state"
     (stack / "situation").mkdir(parents=True)
-    (stack / "situation" / "homestack.toml").write_text('title = "Situation"\nport = 5000\ndata = "/app/instance"\nicon = "icon.svg"\n')
+    (stack / "situation" / "homestack.toml").write_text('title = "Situation"\nport = 5000\ndata = "/app/instance"\nicon = "icon.svg"\naccent = "#ffb020"\n')
     (stack / "situation" / "icon.svg").write_text('<svg viewBox="0 0 24 24"><circle r="9"/></svg>')
     (state_dir / "apps").mkdir(parents=True)
     (state_dir / "apps" / "situation.json").write_text(json.dumps({"name": "situation", "repo": "ego-alt/situation"}))
@@ -142,6 +143,7 @@ def test_render_compose_and_routes(tmp_path):
     compose = (state_dir / "generated" / "compose.apps.yml").read_text()
     assert f'build: "{stack / "situation"}"' in compose and 'APPLICATION_ROOT: "/situation"' in compose
     assert f'"{stack / "situation" / "instance"}:/app/instance"' in compose and '"5000"' in compose
+    assert 'homehub.accent: "#ffb020"' in compose
     route = (state_dir / "generated" / "nginx" / "situation.locations").read_text()
     assert "set                $app_situation http://situation:5000;" in route and "auth_request" in route
     assert (state_dir / "generated" / "icons" / "situation.svg").read_text().startswith("<svg")

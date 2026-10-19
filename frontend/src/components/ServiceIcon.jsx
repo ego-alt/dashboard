@@ -40,14 +40,14 @@ function resolveIconKey(icon, slug) {
   return SLUG_ICONS[slug] || null;
 }
 
-function IconShell({ slug, textClass, children }) {
+function IconShell({ slug, textClass, accent, children }) {
   const text = accentFor(slug);
   return (
     <span
       className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border"
       style={{ background: 'var(--color-bg-inset)', borderColor: 'var(--color-border)' }}
     >
-      <span className={textClass ?? text}>{children}</span>
+      <span className={accent ? undefined : (textClass ?? text)} style={accent ? { color: accent } : undefined}>{children}</span>
     </span>
   );
 }
@@ -113,11 +113,11 @@ const ICONS = {
   music: MusicIcon,
 };
 
-function Monogram({ name, slug }) {
+function Monogram({ name, slug, accent }) {
   const letter = (name || '?').trim().charAt(0).toUpperCase() || '?';
-  const text = accentFor(slug);
+  const text = accent ? '' : accentFor(slug);
   return (
-    <IconShell slug={slug}>
+    <IconShell slug={slug} accent={accent}>
       <span className={`text-sm font-semibold tracking-tight ${text}`}>{letter}</span>
     </IconShell>
   );
@@ -129,10 +129,10 @@ function UrlIcon({ url }) {
   return <span className="block h-5 w-5 bg-current" style={{ mask, WebkitMask: mask }} aria-hidden />;
 }
 
-export default function ServiceIcon({ icon, iconUrl, name, slug }) {
+export default function ServiceIcon({ icon, iconUrl, accent, name, slug }) {
   if (iconUrl) {
     return (
-      <IconShell slug={slug}>
+      <IconShell slug={slug} accent={accent}>
         <UrlIcon url={iconUrl} />
       </IconShell>
     );
@@ -141,10 +141,10 @@ export default function ServiceIcon({ icon, iconUrl, name, slug }) {
   const Icon = key ? ICONS[key] : null;
   if (Icon) {
     return (
-      <IconShell slug={slug} textClass={ICON_COLORS[key]}>
+      <IconShell slug={slug} textClass={ICON_COLORS[key]} accent={accent}>
         <Icon />
       </IconShell>
     );
   }
-  return <Monogram name={name} slug={slug} />;
+  return <Monogram name={name} slug={slug} accent={accent} />;
 }

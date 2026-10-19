@@ -87,7 +87,7 @@ function Tile({ s, uptime30, isAdmin, onStart, busy }) {
       )}
       <div className="flex items-start gap-3">
         <span className={down ? 'opacity-60' : ''}>
-          <ServiceIcon icon={s.icon} iconUrl={s.icon_url} name={s.display_name} slug={s.slug} />
+          <ServiceIcon icon={s.icon} iconUrl={s.icon_url} accent={s.accent} name={s.display_name} slug={s.slug} />
         </span>
         <div className={`min-w-0 flex-1 ${down ? 'opacity-60' : ''}`}>
           <div className="font-medium text-[var(--color-text-primary)]">{s.display_name}</div>

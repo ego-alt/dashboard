@@ -12,6 +12,7 @@ Recognized labels (all under the ``homehub.`` prefix):
   icon         icon key, e.g. book or calendar (optional; UI picks by slug or monogram).
                Apps added in the Deploy tab bring their own SVG instead (icon_url).
   description  one-line blurb (optional)
+  accent       the icon's colour as #rrggbb (optional; otherwise picked from the name)
 """
 
 import os
@@ -28,6 +29,7 @@ _TRUTHY = {"1", "true", "yes", "on"}
 # Icons of apps added in the Deploy tab, copied out of their repos on the Pi.
 ICON_DIR = pathlib.Path(os.environ.get("DEPLOY_STATE_DIR", "/deploy")) / "generated" / "icons"
 _SLUG = re.compile(r"^[a-z][a-z0-9-]{1,30}$")
+_HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 
 def app_icon_path(slug: str) -> pathlib.Path | None:
@@ -85,6 +87,7 @@ def list_services() -> List[Dict[str, Any]]:
                 "icon": _label(labels, "icon"),
                 "icon_url": f"/services/{c['name']}/icon.svg" if app_icon_path(c["name"]) else None,
                 "description": _label(labels, "description"),
+                "accent": a if (a := _label(labels, "accent")) and _HEX.match(a) else None,
                 "container_name": c["name"],
                 "status": "running" if c.get("status") == "running" else "stopped",
                 # up / degraded (running but unhealthy) / down — see container_state.
