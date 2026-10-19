@@ -169,6 +169,9 @@ def test_github_trouble_is_said_not_hidden(client, make_user, state, monkeypatch
     monkeypatch.setattr(deploy, "_get", lambda url, api=True, timeout=10: (403, b""))
     r = _admin(client, make_user).get("/deploy/repos")
     assert r.status_code == 502 and "rate limit" in r.json()["detail"]
+    monkeypatch.setattr(deploy, "_cache", {})
+    monkeypatch.setattr(deploy, "_get", lambda url, api=True, timeout=10: (401, b""))
+    assert "expired" in client.get("/deploy/repos").json()["detail"]
 
 
 def test_running_is_what_the_pi_has_checked_out(client, make_user, state):

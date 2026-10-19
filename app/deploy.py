@@ -88,6 +88,8 @@ def _api(path: str):
     if status in (403, 429):
         github_problem = ("GitHub's rate limit is used up for now"
                           + ("." if TOKEN else "; set DEPLOY_GITHUB_TOKEN on the Pi to raise it."))
+    elif status == 401:
+        github_problem = "GitHub refused DEPLOY_GITHUB_TOKEN; it may have expired."
     elif status == 0:
         github_problem = "GitHub isn't answering."
     elif status == 200:
