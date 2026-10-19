@@ -230,7 +230,6 @@ def _row(app: dict, status: dict, containers: dict, queued: set[str], kind: str)
         "title": app.get("title") or app["name"], "part_of": app.get("part_of"),
         "deployed": deployed,
         "latest": latest_commit(app["repo"], app["branch"]),
-        "container_name": app.get("container") or app["name"],
         "container": {"state": container["state"], "status": container.get("status")} if container else None,
         "queued": app.get("part_of", app["name"]) in queued,
     }

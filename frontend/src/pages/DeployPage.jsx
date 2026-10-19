@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { addApp, checkRepo, deployApps, deployLog, deployNow, deployRepos, removeApp } from '../api';
 import LogsDrawer from '../components/LogsDrawer.jsx';
 import PageHeader from '../components/PageHeader.jsx';
@@ -64,10 +63,7 @@ function CommitCell({ commit, ci }) {
 function Actions({ a, busy, onDeploy, onLog, onRemove }) {
   return (
     <span className="flex items-center justify-end gap-3">
-      <button className="btn-link text-xs" onClick={() => onLog(a)} title="What the Pi did on its last deploys">Deploy log</button>
-      <Link className="btn-link text-xs" to={`/admin/monitor?logs=${a.container_name}`} title="The container, its health and its own logs">
-        Monitor
-      </Link>
+      <button className="btn-link text-xs" onClick={() => onLog(a)} title="What the Pi did on its last deploys">Log</button>
       {!a.part_of && (
         <button className="btn-link text-xs" disabled={busy || a.queued} onClick={() => onDeploy(a)}
           title="Deploy the latest commit now (it still has to pass CI)">
@@ -267,7 +263,7 @@ export default function DeployPage() {
       <Panel
         flush
         title="On the Pi"
-        description="Commits that pass CI deploy on their own within 5 minutes; a deploy that doesn't come up healthy is rolled back. Containers and their logs are in Monitor."
+        description="Commits that pass CI deploy on their own within 5 minutes; a deploy that doesn't come up healthy is rolled back."
         aside={notice && <span className="text-xs text-[var(--color-text-secondary)]">{notice}</span>}
       >
         {error && <p className="px-4 pt-3 text-sm text-[var(--color-danger)]">{error}</p>}
