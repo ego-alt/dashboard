@@ -27,8 +27,8 @@ function navItems(user) {
   return [
     { to: '/', label: 'Services', end: true },
     user?.is_admin && { to: '/admin/monitor', label: 'Monitor' },
-    user?.is_admin && { to: '/admin/users', label: 'Users' },
     user?.is_admin && { to: '/admin/deploy', label: 'Deploy' },
+    user?.is_admin && { to: '/admin/users', label: 'Users' },
     { to: '/settings', label: 'Settings' },
   ].filter(Boolean);
 }

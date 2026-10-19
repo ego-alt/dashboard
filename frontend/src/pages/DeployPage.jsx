@@ -60,21 +60,23 @@ function CommitCell({ commit, ci }) {
   );
 }
 
+/** The same three actions on every row, so the table reads the same throughout. */
 function Actions({ a, busy, onDeploy, onLog, onRemove }) {
+  const core = a.kind !== 'app';
   return (
     <span className="flex items-center justify-end gap-3">
       <button className="btn-link text-xs" onClick={() => onLog(a)} title="What the Pi did on its last deploys">Log</button>
-      {!a.part_of && (
-        <button className="btn-link text-xs" disabled={busy || a.queued} onClick={() => onDeploy(a)}
-          title="Deploy the latest commit now (it still has to pass CI)">
-          Deploy now
-        </button>
-      )}
-      {a.kind === 'app' && (
-        <button className="btn-link text-xs text-[var(--color-danger)]" disabled={busy} onClick={() => onRemove(a)}>
-          Remove
-        </button>
-      )}
+      <button className="btn-link text-xs" disabled={busy || a.queued} onClick={() => onDeploy(a)}
+        title={a.part_of
+          ? `Deploys ${a.part_of}, which ${a.name} ships with (it still has to pass CI)`
+          : 'Deploy the latest commit now (it still has to pass CI)'}>
+        Deploy now
+      </button>
+      <button className="btn-link btn-link-danger text-xs"
+        disabled={busy || core} onClick={() => onRemove(a)}
+        title={core ? 'Part of the stack itself: it can’t be removed here' : 'Stop it and take it off the stack'}>
+        Remove
+      </button>
     </span>
   );
 }
