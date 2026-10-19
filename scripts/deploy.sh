@@ -2,8 +2,9 @@
 # Pull-based deploy for the home stack. Run every few minutes by the
 # home-stack-deploy systemd timer (install with scripts/install-deploy-timer.sh).
 #
-# For each repo (dashboard, library, calendar, tapes), sitting side by side in
-# one folder:
+# For each repo (dashboard, library, calendar, tapes, and every app added with
+# scripts/stack.py, listed in the dashboard's stack/apps.toml), sitting side by
+# side in one folder:
 #   1. fetch its deploy branch; stop if nothing new
 #   2. only continue if the new commit's CI workflow passed on GitHub
 #   3. fast-forward, rebuild and restart that one service
@@ -112,8 +113,9 @@ restart_service() {
     # The dashboard repo also carries docker-compose.yml and the nginx config:
     # apply compose changes to the other services and reload nginx. mcp is
     # left out here and handled by restart_mcp.
+    # Apps from the registry deploy on their own, after their own CI.
     local others
-    others=$(compose config --services | grep -vx mcp | tr '\n' ' ')
+    others=$(compose config --services | grep -vxF -f <(printf '%s\n' mcp ${APP_NAMES[@]+"${APP_NAMES[@]}"}) | tr '\n' ' ')
     # shellcheck disable=SC2086
     compose up -d $others && docker exec home-nginx nginx -s reload || return 1
     restart_mcp
@@ -153,11 +155,16 @@ deploy_repo() {
   local dir="$STACK_DIR/$name" current target result
   local bad_file="$STATE_DIR/$name.bad"
 
+  local first=0
   [[ -d $dir/.git ]] || { log "$name" "no repo at $dir; skipping"; return; }
   git -C "$dir" fetch -q origin "$branch" || { log "$name" "fetch failed"; return; }
   current=$(git -C "$dir" rev-parse HEAD)
   target=$(git -C "$dir" rev-parse "origin/$branch")
-  [[ $current == "$target" ]] && return
+  if [[ $current == "$target" ]]; then
+    # Up to date, unless it was just cloned and has never run.
+    docker inspect "$container" >/dev/null 2>&1 && return
+    first=1
+  fi
 
   if [[ -f $bad_file && $(cat "$bad_file") == "$target" ]]; then
     return   # already failed and rolled back; wait for a newer commit
@@ -183,13 +190,23 @@ deploy_repo() {
     esac
   fi
 
-  log "$name" "deploying ${current:0:7} -> ${target:0:7}"
-  # Checked explicitly: set -e is off inside a function called with ||.
-  git -C "$dir" merge -q --ff-only "$target" || { log "$name" "fast-forward failed"; return; }
+  if (( first )); then
+    log "$name" "first deploy of ${target:0:7}"
+  else
+    log "$name" "deploying ${current:0:7} -> ${target:0:7}"
+    # Checked explicitly: set -e is off inside a function called with ||.
+    git -C "$dir" merge -q --ff-only "$target" || { log "$name" "fast-forward failed"; return; }
+  fi
   if restart_service "$name" "$service" && wait_healthy "$container"; then
     log "$name" "${target:0:7} is live"
     rm -f "$bad_file"
     record "$name" "$target" "deployed"
+    return
+  fi
+  if (( first )); then
+    log "$name" "${target:0:7} didn't start healthy on its first deploy; fix and push again"
+    echo "$target" >"$bad_file"
+    record "$name" "$target" "failed"
     return
   fi
 
@@ -204,7 +221,28 @@ deploy_repo() {
   fi
 }
 
-for entry in "${REPOS[@]}"; do
-  IFS=: read -r name branch service container <<<"$entry"
+# Apps added with scripts/stack.py. The registry is read from the dashboard's
+# latest commit on GitHub, so a newly registered app is cloned before the
+# dashboard deploy that starts routing to it.
+APPS=()
+APP_NAMES=()
+if git -C "$COMPOSE_DIR" fetch -q origin master 2>/dev/null; then
+  while IFS= read -r line; do
+    [[ -n $line ]] && APPS+=("$line")
+  done < <(git -C "$COMPOSE_DIR" show origin/master:stack/apps.toml 2>/dev/null \
+             | python3 "$COMPOSE_DIR/scripts/stack.py" repos --registry - 2>/dev/null)
+fi
+for entry in ${APPS[@]+"${APPS[@]}"}; do
+  IFS=: read -r name branch service container slug <<<"$entry"
+  APP_NAMES+=("$name")
+  if [[ ! -d $STACK_DIR/$name/.git ]]; then
+    log "$name" "new app: cloning $slug"
+    git clone -q --branch "$branch" "https://github.com/$slug.git" "$STACK_DIR/$name" \
+      || log "$name" "clone failed; will try again next run"
+  fi
+done
+
+for entry in "${REPOS[@]}" ${APPS[@]+"${APPS[@]}"}; do
+  IFS=: read -r name branch service container _ <<<"$entry"
   deploy_repo "$name" "$branch" "$service" "$container" || log "$name" "deploy step errored"
 done

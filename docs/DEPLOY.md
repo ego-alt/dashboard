@@ -1,6 +1,6 @@
 # Deploying
 
-All four repos (dashboard, library, calendar, tapes) sit side by side on the Pi, and each runs CI on GitHub (`.github/workflows/ci.yml`: tests, the frontend build here, and advisory lint) on every push and pull request.
+All the repos (dashboard, library, calendar, tapes, and any app added with `scripts/stack.py`, listed in `stack/apps.toml`) sit side by side on the Pi, and each runs CI on GitHub (`.github/workflows/ci.yml`: tests, the frontend build here, and advisory lint) on every push and pull request.
 
 The Pi **pulls** its deploys; nothing pushes to it. A systemd timer runs `scripts/deploy.sh` every 5 minutes. For each repo it:
 
@@ -8,6 +8,8 @@ The Pi **pulls** its deploys; nothing pushes to it. A systemd timer runs `script
 2. stops unless there's a new commit **and** that commit's CI run passed;
 3. fast-forwards, rebuilds and restarts only that service. A dashboard change also re-applies `docker-compose.yml` to the other services, reloads nginx, and rebuilds the `mcp` container. That last step is best-effort: a broken `mcp` shows as `"mcp": "failed"` in the status file and never rolls the dashboard back;
 4. waits for the container's health check. If it doesn't come up healthy, it rolls back to the previous commit, rebuilds that, and won't retry the bad commit until a newer one lands.
+
+Apps in `stack/apps.toml` are read from the dashboard's latest commit on GitHub at the start of each run. A newly listed app is cloned first, then deployed for the first time once its CI passes; a dashboard deploy never restarts them (see [`NEW-APP.md`](NEW-APP.md)).
 
 It skips any repo with local edits or a branch that has diverged from GitHub, so hand-made changes on the Pi are never overwritten. Database migrations run when containers start (library and calendar run `flask db upgrade`; the dashboard adds new tables and columns itself).
 

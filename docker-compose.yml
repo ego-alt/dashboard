@@ -8,6 +8,11 @@
 #   4) uv run python scripts/sync_household_users.py
 #   5) Open https://localhost (or https://home.local with a hosts entry)
 
+# Apps added with scripts/stack.py live in a generated file (from
+# stack/apps.toml); see docs/NEW-APP.md.
+include:
+  - compose.apps.yml
+
 services:
   nginx:
     image: nginx:1.27-alpine
