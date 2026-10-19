@@ -133,12 +133,32 @@ wait_healthy() {
   return 1
 }
 
+# Reload nginx's config, once it's up. Recreating the services it depends on
+# can restart it; a reload sent mid-restart fails, and a fresh start has
+# already read the new config. If it's down, start it.
+reload_nginx() {
+  local waited=0
+  until [[ $(docker inspect -f '{{.State.Running}}' home-nginx 2>/dev/null) == true ]]; do
+    if (( waited >= 30 )); then
+      log nginx "not running; starting it"
+      compose up -d nginx >/dev/null 2>&1 || return 1
+      sleep 3
+      break
+    fi
+    sleep 2
+    waited=$((waited + 2))
+  done
+  docker exec home-nginx nginx -t >/dev/null 2>&1 || { log nginx "config doesn't pass nginx -t"; return 1; }
+  docker exec home-nginx nginx -s reload >/dev/null 2>&1 || sleep 3   # just started: nothing to reload
+  [[ $(docker inspect -f '{{.State.Running}}' home-nginx 2>/dev/null) == true ]]
+}
+
 # Regenerate the apps' compose services and nginx routes from their checked-out
 # homestack.toml, and reload nginx if the routes changed.
 render_apps() {
   [[ $("${RENDER[@]}" render) == changed ]] || return 0
-  if docker exec home-nginx nginx -t >/dev/null 2>&1; then
-    docker exec home-nginx nginx -s reload >/dev/null && log nginx "routes updated for the Deploy tab's apps"
+  if reload_nginx; then
+    log nginx "routes updated for the Deploy tab's apps"
   else
     log nginx "the generated routes don't pass nginx -t; keeping the old ones"
   fi
@@ -157,7 +177,7 @@ restart_service() {
     local others
     others=$(compose config --services | grep -vxF -f <(printf '%s\n' mcp ${APP_NAMES[@]+"${APP_NAMES[@]}"}) | tr '\n' ' ')
     # shellcheck disable=SC2086
-    compose up -d $others && docker exec home-nginx nginx -s reload || return 1
+    compose up -d $others && reload_nginx || return 1
     restart_mcp
   fi
 }
@@ -318,6 +338,13 @@ for entry in "${REPOS[@]}" ${APPS[@]+"${APPS[@]}"}; do
     tail -n 2000 "$LOG_DIR/$name.log" >"$LOG_DIR/$name.log.tmp" && mv "$LOG_DIR/$name.log.tmp" "$LOG_DIR/$name.log"
   fi
 done
+
+# Whatever happened above, nginx is the front door to everything: never
+# leave it stopped.
+if [[ $(docker inspect -f '{{.State.Running}}' home-nginx 2>/dev/null) != true ]]; then
+  log nginx "found stopped at the end of the run; starting it"
+  compose up -d nginx >/dev/null 2>&1 || log nginx "couldn't start it; needs a look"
+fi
 
 # What each repo has checked out right now, for the Deploy tab's "Running"
 # column (true even for repos no deploy has touched yet).
