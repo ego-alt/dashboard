@@ -6,10 +6,10 @@ The Pi **pulls** its deploys; nothing pushes to it. A systemd timer runs `script
 
 1. fetches the deploy branch (`main` for tapes, `master` for the rest);
 2. stops unless there's a new commit **and** that commit's CI run passed;
-3. fast-forwards, rebuilds and restarts only that service. A dashboard change also re-applies `docker-compose.yml` to the other services, reloads nginx, and rebuilds the `mcp` container. That last step is best-effort: a broken `mcp` shows as `"mcp": "failed"` in the status file and never rolls the dashboard back;
+3. fast-forwards, rebuilds and restarts only that service. A dashboard change also re-applies `docker-compose.yml` to the other services, reloads nginx (waiting for it if recreating its dependencies restarted it), and rebuilds the `mcp` container. Every run ends by starting nginx if it's found stopped, since it's the way in to everything. That last step is best-effort: a broken `mcp` shows as `"mcp": "failed"` in the status file and never rolls the dashboard back;
 4. waits for the container's health check. If it doesn't come up healthy, it rolls back to the previous commit, rebuilds that, and won't retry the bad commit until a newer one lands.
 
-The **Deploy** tab in the dashboard shows each repo's running and latest commit, CI result and deploy log, with "Deploy now". Apps added there are cloned, given a compose service and an nginx route, and deployed once their CI passes; a dashboard deploy never restarts them (see [`APPS.md`](APPS.md)). "Deploy now" starts a run at once (a systemd path unit watches for the request).
+The **Deploy** tab in the dashboard shows each repo's running and latest commit, CI result and deploy log, with "Deploy now" and "Remove" (added apps only) on every row. Apps added there are cloned, given a compose service and an nginx route, and deployed once their CI passes; a dashboard deploy never restarts them (see [`APPS.md`](APPS.md)). "Deploy now" starts a run at once (a systemd path unit watches for the request).
 
 It skips any repo with local edits or a branch that has diverged from GitHub, so hand-made changes on the Pi are never overwritten. Database migrations run when containers start (library and calendar run `flask db upgrade`; the dashboard adds new tables and columns itself).
 

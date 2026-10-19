@@ -1,10 +1,12 @@
 # Dashboard
 
-The front door and control room of the home stack: one sign-in for Library, Calendar and Music, and one place to see whether everything is up, has stayed up, and was backed up last night.
+The front door and control room of the home stack: one sign-in for Library, Calendar, Music and any app added from GitHub, and one place to see whether everything is up, has stayed up, was backed up last night, and is running the latest code.
 
 ![Services](images/dashboard-services-2026-10.png)
 
 ![Monitor](images/dashboard-monitor-2026-10.png)
+
+![Deploy](images/dashboard-deploy-2026-10.png)
 
 ![On a phone: services, monitor, logs and settings](images/dashboard-phone-2026-10.png)
 
@@ -12,6 +14,7 @@ The front door and control room of the home stack: one sign-in for Library, Cale
 
 - **Services**: a tile per app with its state (up, degraded, down) and a 30-day uptime strip, plus one status line saying whether anything needs you. Tiles open the app in a new tab; admins can start a down service or read its logs from the tile.
 - **Monitor** (admins): host CPU, memory, disk and temperature; every container's uptime, restarts, 24-hour strip, CPU, memory and network; Start, Stop, Restart and a logs pane beside the page; the last backup. It shows when its data is stale.
+- **Deploy** (admins): each app's running commit beside the latest on GitHub with its CI result, and its deploy log; **Deploy now** and **Remove** on every row (the stack's own apps can't be removed). **Add an app** lists your GitHub repos, checks that one has what the stack needs, and deploys it at `/<repo>/` behind the sign-in, in any language or framework; see [`docs/APPS.md`](docs/APPS.md).
 - **Uptime history**: a sampler records each container once a minute (Docker's state plus its healthcheck) into hourly rows kept for 90 days.
 - **One sign-in**: passwords (breach-checked), TOTP 2FA with recovery codes, passkeys, and API tokens for native apps. nginx asks the dashboard who you are before serving any app.
 - **Your account**: change your password, see where you're signed in and sign other devices out, review recent sign-ins.
