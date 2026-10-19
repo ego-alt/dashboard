@@ -197,7 +197,7 @@ deploy_repo() {
     # Up to date, unless it was just cloned and has never run, or the Deploy
     # tab asked for a fresh build.
     if docker inspect "$container" >/dev/null 2>&1; then
-      (( force )) || return
+      (( force )) || return 0
       rm -f "$bad_file"
     fi
     first=1

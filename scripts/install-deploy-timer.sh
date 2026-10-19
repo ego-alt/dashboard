@@ -43,7 +43,7 @@ Type=oneshot
 User=$RUN_AS
 Environment=DEPLOY_STATE_DIR=$STATE_DIR
 # DEPLOY_GITHUB_TOKEN, if set, comes from the dashboard's .env.
-EnvironmentFile=-$(dirname "$SCRIPT")/../.env
+EnvironmentFile=-$(cd "$(dirname "$SCRIPT")/.." && pwd)/.env
 ExecStart=$SCRIPT
 # Image builds on a Pi can take a while.
 TimeoutStartSec=45min
