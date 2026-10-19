@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { addApp, checkRepo, deployApps, deployLog, deployNow, deployRepos, removeApp } from '../api';
 import LogsDrawer from '../components/LogsDrawer.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import Panel from '../components/Panel.jsx';
-import { StateDot } from '../components/Status.jsx';
 import { usePoll } from '../lib/usePoll';
 
 const short = (sha) => (sha ? sha.slice(0, 7) : '');
@@ -64,7 +64,10 @@ function CommitCell({ commit, ci }) {
 function Actions({ a, busy, onDeploy, onLog, onRemove }) {
   return (
     <span className="flex items-center justify-end gap-3">
-      <button className="btn-link text-xs" onClick={() => onLog(a)}>Log</button>
+      <button className="btn-link text-xs" onClick={() => onLog(a)} title="What the Pi did on its last deploys">Deploy log</button>
+      <Link className="btn-link text-xs" to={`/admin/monitor?logs=${a.container_name}`} title="The container, its health and its own logs">
+        Monitor
+      </Link>
       {!a.part_of && (
         <button className="btn-link text-xs" disabled={busy || a.queued} onClick={() => onDeploy(a)}
           title="Deploy the latest commit now (it still has to pass CI)">
@@ -83,6 +86,7 @@ function Actions({ a, busy, onDeploy, onLog, onRemove }) {
 function AddApp({ onAdded, onClose }) {
   const [repos, setRepos] = useState(null);
   const [owner, setOwner] = useState('');
+  const [privateHidden, setPrivateHidden] = useState(false);
   const [error, setError] = useState('');
   const [picked, setPicked] = useState(null);
   const [check, setCheck] = useState(null);
@@ -90,7 +94,7 @@ function AddApp({ onAdded, onClose }) {
 
   useEffect(() => {
     deployRepos()
-      .then((r) => { setRepos(r.repos); setOwner(r.owner); })
+      .then((r) => { setRepos(r.repos); setOwner(r.owner); setPrivateHidden(r.private_hidden); })
       .catch((e) => setError(e.body?.detail || 'Couldn’t list your GitHub repos.'));
   }, []);
 
@@ -179,6 +183,11 @@ function AddApp({ onAdded, onClose }) {
           ))}
         </ul>
       )}
+      {privateHidden && (
+        <p className="mt-3 text-xs text-[var(--color-text-muted)]">
+          Private repos show here once the dashboard has a <span className="font-mono">DEPLOY_GITHUB_TOKEN</span> (see docs/DEPLOY.md).
+        </p>
+      )}
     </Panel>
   );
 }
@@ -258,7 +267,7 @@ export default function DeployPage() {
       <Panel
         flush
         title="On the Pi"
-        description="Commits that pass CI deploy on their own within 5 minutes; a deploy that doesn't come up healthy is rolled back."
+        description="Commits that pass CI deploy on their own within 5 minutes; a deploy that doesn't come up healthy is rolled back. Containers and their logs are in Monitor."
         aside={notice && <span className="text-xs text-[var(--color-text-secondary)]">{notice}</span>}
       >
         {error && <p className="px-4 pt-3 text-sm text-[var(--color-danger)]">{error}</p>}
@@ -282,7 +291,6 @@ export default function DeployPage() {
                   <tr key={a.name} className="hover:bg-[var(--color-highlight-soft)]">
                     <td className="whitespace-nowrap px-4 py-2">
                       <span className="flex items-center gap-2">
-                        <StateDot state={a.container?.state || 'down'} />
                         <span className="font-mono text-[var(--color-text-primary)]">{a.name}</span>
                         {a.part_of && <span className="text-xs text-[var(--color-text-muted)]">with {a.part_of}</span>}
                       </span>
@@ -299,7 +307,6 @@ export default function DeployPage() {
               {apps.map(row).map(({ a, s, props }) => (
                 <li key={a.name} className="space-y-1.5 px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <StateDot state={a.container?.state || 'down'} />
                     <span className="font-mono text-sm text-[var(--color-text-primary)]">{a.name}</span>
                     <span className={`ml-auto text-xs ${s.tone}`}>{s.text}</span>
                   </div>

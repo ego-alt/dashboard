@@ -63,11 +63,12 @@ def test_lists_the_stack_with_deployed_and_latest(client, make_user, state):
     dash = apps[0]
     assert dash["deployed"]["sha"] == "abc1234" and dash["latest"]["ci"] == "passed"
     assert dash["container"]["state"] == "up" and dash["queued"] is False
+    assert apps[4]["container_name"] == "music"                                # tapes runs as music
 
 
 def test_repos_on_offer_exclude_the_stack(client, make_user, state):
-    repos = _admin(client, make_user).get("/deploy/repos").json()["repos"]
-    assert [r["name"] for r in repos] == ["situation", "half-done"]
+    body = _admin(client, make_user).get("/deploy/repos").json()
+    assert [r["name"] for r in body["repos"]] == ["situation", "half-done"] and body["private_hidden"] is True
 
 
 def test_checklist(client, make_user, state):

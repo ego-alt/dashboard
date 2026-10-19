@@ -230,6 +230,7 @@ def _row(app: dict, status: dict, containers: dict, queued: set[str], kind: str)
         "title": app.get("title") or app["name"], "part_of": app.get("part_of"),
         "deployed": deployed,
         "latest": latest_commit(app["repo"], app["branch"]),
+        "container_name": app.get("container") or app["name"],
         "container": {"state": container["state"], "status": container.get("status")} if container else None,
         "queued": app.get("part_of", app["name"]) in queued,
     }
@@ -253,7 +254,8 @@ def list_apps(_: User = Depends(current_admin)):
 def list_repos(_: User = Depends(current_admin)):
     on_stack = {a["repo"].lower() for a in CORE} | {a["repo"].lower() for a in enabled_apps()}
     repos = [r for r in owner_repos() if r["repo"].lower() not in on_stack]
-    return {"owner": OWNER, "repos": repos}
+    # Without a token GitHub lists only public repos.
+    return {"owner": OWNER, "repos": repos, "private_hidden": not TOKEN}
 
 
 @router.get("/repos/{name}/check")
