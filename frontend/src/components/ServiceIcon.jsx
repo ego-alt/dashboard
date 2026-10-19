@@ -4,23 +4,6 @@ const ACCENTS = [
   'text-violet-400', 'text-fuchsia-400', 'text-teal-400', 'text-indigo-400',
 ];
 
-const ICON_ALIASES = {
-  '📚': 'book',
-  '📅': 'calendar',
-  '🎵': 'music',
-  library: 'book',
-  book: 'book',
-  calendar: 'calendar',
-  music: 'music',
-  tapes: 'music',
-};
-
-const SLUG_ICONS = {
-  library: 'book',
-  calendar: 'calendar',
-  music: 'music',
-};
-
 function hashSlug(slug) {
   let h = 0;
   for (const ch of slug) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
@@ -31,13 +14,10 @@ function accentFor(slug) {
   return ACCENTS[hashSlug(slug) % ACCENTS.length];
 }
 
-function resolveIconKey(icon, slug) {
-  if (icon) {
-    const trimmed = icon.trim();
-    const key = ICON_ALIASES[trimmed] ?? ICON_ALIASES[trimmed.toLowerCase()];
-    if (key) return key;
-  }
-  return SLUG_ICONS[slug] || null;
+/** The built-in icon a service's `homehub.icon` label names (book, calendar, music), if any. */
+function resolveIconKey(icon) {
+  const key = icon?.trim().toLowerCase();
+  return key && Object.hasOwn(ICONS, key) ? key : null;
 }
 
 function IconShell({ slug, textClass, accent, children }) {
@@ -137,7 +117,7 @@ export default function ServiceIcon({ icon, iconUrl, accent, name, slug }) {
       </IconShell>
     );
   }
-  const key = resolveIconKey(icon, slug);
+  const key = resolveIconKey(icon);
   const Icon = key ? ICONS[key] : null;
   if (Icon) {
     return (

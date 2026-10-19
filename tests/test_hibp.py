@@ -38,7 +38,6 @@ def test_password_breach_count_matches_known_suffix(monkeypatch):
         hibp.urllib.request, "urlopen", _mock_urlopen_returning(body)
     )
     assert hibp.password_breach_count("hunter2") == 42
-    assert hibp.is_password_pwned("hunter2") is True
 
 
 def test_password_breach_count_returns_zero_on_network_error(monkeypatch):

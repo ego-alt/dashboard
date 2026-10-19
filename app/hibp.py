@@ -42,6 +42,3 @@ def password_breach_count(password: str, *, timeout: float = 3.0) -> int:
                 return 1
     return 0
 
-
-def is_password_pwned(password: str, *, timeout: float = 3.0) -> bool:
-    return password_breach_count(password, timeout=timeout) > 0
