@@ -32,6 +32,14 @@ docker compose exec dashboard python -m app.cli create-admin <username>
 open https://localhost
 ```
 
+On the Pi, the Tailscale name (`https://raspberrypi.<tailnet>.ts.net`) gets a real certificate, so phones and laptops on the tailnet see no warning. With HTTPS certificates turned on for the tailnet (Tailscale admin console → DNS):
+
+```sh
+sudo scripts/tailscale-cert.sh                         # fetch it; nginx picks it up
+sudo cp scripts/systemd/tailscale-cert.* /etc/systemd/system/
+sudo systemctl enable --now tailscale-cert.timer       # renews weekly as needed
+```
+
 Just the dashboard, for development:
 
 ```sh

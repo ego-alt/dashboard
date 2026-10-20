@@ -1,0 +1,11 @@
+[Unit]
+Description=Weekly check of the home stack's Tailscale TLS certificate
+
+[Timer]
+# Certificates last 90 days and are renewed in their last 30, so weekly is plenty.
+OnCalendar=weekly
+RandomizedDelaySec=3600
+Persistent=true
+
+[Install]
+WantedBy=timers.target
