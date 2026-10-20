@@ -101,10 +101,11 @@ if not runs:
     print("none")
 elif any(r["status"] != "completed" for r in runs):
     print("pending")
-elif all(r["conclusion"] == "success" for r in runs):
-    print("success")
 else:
-    print("failure")
+    # A push can start two runs and the concurrency rule cancels one; only
+    # the runs that finished count.
+    finished = [r for r in runs if r["conclusion"] not in ("cancelled", "skipped")]
+    print("success" if finished and all(r["conclusion"] == "success" for r in finished) else "failure")
 ' <<<"$json"
 }
 
