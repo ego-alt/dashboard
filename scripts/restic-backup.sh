@@ -103,6 +103,7 @@ DB_SPECS=(
   "library:instance/library.db"
   "calendar:instance/events.db"
   "tapes:instance/music.db"
+  "situation:instance/situation.db"
 )
 
 STAGE="snapshotting databases"
@@ -143,6 +144,12 @@ done
 # Calendar attachments (scanner uploads — small, irreplaceable).
 if dir="$(resolve_app_dir calendar)"; then
   [[ -d "$dir/instance/attachments" ]] && PATHS+=( "$dir/instance/attachments" )
+fi
+
+# Situation's saved news snapshots: your labels refer to them, so without them
+# the labels can't be checked again.
+if dir="$(resolve_app_dir situation)"; then
+  [[ -d "$dir/instance/snapshots" ]] && PATHS+=( "$dir/instance/snapshots" )
 fi
 
 # Bulk media.

@@ -6,9 +6,10 @@ so the bucket never sees plaintext. A single snapshot contains:
 
 | What | Source | Notes |
 |------|--------|-------|
-| SQLite DBs | `dashboard.db`, `library.db`, `events.db`, `music.db` | Snapshotted via SQLite's online-backup API + `integrity_check` before upload — a corrupt DB **aborts** the run. |
+| SQLite DBs | `dashboard.db`, `library.db`, `events.db`, `music.db`, `situation.db` | Snapshotted via SQLite's online-backup API + `integrity_check` before upload — a corrupt DB **aborts** the run. |
 | App config | each app's `.env` | Secrets; safe because the repo is encrypted. |
 | Calendar attachments | `calendar/instance/attachments/` | Scanner uploads. |
+| Situation snapshots | `situation/instance/snapshots/` | The saved news your labels refer to. |
 | Books | `/mnt/backup/books` | EPUB library. |
 | Music | `/mnt/backup/tapes` | MP3s. |
 
