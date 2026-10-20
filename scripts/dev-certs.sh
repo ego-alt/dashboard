@@ -29,5 +29,9 @@ else
 fi
 
 chmod 644 "$TLS_DIR/home.crt"
-chmod 600 "$TLS_DIR/home.key"
+# nginx picks the certificate per connection (nginx/conf.d/home.conf), so its
+# worker processes (group 101, "nginx", in the nginx image) must read the key.
+chmod 640 "$TLS_DIR/home.key"
+chgrp 101 "$TLS_DIR/home.key" 2>/dev/null || sudo chgrp 101 "$TLS_DIR/home.key" 2>/dev/null \
+    || chmod 644 "$TLS_DIR/home.key"   # no sudo (a laptop): readable is fine for a dev cert
 echo "Wrote $TLS_DIR/home.crt + home.key"

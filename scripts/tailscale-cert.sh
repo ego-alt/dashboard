@@ -19,9 +19,12 @@ NAME="$(tailscale status --json | python3 -c 'import json, sys; print(json.load(
 [[ "$NAME" == *.ts.net ]] || { echo "no Tailscale name (is tailscale up?): '$NAME'" >&2; exit 1; }
 
 tailscale cert --cert-file "$TLS_DIR/tailscale.crt" --key-file "$TLS_DIR/tailscale.key" "$NAME"
-# The key stays readable only by its owner, like home.key.
-chmod 600 "$TLS_DIR/tailscale.key"
-[[ -n "${SUDO_USER:-}" ]] && chown "$SUDO_USER": "$TLS_DIR/tailscale.crt" "$TLS_DIR/tailscale.key"
+# nginx picks the certificate per connection (nginx/conf.d/home.conf), so its
+# worker processes (group 101, "nginx", in the nginx image) must read the key;
+# no one else can.
+[[ -n "${SUDO_USER:-}" ]] && chown "$SUDO_USER" "$TLS_DIR/tailscale.crt" "$TLS_DIR/tailscale.key"
+chgrp 101 "$TLS_DIR/tailscale.key"
+chmod 640 "$TLS_DIR/tailscale.key"
 
 # nginx reads the certificate per connection (see nginx/conf.d/home.conf), but
 # a reload drops any cached copy.
