@@ -79,10 +79,14 @@ services:
       APPLICATION_ROOT: /library
       AUTH_PROXY_HEADER: X-Forwarded-User
       BOOK_DIR: /data/books
+      COMIC_DIR: /data/comics
       SECRET_KEY: ${LIBRARY_SECRET_KEY:-}
     volumes:
       - ../library/instance:/app/instance
       - ${LIBRARY_BOOK_DIR:-../library/books}:/data/books
+      # Comics (CBZs, plus an _import folder for downloads and drops). Not in
+      # the restic backup: it's big and can be downloaded again.
+      - ${LIBRARY_COMIC_DIR:-../library/instance/comics}:/data/comics
     expose:
       - "5001"
     labels:
@@ -90,7 +94,7 @@ services:
       homehub.name: "Library"
       homehub.route: "/library/"
       homehub.icon: "book"
-      homehub.description: "EPUB library + reader"
+      homehub.description: "Books and comics"
     # Apply any new database migrations, then serve (same pattern as calendar). Straight from the
     # virtualenv: `uv run` would install the dev tools on every start.
     command:
