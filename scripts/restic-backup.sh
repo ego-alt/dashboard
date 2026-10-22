@@ -175,6 +175,11 @@ restic backup \
 
 # --- 4. retention ------------------------------------------------------------
 STAGE="pruning"
+# Pruning needs the repo to itself. A restic run that was killed (say a
+# restore drill stopped with pkill) leaves its lock behind and would block
+# every prune after it; `unlock` clears only stale locks (dead process or
+# old), never a live one, so a run in progress is safe.
+restic unlock
 log "applying retention (daily=$KEEP_DAILY weekly=$KEEP_WEEKLY monthly=$KEEP_MONTHLY)"
 restic forget \
   --tag "$TAG" \
