@@ -84,8 +84,8 @@ services:
     volumes:
       - ../library/instance:/app/instance
       - ${LIBRARY_BOOK_DIR:-../library/books}:/data/books
-      # Comics (CBZs, plus an _import folder for downloads and drops). Not in
-      # the restic backup: it's big and can be downloaded again.
+      # Comics (CBZs). Not in the restic backup: it's big and can be
+      # downloaded again.
       - ${LIBRARY_COMIC_DIR:-../library/instance/comics}:/data/comics
     expose:
       - "5001"

@@ -6,7 +6,9 @@
 # the dashboard's Deploy tab), sitting side by side in one folder:
 #   1. fetch its deploy branch; stop if nothing new
 #   2. only continue if the new commit's CI workflow passed on GitHub
-#   3. fast-forward, rebuild and restart that one service
+#   3. fast-forward, then restart that one service on the image CI built and
+#      published for that commit (ghcr.io/<owner>/<repo>:<sha>); only a repo
+#      with no such image is built here, as before
 #   4. wait for its health check; if it fails, roll back to the previous
 #      commit and rebuild that, and don't retry the bad commit
 #
@@ -165,11 +167,40 @@ render_apps() {
   fi
 }
 
+# The image CI built and published for the commit checked out in a repo,
+# pulled and tagged as the service's local image (<service>:dev, as the
+# compose files name them), so compose runs it without building. Returns 1
+# when there's none (a repo without CI's image step, or one not published).
+# The tag is the commit, and only commits whose CI passed get this far.
+pull_image() {  # repo-folder service [suffix: "-mcp" for the dashboard's mcp]
+  local dir=$1 service=$2 suffix=${3:-} sha slug ref
+  sha=$(git -C "$dir" rev-parse HEAD)
+  slug=$(github_slug "$dir" | tr '[:upper:]' '[:lower:]')
+  ref="ghcr.io/$slug$suffix:$sha"
+  docker pull -q "$ref" >/dev/null 2>&1 || return 1
+  docker tag "$ref" "$service:dev"
+  # Keep this and the one before (for a rollback); older pulls go.
+  docker images --format '{{.Repository}}:{{.Tag}}' "ghcr.io/$slug$suffix" | tail -n +3 \
+    | xargs -r docker rmi >/dev/null 2>&1 || true
+}
+
+# The service's image for what's checked out: CI's if it published one,
+# else built here (the old way, which the Pi can barely afford).
+get_image() {  # name repo-folder service [suffix]
+  local name=$1 dir=$2 service=$3 suffix=${4:-}
+  if pull_image "$dir" "$service" "$suffix"; then
+    log "$name" "running the image CI built for $(git -C "$dir" rev-parse --short HEAD)"
+  else
+    log "$name" "no image from CI for this commit; building it here"
+    compose build "$service"
+  fi
+}
+
 restart_service() {
   local name=$1 service=$2
   # An app's manifest (port, env, tile) may have changed in the commit just checked out.
   if is_app "$name"; then render_apps; fi
-  compose build "$service" && compose up -d "$service" || return 1
+  get_image "$name" "$STACK_DIR/$name" "$service" && compose up -d --no-build "$service" || return 1
   if [[ $name == dashboard ]]; then
     # The dashboard repo also carries docker-compose.yml and the nginx config:
     # apply compose changes to the other services and reload nginx. mcp is
@@ -189,7 +220,7 @@ restart_service() {
 restart_mcp() {
   local sha
   sha=$(git -C "$STACK_DIR/dashboard" rev-parse HEAD)
-  if compose build mcp && compose up -d mcp && wait_healthy mcp; then
+  if get_image mcp "$STACK_DIR/dashboard" mcp -mcp && compose up -d --no-build mcp && wait_healthy mcp; then
     record mcp "$sha" "deployed"
   else
     log mcp "${sha:0:7}: mcp didn't build or start healthy; the rest of the stack is unaffected"

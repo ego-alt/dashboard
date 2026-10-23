@@ -6,7 +6,7 @@ Any repo can join the stack, in any language or framework, if it has three files
 |---|---|
 | `Dockerfile` | At the root. The image serves HTTP on the manifest's port. |
 | `homestack.toml` | The manifest below. |
-| `.github/workflows/ci.yml` | The Pi deploys a commit only after this workflow passes. |
+| `.github/workflows/ci.yml` | The Pi deploys a commit only after this workflow passes. Give it an `image` job like the library's, which publishes `ghcr.io/<owner>/<repo>:<commit>` for the Pi to pull; without one the Pi builds the image itself, which is slow and heavy on it. |
 
 ```toml
 # homestack.toml (only title is required)
