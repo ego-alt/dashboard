@@ -150,6 +150,8 @@ fi
 # the labels can't be checked again.
 if dir="$(resolve_app_dir situation)"; then
   [[ -d "$dir/instance/snapshots" ]] && PATHS+=( "$dir/instance/snapshots" )
+  # Its ground truth for grouping, one Claude-labelled file per week.
+  [[ -d "$dir/instance/groundtruth" ]] && PATHS+=( "$dir/instance/groundtruth" )
 fi
 
 # Bulk media.
