@@ -117,6 +117,8 @@ services:
       APPLICATION_ROOT: /calendar
       AUTH_PROXY_HEADER: X-Forwarded-User
       SECRET_KEY: ${CALENDAR_SECRET_KEY:-}
+      # Entries are in local time; a receipt added without a time is stamped with this zone's clock.
+      TZ: ${TZ:-Europe/London}
     volumes:
       - ../calendar/instance:/app/instance
     expose:
