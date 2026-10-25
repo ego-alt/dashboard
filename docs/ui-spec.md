@@ -1,18 +1,32 @@
 # Home-stack UI spec
 
-Goal: **structural unity, chromatic identity.** A button in calendar, library, and dashboard should *sit* the same way (same padding, radius, focus ring, hover transition) even though each app's palette is different. Users moving between apps feel "same product family"; each app keeps its own visual voice.
+Goal: **shared discipline, own voice.** The apps don't share a stylesheet; each one has its own type, sizes, corners and palette to match its theme (calendar is a terminal, tapes a cassette deck, library a gallery wall). What they share is a handful of rules, so each app stays tidy on its own terms and they all behave the same way to use.
 
-The spec is two shared pieces + per-app freedom:
+Each Flask app (calendar, library, tapes) has:
 
-1. **Shared base** (`structural.css`) — the non-thematic skeleton: spacing, radii, type, fonts, motion tokens, **and** the `.btn`/`.input` primitives. Byte-identical across the Flask apps (dashboard mirrors the shapes via its React global CSS).
-2. **Per-app theme** (`tokens.css`) — the colour role-tokens. Same names everywhere; values unique per app.
-3. **App-specific extensions** — anything visual unique to one app (calendar's mood circles, library's bookshelf spines, dashboard's service tiles) lives in that app's own CSS and isn't part of the spec.
+- **`tokens.css`** — every size and colour the app uses: spacing, corners, type, fonts, motion, colours. Its own values.
+- **`controls.css`** — its one definition of buttons and inputs (`.btn`, `-primary`, `-secondary`, `-ghost`, `.input`), in its own style.
+- Its own CSS for everything else, written only in its tokens.
+
+Dashboard (React/Tailwind) keeps the same colour role names in its global CSS.
+
+There used to be a shared `structural.css`, meant to be byte-identical across the apps. It drifted as each app's look developed, and was retired in October 2026.
 
 ---
 
-## Layer 1 — Token interface
+## The rules
 
-Mandatory. Each app declares these in `:root` (light) with optional `.dark-mode` (or media-query) overrides. Names are the contract; values vary.
+1. **No raw sizes or colours outside `tokens.css`.** Stylesheets use `var(--text-*)`, `var(--space-*)`, `var(--color-*)`. Relative sizes (`em`, `%`) are fine where something is sized to the text around it (a book's headings, an icon). Each app's `tests/test_style_tokens.py` fails on a raw `font-size` (or `font:` shorthand size) outside `tokens.css`.
+2. **At most five type sizes, as tokens.** Name them `--text-xs`, `-sm`, `-base`, `-lg`, `-xl`; the values are the app's own (a monospace face wants different sizes from Inter). No two a pixel apart. The test fails above five. Text an app doesn't own (a book's own styles in library's reader) keeps its sizes.
+3. **One spacing scale, one set of corners** per app, as tokens.
+4. **One button definition per app**, in `controls.css`: a main action, a quiet one and a bare-words one. Nowhere else redefines them; a component may only position or size one.
+5. **Colour role names are shared** (below), so the same word means the same job everywhere. Values are each app's own. Apps may add their own roles.
+6. **One mobile breakpoint, 640px.** CSS can't read a `var()` inside `@media`, so it's a convention: `@media (max-width: 640px)`.
+7. **The same behaviour everywhere:** a visible focus ring on everything focusable, touch targets of at least 44px on phones, motion off under `prefers-reduced-motion`, and contrast of at least 4.5:1 for text.
+
+---
+
+## Colour role names
 
 ```css
 :root {
@@ -31,123 +45,43 @@ Mandatory. Each app declares these in `:root` (light) with optional `.dark-mode`
     --color-text-muted;     /* metadata, captions, placeholders */
 
     /* Accent */
-    --color-accent;         /* primary-button bg, focus ring */
-    --color-accent-hover;   /* primary-button hover, soft accent fills */
+    --color-accent;         /* main action, focus ring */
+    --color-accent-hover;
 
     /* Status */
-    --color-danger;         /* destructive-button bg, error text */
+    --color-danger;         /* destructive actions, error text */
     --color-danger-hover;
 
     /* Decoration */
     --color-shadow;         /* box-shadow tint */
-    --color-highlight-soft; /* hover bg, subtle separators */
-
-    /* Spacing scale (numbers are × 4px) */
-    --space-1;              /*  4px — micro gap (icon padding, tag chips) */
-    --space-2;              /*  8px — tight gap inside controls */
-    --space-3;              /* 12px — gap between controls */
-    --space-4;              /* 16px — card / form-row rhythm */
-    --space-5;              /* 20px — section padding */
-    --space-8;              /* 40px — top-level layout rhythm */
-
-    /* Radii */
-    --radius-sm;            /*  4px — inputs, small chrome */
-    --radius-md;            /*  8px — cards, buttons, modals */
-    --radius-lg;            /* 16px — mobile bottom-sheet */
-    --radius-pill;          /* full-round — pills, circular dots */
-
-    /* Type scale — four sizes */
-    --text-sm;              /* 14px — captions, secondary */
-    --text-base;            /* 16px — body */
-    --text-lg;              /* 20px — h2, emphasis */
-    --text-xl;              /* 32px — h1 */
-
-    /* Fonts */
-    --font-sans;            /* 'Inter', Arial, Helvetica, sans-serif */
-    --font-mono;            /* ui-monospace, SFMono-Regular, Menlo, Consolas, monospace */
-
-    /* Motion — `ease` is the default curve; --ease-emphasized for entrances/pops */
-    --dur-fast;             /* 0.12s — hover / opacity micro-transitions */
-    --dur-base;             /* 0.20s — default control transitions (matches .btn) */
-    --dur-slow;             /* 0.30s — panels, drawers, progress fills */
-    --ease-emphasized;      /* cubic-bezier(0.16, 1, 0.3, 1) — menus, toasts */
+    --color-highlight-soft; /* hover background, subtle separators */
 }
 ```
 
-**14 color tokens + 4 sizes + 6 spaces + 4 radii + 4 motion.** Apps **may** add their own role-style tokens for unique surfaces (calendar adds `--color-bg-chrome` and `--color-bg-pane` for its bottom bar and drawers, `--color-syn-*` for its logbook text colours, `--radius-tile` for the mood tiles and `--drawer-w`). These are app-local and don't enter the spec.
+Apps add their own roles for surfaces only they have: calendar's `--color-bg-chrome`, `--color-bg-pane` and `--color-syn-*`; library's `--color-success`, `--color-scrim`, `--wood`; tapes' `--color-bg-pane`.
 
-Library additionally defines a semantic status token `--color-success` (used by toast notifications), plus app-local surface tokens with night variants: `--color-text-selection` (reader highlight), `--color-scrim` (image overlays) and `--wood` / `--wood-edge` (bookshelf view). Treat these as app-local extensions until a second app needs the same role.
+### Reference values
 
-Inter is loaded via Google Fonts in each app's HTML entry point with the preconnect pair + a `wght@400..700` variable subset. Falls back to Arial when the CDN is blocked.
-
-**Breakpoint.** One mobile breakpoint across the stack: **640px**. CSS can't read a `var()` inside `@media`, so this is a convention, not a token — write `@media (max-width: 640px)`. An app whose layout genuinely pivots elsewhere may add its own, but converge on 640px for the primary mobile collapse. (Current drift to reconcile: calendar uses 480px, library 575.98/600/768px; tapes is at 640px.)
-
-**Structural vs chromatic.** Everything above *except the colour tokens* is structural — no brand meaning, identical everywhere. It lives (together with the `.btn`/`.input` primitives) in `structural.css`; the per-app colours live in `tokens.css`. Swap the theme and the skeleton never moves.
-
-### Reference values (current apps)
-
-| Role | Calendar (Gruvbox) | Library / Shelves (day) | Library / Shelves (night) | Tapes (Gruvbox+orange) | Dashboard (Slate) |
+| Role | Calendar (Gruvbox) | Library (day) | Library (night) | Tapes (Gruvbox + orange) | Dashboard (Slate) |
 |---|---|---|---|---|---|
 | `--color-bg-base` | `#1d2021` | `#f6f4ef` | `#141210` | `#282828` | `#182230` |
 | `--color-text-primary` | `#ebdbb2` | `#1f1d1a` | `#eadfca` | `#ebdbb2` | `#d4dde8` |
-| `--color-accent` | `#689d6a` | `#2d5b8a` | `#8fb0cf` | `#fe8019` | `#6f9bc4` |
-| `--color-danger` | `#cc241d` | `#a6352b` | `#cc241d` | `#cc241d` | `#e0697d` |
+| `--color-accent` | `#689d6a` | `#535f5f` slate | `#d4b36a` gold | `#fe8019` | `#6f9bc4` |
+| `--color-danger` | `#cc241d` | `#a6352b` | `#e46b5f` | `#cc241d` | `#e0697d` |
 
-Each app has one accent: calendar green, tapes orange, library ink blue. Library ("Shelves") is a gallery wall in warm light: by day a pale wall lit through a paper blind, at night the same gallery under a lamp. The light (a glow, a paper grain and frosted panels) is app-local in its `index.css`; its reader deliberately drops all of it for a flat page with softened contrast (`--reader-bg` / `--reader-ink` in `reader.css`).
+### Type scales
 
-### Heading conventions (per-app, not spec tokens)
-
-Applied identically in calendar + library; dashboard headings use Tailwind utility classes mapping to the same scale.
-
-| Element | Rule |
-|---|---|
-| `h1` | `font-size: var(--text-xl)` · `font-weight: 550` · `letter-spacing: -0.01em` · `color: var(--color-text-muted)` |
-| `h2` | `font-size: var(--text-lg)` · `font-weight: 600` |
+| | xs | sm | base | lg | xl |
+|---|---|---|---|---|---|
+| Calendar | 11 | 14 | 16 | 20 | 32 |
+| Library | 12 | 14 | 16 | 20 | 24 |
+| Tapes | 12 | 14 | 16 | 20 | 24 |
 
 ---
 
-## Layer 2 — Primitive components
+## Each app's voice
 
-`.btn` (+ `-primary` / `-secondary` / `-danger` / `-ghost`) and `.input`. The canonical rules live **in `structural.css`** alongside the tokens — the Flask apps load that one file; dashboard carries the same shapes in its React global CSS. Transitions use `--dur-base`. An app may override a single primitive in its own CSS (calendar, for instance, sets its controls in monospace).
-
-### Conventions
-
-- **`.btn-primary`** — single most-important action on a surface (Save, Sign in, Submit).
-- **`.btn-secondary`** — alternative action (Cancel, Close).
-- **`.btn-danger`** — destructive (Delete, Disable 2FA).
-- **`.btn-ghost`** — icon-only header buttons; no fill, no border.
-- **`.btn-link`** (+ `-danger`) — bare text actions in table rows / inline lists (Stop, Revoke, Delete). Dashboard-only so far.
-
-Markup pattern: every button gets `class="btn btn-{variant}"`. Layout-only classes (`.save-btn`, `.login-button` etc.) can coexist on the same element purely for positioning / width.
-
----
-
-## Layer 3 — App-specific extensions
-
-Not part of the spec. Each app owns its own additional CSS for:
-
-- **Calendar** — the month's mood tiles, the two side drawers (day panel; Year / Diary), the tmux-style bottom bar, and the logbook text marks.
-- **Library** — bookshelf spines + planks, book-card overlays, EPUB reader controls, status tags (`--tag-*`).
-- **Dashboard** — service tiles, container monitor cards, sparkline charts.
-
-These should reference the token interface (so palette swaps cascade) but otherwise are free to define their own shapes.
-
----
-
-## Distribution
-
-Each Flask app (tapes, calendar, library) carries two files: a shared **`structural.css`** (tokens + primitives — byte-identical across the three) and a per-app **`tokens.css`** (colours), loaded in that order. Dashboard (React/Tailwind) declares the same colour tokens in its global CSS and styles `.btn`/`.input` there directly.
-
-Keep `structural.css` in sync by copying it verbatim between the apps — it changes rarely. Colours and app-specific extensions diverge freely.
-
----
-
-## Current adoption
-
-- ✅ **Calendar / Library / Tapes** — shared `structural.css` (tokens + primitives + motion) + per-app `tokens.css`. Primitive overrides: calendar sets `.btn` and `.input` in 14px monospace and squares the corners (radii 0, except its mood tiles), for its terminal look; library's search and status controls are hairlines and underlines rather than fields and pills, and its covers have square corners. Library uses the 640px breakpoint throughout.
-- 🟡 **Dashboard** — colour tokens + `.btn`/`.input` in its React global CSS; buttons on primitives across Login/Settings/Users/Monitor (row actions via `.btn-link`). Every page opens with `PageHeader.jsx` (a 36px title row with optional controls on the right, then 16px to the first card). Cards on Monitor, Users and Settings share one recipe, `Panel.jsx` + `.bp-panel*`: 16px padding, a title whose line box is trimmed to the letters (`text-box: trim-both cap alphabetic`) so the space above it matches the padding, small right-hand asides, and a `flush` variant for tables. The top bar and phone nav use `--color-bg-chrome`, darker than the page, like calendar's and tapes' chrome. Services tiles are their own extension; layout inside pages is still Tailwind utilities on the same tokens.
-
-## Open questions
-
-- ~~**Library still loads Bootstrap CDN**~~ — resolved (Oct 2026): Bootstrap is gone; library ships `static/css/base.css` with only the reset, container, grid columns and utilities it used, coloured from its tokens.
-- **Dashboard primitive coverage**. Cards and buttons are on shared primitives; the layout inside pages is still Tailwind utilities. Status colours (up/degraded/down) are Tailwind's green/amber/red rather than tokens.
+- **Calendar** — a terminal: buttons and inputs in 14px monospace, square corners (except the mood tiles), the tmux-style bottom bar and the logbook text marks in the drawers.
+- **Library** — a gallery wall in warm light (a glow, a paper grain and frosted panels by day and night); covers hang with square corners; buttons are outlines, never filled, with small corners like the reader's settings; search and status are hairlines and underlines. The reader drops the light for a flat, calm page.
+- **Tapes** — Gruvbox with an orange accent, a drawn cassette whose label is handwritten and scales with the cassette.
+- **Dashboard** — slate; every page opens with `PageHeader.jsx`, cards share `Panel.jsx` + `.bp-panel*`, row actions use `.btn-link`. Status colours are still Tailwind's green/amber/red rather than tokens.
