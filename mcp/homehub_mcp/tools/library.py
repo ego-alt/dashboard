@@ -74,7 +74,7 @@ def register(server: MCPServer, deps: Deps) -> None:
     @server.tool(
         name="library_get_book",
         annotations=READ,
-        description="A book's details: title, author, genre, the user's tags, reading status and place.",
+        description="A book's details: title, author, the user's tags, reading status and place.",
     )
     async def library_get_book(filename: FilenameArg) -> str:
         m, b = await asyncio.gather(
@@ -87,8 +87,6 @@ def register(server: MCPServer, deps: Deps) -> None:
                 f" (chapter {b['chapter_index'] + 1})" if b.get("chapter_index") else ""
             ),
         ]
-        if m.get("genre"):
-            lines.append(f"genre: {m['genre']}")
         lines.append("tags: " + (", ".join(m["tags"]) or "none"))
         return "\n".join(lines)
 
@@ -96,9 +94,9 @@ def register(server: MCPServer, deps: Deps) -> None:
         name="library_update_book",
         annotations=IDEMPOTENT,
         description=(
-            "Change a book's reading status or the user's own tags. Title, author and genre "
-            "are shared by everyone and only admins can change them. Leave a field '' (or "
-            "the tag lists empty) to keep it as is."
+            "Change a book's reading status or the user's own tags (tags also say what a book "
+            "is: Biography, Crime). Title and author are shared by everyone and only admins "
+            "can change them. Leave a field '' (or the tag lists empty) to keep it as is."
         ),
     )
     async def library_update_book(
@@ -108,7 +106,6 @@ def register(server: MCPServer, deps: Deps) -> None:
         remove_tags: list[str] = [],
         title: str = "",
         author: str = "",
-        genre: str = "",
     ) -> str:
         cur = await call("GET", f"/book_metadata/{_f(filename)}")
         drop = {t.strip().lower() for t in remove_tags}
@@ -123,10 +120,8 @@ def register(server: MCPServer, deps: Deps) -> None:
             body["title"] = title
         if author:
             body["author"] = author
-        if genre:
-            body["genre"] = genre
         await call("POST", f"/book_metadata/{_f(filename)}", json=body)
-        if title or author or genre:
+        if title or author:
             # Shared fields are admin-only and silently kept for others: read
             # back to tell the model which happened.
             new = await call("GET", f"/book_metadata/{_f(filename)}")
