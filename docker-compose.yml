@@ -52,6 +52,8 @@ services:
       # limit of 60 requests an hour and shows private repos (see docs/DEPLOY.md).
       GITHUB_OWNER: ${GITHUB_OWNER:-ego-alt}
       DEPLOY_GITHUB_TOKEN: ${DEPLOY_GITHUB_TOKEN:-}
+      # Extra origins allowed to sign in and save (see .env.example).
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
     # Match the host's docker.sock GID so the non-root app user can read it.
     # Find with: stat -c '%g' /var/run/docker.sock   (Pi/Debian usually 999.)
     group_add:
