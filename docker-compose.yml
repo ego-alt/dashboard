@@ -54,6 +54,8 @@ services:
       DEPLOY_GITHUB_TOKEN: ${DEPLOY_GITHUB_TOKEN:-}
       # Extra origins allowed to sign in and save (see .env.example).
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      # Phone apps' APKs, fetched from their GitHub releases (app/phone_apps.py).
+      PHONE_APPS_DIR: /data/phone-apps
     # Match the host's docker.sock GID so the non-root app user can read it.
     # Find with: stat -c '%g' /var/run/docker.sock   (Pi/Debian usually 999.)
     group_add:

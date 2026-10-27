@@ -7,9 +7,15 @@ Any repo can join the stack, in any language or framework, if it has:
   .github/workflows/ci.yml
                      the Pi deploys a commit only after this workflow passes
 
+A phone app (kind = "android") needs no Dockerfile: its CI publishes a signed
+APK as a GitHub release, and the dashboard offers it under Services (see
+app/phone_apps.py).
+
 homestack.toml (everything but `title` is optional):
 
     title = "Situation"              # the Services tile and the Deploy tab
+    kind = "web"                     # or "android": a phone app, installed from Services
+    package = "com.scanner.app"      # android only: the app's package name
     description = "World news on a map"
     icon = "icon.svg"                # an SVG in the repo, drawn in one colour like
                                      # the other tiles (stroke or fill="currentColor")
@@ -39,6 +45,8 @@ RESERVED = {"dashboard", "library", "calendar", "music", "tapes", "mcp", "nginx"
             "monitor", "users", "me", "backups", "deploy", "healthz", "ping", "authorize", "token",
             "register", "revoke"}
 REQUIRED_FILES = ("Dockerfile", "homestack.toml", ".github/workflows/ci.yml")
+KINDS = ("web", "android")
+_PACKAGE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$")
 ICON_MAX_BYTES = 64 * 1024
 TILE_BG = "#141d28"                  # the dashboard's --color-bg-inset, behind every tile icon
 _HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -72,6 +80,11 @@ def name_problem(name: str) -> str | None:
     return None
 
 
+def required_files(kind: str) -> tuple[str, ...]:
+    """What a repo of this kind needs: a phone app has no container to build."""
+    return REQUIRED_FILES if kind == "web" else ("homestack.toml", ".github/workflows/ci.yml")
+
+
 def parse(text: str) -> dict:
     """homestack.toml → a complete manifest with defaults, or ManifestError."""
     try:
@@ -81,6 +94,12 @@ def parse(text: str) -> dict:
     title = str(raw.get("title") or "").strip()
     if not title:
         raise ManifestError("homestack.toml needs a title.")
+    kind = str(raw.get("kind", "web")).strip().lower()
+    if kind not in KINDS:
+        raise ManifestError('kind must be "web" (the default) or "android".')
+    package = str(raw.get("package", "")).strip()
+    if kind == "android" and not _PACKAGE.match(package):
+        raise ManifestError('A phone app needs its package name, like package = "com.scanner.app".')
     port = raw.get("port", 8000)
     if not isinstance(port, int) or not 1 <= port <= 65535:
         raise ManifestError("port must be a number between 1 and 65535.")
@@ -103,6 +122,8 @@ def parse(text: str) -> dict:
         raise ManifestError("env keys must be UPPER_CASE names.")
     return {
         "title": title,
+        "kind": kind,
+        "package": package if kind == "android" else "",
         "description": str(raw.get("description", "")).strip(),
         "icon": icon,
         "accent": accent,

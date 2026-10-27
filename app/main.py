@@ -1045,4 +1045,10 @@ from app.deploy import router as deploy_router  # noqa: E402
 
 app.include_router(deploy_router)
 
+# ---------- Phone apps (Services; see app/phone_apps.py) ----------
+
+from app.phone_apps import router as phone_apps_router  # noqa: E402
+
+app.include_router(phone_apps_router)
+
 register_spa(app)

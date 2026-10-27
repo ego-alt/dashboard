@@ -26,6 +26,11 @@ const RESULT = {
 
 /** One line saying where an app stands: what the Pi runs against what's on GitHub. */
 function standing(a, checking) {
+  if (a.kind === 'phone') {
+    return a.release
+      ? { text: `Phone app: release ${a.release.version_name}`, tone: 'text-[var(--color-text-muted)]' }
+      : { text: 'Phone app: no release yet (its CI publishes them)', tone: 'text-amber-300' };
+  }
   if (a.queued) return { text: 'Queued: the Pi is on it', tone: 'text-[var(--color-accent)]' };
   const deployed = a.deployed?.sha;
   const latest = a.latest?.sha;
@@ -64,14 +69,17 @@ function CommitCell({ commit, ci }) {
 
 /** The same three actions on every row, so the table reads the same throughout. */
 function Actions({ a, busy, onDeploy, onLog, onRemove }) {
-  const core = a.kind !== 'app';
+  const core = a.kind === 'core';
+  const phone = a.kind === 'phone';
   return (
     <span className="flex items-center justify-end gap-3">
-      <button className="btn-link text-xs" onClick={() => onLog(a)} title="What the Pi did on its last deploys">Log</button>
-      <button className="btn-link text-xs" disabled={busy || a.queued} onClick={() => onDeploy(a)}
-        title={a.part_of
-          ? `Deploys ${a.part_of}, which ${a.name} ships with (it still has to pass CI)`
-          : 'Deploy the latest commit now (it still has to pass CI)'}>
+      <button className="btn-link text-xs" disabled={phone} onClick={() => onLog(a)}
+        title={phone ? 'Nothing runs on the Pi: its builds are on GitHub' : 'What the Pi did on its last deploys'}>Log</button>
+      <button className="btn-link text-xs" disabled={busy || a.queued || phone} onClick={() => onDeploy(a)}
+        title={phone ? 'A phone app ships when its CI publishes a release'
+          : a.part_of
+            ? `Deploys ${a.part_of}, which ${a.name} ships with (it still has to pass CI)`
+            : 'Deploy the latest commit now (it still has to pass CI)'}>
         Deploy now
       </button>
       <button className="btn-link btn-link-danger text-xs"
@@ -125,7 +133,7 @@ function AddApp({ onAdded, onClose }) {
   return (
     <Panel
       title="Add an app"
-      description={`Any repo under ${owner || 'your account'} with a Dockerfile, a homestack.toml and a CI workflow. It's served at /<repo name>/ behind your sign-in.`}
+      description={`Any repo under ${owner || 'your account'} with a Dockerfile, a homestack.toml and a CI workflow. It's served at /<repo name>/ behind your sign-in. A phone app (kind = "android") needs no Dockerfile and is installed from Services.`}
       aside={<button className="btn btn-ghost" onClick={onClose} aria-label="Close" title="Close">×</button>}
       className="mb-6"
     >
@@ -165,13 +173,15 @@ function AddApp({ onAdded, onClose }) {
                       </ul>
                       {check.manifest && (
                         <p className="mt-2 text-xs text-[var(--color-text-muted)]">
-                          “{check.manifest.title}” on port {check.manifest.port}, health {check.manifest.health}
-                          {check.manifest.data ? `, keeps ${check.manifest.data}` : ''}
+                          {check.manifest.kind === 'android'
+                            ? `“${check.manifest.title}”, a phone app (${check.manifest.package}): installed from Services`
+                            : <>“{check.manifest.title}” on port {check.manifest.port}, health {check.manifest.health}
+                              {check.manifest.data ? `, keeps ${check.manifest.data}` : ''}</>}
                         </p>
                       )}
                       <div className="mt-3 flex items-center gap-3">
                         <button className="btn btn-primary" disabled={!check.ok || busy} onClick={deploy}>
-                          {busy ? 'Adding…' : `Deploy ${check.name}`}
+                          {busy ? 'Adding…' : check.manifest?.kind === 'android' ? `Add ${check.name} to Phone apps` : `Deploy ${check.name}`}
                         </button>
                         <button className="btn btn-secondary" onClick={() => pick(r.name)}>Check again</button>
                       </div>
@@ -261,7 +271,9 @@ export default function DeployPage() {
       a, busy: !!busy[a.name],
       onDeploy: (x) => run(x, deployNow, `Asked the Pi to deploy ${x.name}.`),
       onLog: (x) => setLogFor(x.name),
-      onRemove: (x) => window.confirm(`Remove ${x.name} from the stack? Its container stops; its repo and data stay on the Pi.`)
+      onRemove: (x) => window.confirm(x.kind === 'phone'
+        ? `Take ${x.name} off Phone apps? Copies already on phones stay installed.`
+        : `Remove ${x.name} from the stack? Its container stops; its repo and data stay on the Pi.`)
         && run(x, removeApp, `Removing ${x.name}.`),
     } };
   };

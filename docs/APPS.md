@@ -45,6 +45,26 @@ From then on, every push that passes CI deploys within 5 minutes, and a commit t
 - **Environment:** `APPLICATION_ROOT`, `AUTH_PROXY_HEADER=X-Forwarded-User`, and anything under `[env]`.
 - **Websockets** pass through.
 
+## Phone apps
+
+An Android app joins the same way, without a Dockerfile: its `homestack.toml` says what it is.
+
+```toml
+title = "Scanner"
+kind = "android"
+package = "com.scanner.app"      # its applicationId
+description = "Scan documents"
+icon = "icon.svg"
+accent = "#7dd3fc"
+```
+
+- **Its CI publishes the builds.** Each push that builds produces a signed APK, released on GitHub with the tag `v<versionCode>`, named after its `versionName`, and the APK attached. A release exists only when CI passed, so the rule holds: nothing ships that didn't pass. Sign every build with the same key, or phones refuse the update.
+- **Adding it** (Deploy → Add an app) lists it under **Phone apps** on Services. Nothing runs on the Pi: the dashboard fetches each new release's APK once and keeps it (in the dashboard's `data/phone-apps/` on the Pi), so phones install over the tailnet.
+- **Services** offers Install, Update to 1.0.12, or Up to date. A web page can't see what a phone has installed, so the app says so itself when it checks for updates.
+- **The app checks for updates** with `GET /phone-apps/<name>/latest?installed=<versionCode>&installed_name=<versionName>` and downloads from `GET /phone-apps/<name>/download`. Both take the dashboard API token the app already holds (`Authorization: Bearer …`); a token reaches nothing else in the dashboard.
+
+The code is `app/phone_apps.py`.
+
 ## How it fits together
 
 - **The dashboard** (`app/deploy.py`) records enabled apps in `apps/<name>.json` and "deploy now" requests in `requests/<name>`, in the deploy state folder (`/var/lib/home-stack-deploy` on the Pi). It reads `status.json` and `logs/` from the same folder. It never builds or starts anything itself.

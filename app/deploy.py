@@ -6,6 +6,8 @@ the Pi's deploy script (scripts/deploy.sh, mounted here at DEPLOY_STATE_DIR):
   status.json          written by the script: the last outcome per repo
   logs/<name>.log      written by the script: each repo's deploy log
   apps/<name>.json     written here: apps enabled in the Deploy tab
+  phone-apps/<name>.*  written here: phone apps, which the script never sees
+                       (nothing to run; see app/phone_apps.py)
   requests/<name>      written here: "deploy now"; a systemd path unit starts
                        the script at once, and the script deletes the file
 
@@ -28,7 +30,7 @@ from pydantic import BaseModel
 
 from app.auth import current_admin
 from app.models import User
-from app.stack_manifest import ICON_MAX_BYTES, REQUIRED_FILES, ManifestError, app_name, name_problem, parse
+from app.stack_manifest import ICON_MAX_BYTES, ManifestError, app_name, name_problem, parse, required_files
 
 router = APIRouter(prefix="/deploy", tags=["deploy"])
 
@@ -190,25 +192,35 @@ def owner_repos() -> list[dict]:
     return repos
 
 
+def phone_apps() -> list[dict]:
+    from app.phone_apps import registered
+    return registered()
+
+
 def check_repo(repo: str, branch: str) -> dict:
-    """Whether a repo can join the stack, as a checklist."""
+    """Whether a repo can join the stack, as a checklist. A phone app
+    (kind = "android") needs no Dockerfile: it's listed, not served."""
     name = app_name(repo)
-    taken = {a["name"] for a in CORE} | {a["name"] for a in enabled_apps()}
-    checks = []
-    problem = name_problem(name)
-    checks.append({"label": f"Served at /{name}/", "ok": not problem and name not in taken,
-                   "detail": problem or ("Already on the stack." if name in taken else "")})
-    files = {path: _raw(repo, branch, path) for path in REQUIRED_FILES}
-    checks.append({"label": "Dockerfile", "ok": files["Dockerfile"][0] == 200,
-                   "detail": "" if files["Dockerfile"][0] == 200 else "Add a Dockerfile at the repo's root."})
+    taken = {a["name"] for a in CORE} | {a["name"] for a in enabled_apps()} | {a["name"] for a in phone_apps()}
+    status, text = _raw(repo, branch, "homestack.toml")
     manifest, detail = None, ""
-    if files["homestack.toml"][0] != 200:
+    if status != 200:
         detail = "Add homestack.toml (title, port, health path); see the dashboard's docs/APPS.md."
     else:
         try:
-            manifest = parse(files["homestack.toml"][1])
+            manifest = parse(text)
         except ManifestError as e:
             detail = str(e)
+    kind = manifest["kind"] if manifest else "web"
+    files = {path: _raw(repo, branch, path) for path in required_files(kind) if path != "homestack.toml"}
+    checks = []
+    problem = name_problem(name)
+    checks.append({"label": f"Served at /{name}/" if kind == "web" else f"Listed under Phone apps as {name}",
+                   "ok": not problem and name not in taken,
+                   "detail": problem or ("Already on the stack." if name in taken else "")})
+    if kind == "web":
+        checks.append({"label": "Dockerfile", "ok": files["Dockerfile"][0] == 200,
+                       "detail": "" if files["Dockerfile"][0] == 200 else "Add a Dockerfile at the repo's root."})
     checks.append({"label": "homestack.toml", "ok": manifest is not None, "detail": detail})
     if manifest and manifest["icon"]:
         status, text = _raw(repo, branch, manifest["icon"])
@@ -216,8 +228,9 @@ def check_repo(repo: str, branch: str) -> dict:
         checks.append({"label": f"Icon ({manifest['icon']})", "ok": ok,
                        "detail": "" if ok else "homestack.toml names an icon that isn't an SVG in the repo (64 KB at most)."})
     ci = files[".github/workflows/ci.yml"][0] == 200
-    checks.append({"label": "CI workflow (.github/workflows/ci.yml)", "ok": ci,
-                   "detail": "" if ci else "The Pi deploys only commits whose ci.yml run passed."})
+    checks.append({"label": "CI workflow (.github/workflows/ci.yml)", "ok": ci, "detail": "" if ci else (
+        "The Pi deploys only commits whose ci.yml run passed." if kind == "web"
+        else "Its CI builds the signed APK and publishes it as a release (tag v<versionCode>).")})
     return {"repo": repo, "name": name, "branch": branch, "ok": all(c["ok"] for c in checks),
             "checks": checks, "manifest": manifest}
 
@@ -258,11 +271,19 @@ def list_apps(_: User = Depends(current_admin)):
     rows = [_row(a, status, containers, queued, "core") for a in CORE]
     for app in enabled_apps():
         rows.append(_row({**app, "container": app["name"]}, status, containers, queued, "app"))
+    from app.phone_apps import latest_release
+    for app in phone_apps():      # nothing deployed: what matters is the newest release
+        release = latest_release(app)
+        rows.append({"name": app["name"], "kind": "phone", "repo": app["repo"], "branch": app["branch"],
+                     "title": app.get("title") or app["name"], "part_of": None, "deployed": None,
+                     "latest": cached_latest(app["repo"], app["branch"]), "container": None, "queued": False,
+                     "release": {"version_code": release["version_code"], "version_name": release["version_name"],
+                                 "published_at": release["published_at"]} if release else None})
     return {"apps": rows, "owner": OWNER, "github_problem": github_problem}
 
 
 def _stack() -> list[dict]:
-    return CORE + enabled_apps()
+    return CORE + enabled_apps() + phone_apps()
 
 
 @router.get("/apps/latest")
@@ -279,7 +300,7 @@ def list_latest(_: User = Depends(current_admin)):
 
 @router.get("/repos")
 def list_repos(_: User = Depends(current_admin)):
-    on_stack = {a["repo"].lower() for a in CORE} | {a["repo"].lower() for a in enabled_apps()}
+    on_stack = {a["repo"].lower() for a in _stack()}
     repos = [r for r in owner_repos() if r["repo"].lower() not in on_stack]
     # Without a token GitHub lists only public repos.
     return {"owner": OWNER, "repos": repos, "private_hidden": not TOKEN}
@@ -308,6 +329,9 @@ def add_app(body: AddApp, user: User = Depends(current_admin)):
             c["detail"] or c["label"] for c in result["checks"] if not c["ok"]))
     if repo["private"] and not TOKEN:
         raise HTTPException(400, "Private repos need DEPLOY_GITHUB_TOKEN in the dashboard's .env on the Pi.")
+    manifest = result["manifest"]
+    if manifest["kind"] == "android":
+        return {"app": _add_phone_app(result, repo, manifest, user)}
     folder = STATE_DIR / "apps"
     folder.mkdir(parents=True, exist_ok=True)
     entry = {"name": result["name"], "repo": repo["repo"], "branch": repo["branch"],
@@ -318,18 +342,41 @@ def add_app(body: AddApp, user: User = Depends(current_admin)):
     return {"app": entry}
 
 
+def _add_phone_app(result: dict, repo: dict, manifest: dict, user: User) -> dict:
+    """A phone app is listed, not deployed: its details and icon go where
+    Services reads them, and the deploy script never sees it."""
+    folder = STATE_DIR / "phone-apps"
+    folder.mkdir(parents=True, exist_ok=True)
+    entry = {"name": result["name"], "repo": repo["repo"], "branch": repo["branch"], "kind": "android",
+             "title": manifest["title"], "description": manifest["description"], "accent": manifest["accent"],
+             "package": manifest["package"], "private": repo["private"],
+             "added_by": user.username, "added_at": datetime.now(timezone.utc).isoformat()}
+    if manifest["icon"]:
+        status, text = _raw(repo["repo"], repo["branch"], manifest["icon"])
+        if status == 200 and "<svg" in text and len(text.encode()) <= ICON_MAX_BYTES:
+            (folder / f"{result['name']}.svg").write_text(text)
+    (folder / f"{result['name']}.json").write_text(json.dumps(entry, indent=2))
+    return entry
+
+
 @router.post("/apps/{name}/deploy", status_code=202)
 def deploy_now(name: str, _: User = Depends(current_admin)):
     known = {a["name"]: a for a in CORE} | {a["name"]: a for a in enabled_apps()}
     app = known.get(name)
     if app is None:
-        raise HTTPException(404, "No such app.")
+        raise HTTPException(404, "No such app." if name not in {a["name"] for a in phone_apps()}
+                            else "A phone app ships when its CI publishes a release.")
     request_deploy(app.get("part_of") or name)
     return {"queued": True}
 
 
 @router.delete("/apps/{name}")
 def remove_app(name: str, _: User = Depends(current_admin)):
+    phone = STATE_DIR / "phone-apps" / f"{name}.json"
+    if phone.exists():          # nothing running to stop; installed copies stay on phones
+        phone.unlink()
+        (STATE_DIR / "phone-apps" / f"{name}.svg").unlink(missing_ok=True)
+        return {"removed": name}
     path = STATE_DIR / "apps" / f"{name}.json"
     if not path.exists():
         raise HTTPException(404, "Only apps added here can be removed.")

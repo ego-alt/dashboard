@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, LargeBinary, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -188,3 +188,24 @@ class UptimeHour(Base):
 
 #: Services are discovered from Docker container labels (``homehub.*``), not
 #: persisted here — see ``app/services.py``. No Service ORM model by design.
+
+
+class InstalledApp(Base):
+    """The version of a phone app someone has installed, as the app last
+    reported it when checking for updates (app/phone_apps.py). A web page
+    can't see what a phone has installed, so this is how Services knows to
+    say Install, Update or Up to date."""
+
+    __tablename__ = "installed_apps"
+    __table_args__ = (UniqueConstraint("user_id", "app"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    app: Mapped[str] = mapped_column(String(40), nullable=False)
+    version_code: Mapped[int] = mapped_column(Integer, nullable=False)
+    version_name: Mapped[str] = mapped_column(String(40), nullable=False, default="")
+    seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )

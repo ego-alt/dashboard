@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { apiJson, backupStatus, containerAction, uptime } from '../api';
+import { apiJson, backupStatus, containerAction, phoneApps, uptime } from '../api';
 import { useAuth } from '../auth.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import ServiceIcon from '../components/ServiceIcon.jsx';
@@ -134,6 +134,86 @@ function Tile({ s, uptime30, isAdmin, onStart, busy }) {
   );
 }
 
+const isAndroid = /Android/i.test(navigator.userAgent);
+
+function megabytes(bytes) {
+  return bytes ? `${(bytes / 1048576).toFixed(1)}\u00a0MB` : '';
+}
+
+/** Install, Update or Up to date. The app reports what it has when it checks
+ * for updates, so the dashboard knows which to offer. */
+function PhoneAction({ a }) {
+  const latest = a.latest;
+  if (!latest) return <span className="text-xs text-[var(--color-text-muted)]">No release yet</span>;
+  const have = a.installed?.version_code;
+  if (have != null && have >= latest.version_code)
+    return <span className="text-xs text-[var(--color-text-muted)]">Up to date ✓</span>;
+  if (!a.ready) return <span className="text-xs text-[var(--color-text-muted)]">Preparing…</span>;
+  return (
+    <a href={`/phone-apps/${encodeURIComponent(a.name)}/download`} download className="btn btn-primary text-sm">
+      {have != null ? `Update to ${latest.version_name}` : 'Install'}
+    </a>
+  );
+}
+
+function PhoneTile({ a }) {
+  const latest = a.latest;
+  const behind = a.installed && latest && a.installed.version_code < latest.version_code;
+  return (
+    <div className="bp-card bp-ticks flex h-full flex-col gap-4 px-5 py-5">
+      <div className="flex items-start gap-3">
+        <ServiceIcon iconUrl={a.icon_url} accent={a.accent} name={a.title} slug={a.name} />
+        <div className="min-w-0 flex-1">
+          <div className="font-medium text-[var(--color-text-primary)]">{a.title}</div>
+          {a.description && (
+            <div className="mt-0.5 truncate text-sm text-[var(--color-text-muted)]" title={a.description}>
+              {a.description}
+            </div>
+          )}
+        </div>
+        <span className="shrink-0 self-start">
+          <PhoneAction a={a} />
+        </span>
+      </div>
+      {latest && (
+        <div className="text-xs text-[var(--color-text-muted)]">
+          {[latest.version_name, megabytes(latest.size), latest.published_at && `${age(secondsSince(latest.published_at))} ago`]
+            .filter(Boolean).join(' · ')}
+          {a.installed && (
+            <span className={behind ? 'text-[var(--color-accent)]' : undefined}>
+              {' · '}your phone has {a.installed.version_name || a.installed.version_code}
+            </span>
+          )}
+        </div>
+      )}
+      {latest?.notes && (
+        <details className="text-sm text-[var(--color-text-secondary)]">
+          <summary className="cursor-pointer text-xs text-[var(--color-text-muted)]">What’s new</summary>
+          <p className="mt-2 whitespace-pre-line">{latest.notes}</p>
+        </details>
+      )}
+    </div>
+  );
+}
+
+/** Android apps from your repos: install them here, and they update themselves. */
+function PhoneApps({ apps }) {
+  if (!apps?.length) return null;
+  return (
+    <section className="mt-10" aria-labelledby="phone-apps">
+      <h2 id="phone-apps" className="mb-1 text-sm font-medium text-[var(--color-text-secondary)]">Phone apps</h2>
+      <p className="mb-3 text-xs text-[var(--color-text-muted)]">
+        {isAndroid
+          ? 'The first install asks you to allow installs from this browser. After that the apps offer their own updates.'
+          : 'Open this page on your Android phone to install. After that the apps offer their own updates.'}
+      </p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {apps.map((a) => <PhoneTile key={a.name} a={a} />)}
+      </div>
+    </section>
+  );
+}
+
 export default function HomePage() {
   const { user } = useAuth();
   const isAdmin = !!user?.is_admin;
@@ -144,6 +224,7 @@ export default function HomePage() {
   const [host, setHost] = useState(null);
   const [backup, setBackup] = useState(null);
   const [starting, setStarting] = useState(null);
+  const [phone, setPhone] = useState(null);
 
   const loadServices = useCallback(async () => {
     try {
@@ -160,6 +241,7 @@ export default function HomePage() {
         setServices((cur) => cur ?? []);
       }
     }
+    phoneApps().then((r) => setPhone(r.apps)).catch(() => {});
     if (isAdmin) {
       apiJson('/stats/system').then(setHost).catch(() => {});
       backupStatus().then(setBackup).catch(() => {});
@@ -217,6 +299,7 @@ export default function HomePage() {
           ))}
         </div>
       )}
+      <PhoneApps apps={phone} />
     </div>
   );
 }
