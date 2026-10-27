@@ -19,6 +19,7 @@ from sqlalchemy import delete
 from sqlalchemy.orm import Session as DbSession
 
 from .db import get_db
+from .hibp import password_breach_count
 from .models import LoginEvent, User, UserSession
 
 SESSION_COOKIE = "session"
@@ -354,3 +355,25 @@ def mfa_pending_session(
     if sess is None or not sess.mfa_pending:
         raise HTTPException(status_code=401, detail="no pending session")
     return sess
+
+
+MIN_PASSWORD_LEN = 8
+
+
+def password_problem(password: str, *, check_breaches: bool = True) -> Optional[str]:
+    """Why a new password isn't allowed, or None: the one rule for the pages and
+    the CLI. At least MIN_PASSWORD_LEN characters, and not in a known breach
+    (HaveIBeenPwned; allowed when it can't be reached)."""
+    if len(password) < MIN_PASSWORD_LEN:
+        return f"password must be at least {MIN_PASSWORD_LEN} characters"
+    if check_breaches and (count := password_breach_count(password)) > 0:
+        return f"that password appears in {count:,} known breach(es) — pick another"
+    return None
+
+
+
+def check_new_password(password: str) -> None:
+    """Refuse a new password that breaks the rule, as a 400 saying why."""
+    problem = password_problem(password)
+    if problem:
+        raise HTTPException(status_code=400, detail=problem)

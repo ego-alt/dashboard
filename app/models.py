@@ -192,7 +192,7 @@ class UptimeHour(Base):
 
 class InstalledApp(Base):
     """The version of a phone app someone has installed, as the app last
-    reported it when checking for updates (app/phone_apps.py). A web page
+    reported it when checking for updates (app/routes/phone_apps.py). A web page
     can't see what a phone has installed, so this is how Services knows to
     say Install, Update or Up to date."""
 

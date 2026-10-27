@@ -6,7 +6,8 @@ import pathlib
 
 import pytest
 
-import app.deploy as deploy
+import app.github as github
+import app.routes.deploy as deploy
 from app.stack_manifest import ManifestError, name_problem, parse
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -17,7 +18,7 @@ GOOD_MANIFEST = 'title = "Situation"\ndescription = "World news"\nicon = "icon.s
 @pytest.fixture
 def state(tmp_path, monkeypatch):
     monkeypatch.setattr(deploy, "STATE_DIR", tmp_path)
-    monkeypatch.setattr(deploy, "_cache", {})
+    monkeypatch.setattr(github, "_cache", {})
     (tmp_path / "status.json").write_text(json.dumps(
         {"dashboard": {"sha": "abc1234", "result": "deployed", "at": "2026-10-19T04:22:11+0100"}}))
     repos = [
@@ -36,9 +37,9 @@ def state(tmp_path, monkeypatch):
         ("ego-alt/situation", "icon.svg"): '<svg viewBox="0 0 24 24"></svg>',
         ("ego-alt/half-done", "Dockerfile"): "FROM node:22",
     }
-    monkeypatch.setattr(deploy, "_raw", lambda repo, branch, path: (200, files[(repo, path)])
+    monkeypatch.setattr(github, "raw", lambda repo, branch, path: (200, files[(repo, path)])
                         if (repo, path) in files else (404, ""))
-    monkeypatch.setattr(deploy, "latest_commit", lambda repo, branch: {
+    monkeypatch.setattr(github, "latest_commit", lambda repo, branch: {
         "sha": "def5678", "message": "small/fix", "at": "2026-10-19T10:00:00Z", "ci": "passed"})
     import app.docker_control as dc
     monkeypatch.setattr(dc, "get_containers", lambda: [{"name": "dashboard", "state": "up", "status": "running"}])
@@ -61,7 +62,7 @@ def test_lists_the_stack_without_waiting_for_github(client, make_user, state, mo
     """The list is the Pi's view and comes straight back; GitHub's side comes from /apps/latest."""
     def no_github(*_):
         raise AssertionError("the list mustn't ask GitHub")
-    monkeypatch.setattr(deploy, "latest_commit", no_github)
+    monkeypatch.setattr(github, "latest_commit", no_github)
     apps = _admin(client, make_user).get("/deploy/apps").json()["apps"]
     assert [a["name"] for a in apps] == ["dashboard", "mcp", "library", "calendar", "tapes"]
     dash = apps[0]
@@ -82,7 +83,7 @@ def test_latest_asks_github_about_every_repo_at_once(client, make_user, state, m
         with lock:
             running[0] -= 1
         return {"sha": "def5678", "message": f"{repo}@{branch}", "at": None, "ci": "passed"}
-    monkeypatch.setattr(deploy, "latest_commit", slow)
+    monkeypatch.setattr(github, "latest_commit", slow)
     c = _admin(client, make_user)
     started = time.monotonic()
     latest = c.get("/deploy/apps/latest").json()["latest"]
@@ -92,7 +93,7 @@ def test_latest_asks_github_about_every_repo_at_once(client, make_user, state, m
 
 
 def test_a_cached_latest_shows_in_the_list(client, make_user, state, monkeypatch):
-    monkeypatch.setattr(deploy, "_cache", {"commit:ego-alt/dashboard:master": (deploy.time.monotonic(), {"sha": "f00d"})})
+    monkeypatch.setattr(github, "_cache", {"commit:ego-alt/dashboard:master": (github.time.monotonic(), {"sha": "f00d"})})
     apps = _admin(client, make_user).get("/deploy/apps").json()["apps"]
     assert apps[0]["latest"] == {"sha": "f00d"} and apps[2]["latest"] is None
 
@@ -199,12 +200,12 @@ def test_an_app_without_a_manifest_gets_no_route_yet(tmp_path):
 def test_github_trouble_is_said_not_hidden(client, make_user, state, monkeypatch):
     monkeypatch.undo()                                       # the real owner_repos, with GitHub refusing
     monkeypatch.setattr(deploy, "STATE_DIR", state)
-    monkeypatch.setattr(deploy, "_cache", {})
-    monkeypatch.setattr(deploy, "_get", lambda url, api=True, timeout=10: (403, b""))
+    monkeypatch.setattr(github, "_cache", {})
+    monkeypatch.setattr(github, "get", lambda url, api=True, timeout=10: (403, b""))
     r = _admin(client, make_user).get("/deploy/repos")
     assert r.status_code == 502 and "rate limit" in r.json()["detail"]
-    monkeypatch.setattr(deploy, "_cache", {})
-    monkeypatch.setattr(deploy, "_get", lambda url, api=True, timeout=10: (401, b""))
+    monkeypatch.setattr(github, "_cache", {})
+    monkeypatch.setattr(github, "get", lambda url, api=True, timeout=10: (401, b""))
     assert "expired" in client.get("/deploy/repos").json()["detail"]
 
 
@@ -242,14 +243,14 @@ def test_private_repos_need_the_dashboards_token(client, make_user, state, monke
     c = _admin(client, make_user)
     r = c.post("/deploy/apps", json={"name": "situation"})
     assert r.status_code == 400 and "DEPLOY_GITHUB_TOKEN" in r.json()["detail"]
-    monkeypatch.setattr(deploy, "TOKEN", "github_pat_test")
+    monkeypatch.setattr(github, "TOKEN", "github_pat_test")
     assert c.post("/deploy/apps", json={"name": "situation"}).status_code == 201
 
 
 def test_with_a_token_files_come_through_the_api(monkeypatch):
     calls = []
-    monkeypatch.setattr(deploy, "TOKEN", "github_pat_test")
-    monkeypatch.setattr(deploy, "_get", lambda url, **kw: calls.append((url, kw)) or (200, b"title = 'x'"))
-    assert deploy._raw("ego-alt/situation", "main", "homestack.toml") == (200, "title = 'x'")
+    monkeypatch.setattr(github, "TOKEN", "github_pat_test")
+    monkeypatch.setattr(github, "get", lambda url, **kw: calls.append((url, kw)) or (200, b"title = 'x'"))
+    assert github.raw("ego-alt/situation", "main", "homestack.toml") == (200, "title = 'x'")
     assert calls[0][0] == "https://api.github.com/repos/ego-alt/situation/contents/homestack.toml?ref=main"
     assert calls[0][1]["accept"] == "application/vnd.github.raw"

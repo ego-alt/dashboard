@@ -9,7 +9,7 @@ Any repo can join the stack, in any language or framework, if it has:
 
 A phone app (kind = "android") needs no Dockerfile: its CI publishes a signed
 APK as a GitHub release, and the dashboard offers it under Services (see
-app/phone_apps.py).
+app/routes/phone_apps.py).
 
 homestack.toml (everything but `title` is optional):
 

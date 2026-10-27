@@ -112,8 +112,8 @@ def test_non_admin_cannot_start_container(client, make_user):
 def test_non_admin_can_read_containers_endpoint(client, make_user, monkeypatch):
     make_user(username="alice", password="hunter2-pass", is_admin=False)
     client.post("/login", data={"username": "alice", "password": "hunter2-pass"})
-    from app import main
-    monkeypatch.setattr(main, "get_containers", lambda **_kw: [])
+    from app.routes import containers
+    monkeypatch.setattr(containers, "get_containers", lambda **_kw: [])
     r = client.get("/containers")
     assert r.status_code == 200
     assert r.json() == []

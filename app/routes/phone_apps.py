@@ -8,7 +8,7 @@ v<versionCode> and named after its versionName, with the APK attached. A
 release exists only once CI has passed, as a deploy waits for CI.
 
   phone-apps/<name>.json   in the deploy state folder: the apps added (written
-                           by app/deploy.py), with their title and colour
+                           by app/routes/deploy.py), with their title and colour
   phone-apps/<name>.svg    their icon
   <PHONE_APPS_DIR>/<name>/ the APKs, fetched from GitHub once and kept here, so
                            phones install over the tailnet, not from GitHub
@@ -34,10 +34,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session as DbSession
 
-from app import deploy
+from app import github
 from app.auth import current_user, current_user_cookie_or_token
 from app.db import get_db
 from app.models import InstalledApp, User
+from app.routes import deploy
+from app.services import svg_response
 
 router = APIRouter(prefix="/phone-apps", tags=["phone-apps"])
 
@@ -74,24 +76,22 @@ def find(name: str) -> dict:
 
 def latest_release(app: dict) -> Optional[dict]:
     """The newest release with an APK, or None (none yet, or GitHub not answering)."""
-    def fetch():
-        release = deploy._api(f"/repos/{app['repo']}/releases/latest")
-        if not release:
-            return None
-        tag = _TAG.match(release.get("tag_name") or "")
-        apk = next((a for a in release.get("assets") or [] if a.get("name", "").endswith(".apk")), None)
-        if not tag or not apk:
-            return None
-        return {
-            "version_code": int(tag.group(1)),
-            "version_name": (release.get("name") or release["tag_name"]).strip(),
-            "notes": (release.get("body") or "").strip(),
-            "published_at": release.get("published_at"),
-            "size": apk.get("size"),
-            "asset_url": apk.get("url"),                       # the API's: works for private repos
-            "download_url": apk.get("browser_download_url"),
-        }
-    return deploy._cached(f"release:{app['repo']}", RELEASE_TTL, fetch)
+    release = github.latest_release(app["repo"], RELEASE_TTL)
+    if not release:
+        return None
+    tag = _TAG.match(release.get("tag_name") or "")
+    apk = next((a for a in release.get("assets") or [] if a.get("name", "").endswith(".apk")), None)
+    if not tag or not apk:
+        return None
+    return {
+        "version_code": int(tag.group(1)),
+        "version_name": (release.get("name") or release["tag_name"]).strip(),
+        "notes": (release.get("body") or "").strip(),
+        "published_at": release.get("published_at"),
+        "size": apk.get("size"),
+        "asset_url": apk.get("url"),                       # the API's: works for private repos
+        "download_url": apk.get("browser_download_url"),
+    }
 
 
 def apk_path(name: str, version_code: int) -> pathlib.Path:
@@ -112,9 +112,9 @@ def _download(app: dict, release: dict) -> None:
     target = apk_path(app["name"], release["version_code"])
     target.parent.mkdir(parents=True, exist_ok=True)
     headers = {"User-Agent": "home-stack-dashboard", "Accept": "application/octet-stream"}
-    if deploy.TOKEN:
-        headers["Authorization"] = f"Bearer {deploy.TOKEN}"
-    url = release["asset_url"] if deploy.TOKEN else release["download_url"]
+    if github.TOKEN:
+        headers["Authorization"] = f"Bearer {github.TOKEN}"
+    url = release["asset_url"] if github.TOKEN else release["download_url"]
     tmp = target.with_suffix(".part")
     try:
         opener = urllib.request.build_opener(_NoAuthOnRedirect)
@@ -183,7 +183,7 @@ def list_phone_apps(user: User = Depends(current_user), db: DbSession = Depends(
             "installed": {"version_code": mine.version_code, "version_name": mine.version_name,
                           "seen_at": mine.seen_at.isoformat()} if mine else None,
         })
-    return {"apps": apps, "github_problem": deploy.github_problem}
+    return {"apps": apps, "github_problem": github.problem}
 
 
 @router.get("/{name}/latest")
@@ -224,6 +224,4 @@ def icon(name: str, _: User = Depends(current_user)):
     path = folder() / f"{name}.svg"
     if not path.is_file():
         raise HTTPException(404, "No icon.")
-    return FileResponse(path, media_type="image/svg+xml", headers={      # can't run anything, as on Services
-        "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
-        "X-Content-Type-Options": "nosniff", "Cache-Control": "private, max-age=300"})
+    return svg_response(path)

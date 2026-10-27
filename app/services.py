@@ -20,6 +20,8 @@ import pathlib
 import re
 from typing import Any, Dict, List
 
+from fastapi import Response
+
 from app.docker_control import list_service_candidates
 
 LABEL_PREFIX = "homehub."
@@ -35,6 +37,14 @@ _HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 def app_icon_path(slug: str) -> pathlib.Path | None:
     path = ICON_DIR / f"{slug}.svg"
     return path if _SLUG.match(slug) and path.is_file() else None
+
+
+def svg_response(path: pathlib.Path) -> Response:
+    """An app's icon (an SVG from its repo), served so it can't run anything
+    even if opened directly."""
+    return Response(path.read_bytes(), media_type="image/svg+xml", headers={
+        "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+        "X-Content-Type-Options": "nosniff", "Cache-Control": "private, max-age=300"})
 
 
 class DockerUnavailable(Exception):

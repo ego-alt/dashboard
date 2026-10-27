@@ -3,18 +3,10 @@ import { addApp, checkRepo, deployApps, deployLatest, deployLog, deployNow, depl
 import LogsDrawer from '../components/LogsDrawer.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import Panel from '../components/Panel.jsx';
+import { ago } from '../lib/format';
 import { usePoll } from '../lib/usePoll';
 
 const short = (sha) => (sha ? sha.slice(0, 7) : '');
-
-function ago(iso) {
-  if (!iso) return '';
-  const mins = Math.round((Date.now() - Date.parse(iso)) / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins} min ago`;
-  const h = Math.round(mins / 60);
-  return h < 48 ? `${h} h ago` : `${Math.round(h / 24)} d ago`;
-}
 
 const RESULT = {
   deployed: { text: 'Deployed', tone: 'text-[var(--color-text-secondary)]' },

@@ -20,6 +20,13 @@ export function secondsSince(iso, now = Date.now()) {
   return Number.isNaN(t) ? null : (now - t) / 1000;
 }
 
+/** "just now", "12 min ago", "3 h ago", "4 d ago": how long ago a timestamp was. */
+export function ago(iso, now = Date.now()) {
+  const s = secondsSince(iso, now);
+  if (s == null) return '';
+  return s < MIN ? 'just now' : `${age(s)} ago`;
+}
+
 /** "02:14" today, "Wed 02:14" within a week, "14 Oct" otherwise. */
 export function clock(iso, now = new Date()) {
   if (!iso) return '';

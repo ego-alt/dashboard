@@ -6,8 +6,9 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-import app.deploy as deploy
-import app.phone_apps as phone_apps
+import app.github as github
+import app.routes.deploy as deploy
+import app.routes.phone_apps as phone_apps
 from app.stack_manifest import ManifestError, parse
 
 ANDROID = 'title = "Scanner"\nkind = "android"\npackage = "com.scanner.app"\ndescription = "Scan documents"\nicon = "icon.svg"\naccent = "#7dd3fc"\n'
@@ -20,7 +21,7 @@ RELEASE = {"tag_name": "v12", "name": "1.0.12", "body": "- send the time with ca
 @pytest.fixture
 def state(tmp_path, monkeypatch):
     monkeypatch.setattr(deploy, "STATE_DIR", tmp_path / "state")
-    monkeypatch.setattr(deploy, "_cache", {})
+    monkeypatch.setattr(github, "_cache", {})
     monkeypatch.setattr(phone_apps, "APK_DIR", tmp_path / "apks")
     repos = [{"repo": "ego-alt/doc-scanner", "name": "doc-scanner", "description": "", "branch": "main",
               "pushed_at": "2026-10-27T09:00:00Z", "private": False}]
@@ -28,10 +29,10 @@ def state(tmp_path, monkeypatch):
     files = {("ego-alt/doc-scanner", "homestack.toml"): ANDROID,
              ("ego-alt/doc-scanner", ".github/workflows/ci.yml"): "name: CI",
              ("ego-alt/doc-scanner", "icon.svg"): '<svg viewBox="0 0 24 24"></svg>'}
-    monkeypatch.setattr(deploy, "_raw", lambda repo, branch, path: (200, files[(repo, path)])
+    monkeypatch.setattr(github, "raw", lambda repo, branch, path: (200, files[(repo, path)])
                         if (repo, path) in files else (404, ""))
-    monkeypatch.setattr(deploy, "latest_commit", lambda repo, branch: None)
-    monkeypatch.setattr(deploy, "_api", lambda path: RELEASE if path.endswith("/releases/latest") else None)
+    monkeypatch.setattr(github, "latest_commit", lambda repo, branch: None)
+    monkeypatch.setattr(github, "api", lambda path: RELEASE if path.endswith("/releases/latest") else None)
     fetched = []
 
     def fake_download(app, release):          # what _download leaves behind, without the network
@@ -123,8 +124,8 @@ def test_the_app_checks_with_its_token_and_services_learns_its_version(client, m
 def test_no_release_yet(client, make_user, state, monkeypatch):
     _login(client, make_user)
     _add(client)
-    monkeypatch.setattr(deploy, "_cache", {})
-    monkeypatch.setattr(deploy, "_api", lambda path: {"tag_name": "nightly", "assets": []})
+    monkeypatch.setattr(github, "_cache", {})
+    monkeypatch.setattr(github, "api", lambda path: {"tag_name": "nightly", "assets": []})
     app = client.get("/phone-apps").json()["apps"][0]
     assert app["latest"] is None and app["ready"] is False
     assert client.get("/phone-apps/doc-scanner/download").status_code == 404

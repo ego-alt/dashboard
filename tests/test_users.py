@@ -12,7 +12,7 @@ from app.models import ApiToken, User, UserSession
 @pytest.fixture(autouse=True)
 def _no_hibp(monkeypatch):
     # Never hit the HaveIBeenPwned network API in tests; treat all as un-breached.
-    monkeypatch.setattr("app.main.password_breach_count", lambda pw: 0)
+    monkeypatch.setattr("app.auth.password_breach_count", lambda pw: 0)
 
 
 def _login(client, username, password="hunter2-secret"):

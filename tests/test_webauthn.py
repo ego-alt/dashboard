@@ -121,7 +121,7 @@ def test_register_finish_stores_credential(client, make_user, TestSession):
     )
     cred_dict = {"id": "abc", "response": {"transports": ["usb"]}}
     with patch(
-        "app.main.webauthn_lib.verify_registration_response",
+        "app.routes.passkeys.webauthn_lib.verify_registration_response",
         return_value=fake_verified,
     ):
         r = client.post(
@@ -189,7 +189,7 @@ def test_login_finish_mints_session_and_skips_2fa(client, make_user, TestSession
     cred_dict = {"id": "ESIz", "rawId": "ESIz", "response": {}}
     fake_verified = SimpleNamespace(new_sign_count=1)
     with patch(
-        "app.main.webauthn_lib.verify_authentication_response",
+        "app.routes.passkeys.webauthn_lib.verify_authentication_response",
         return_value=fake_verified,
     ):
         r = client.post(

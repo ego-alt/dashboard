@@ -5,7 +5,7 @@ import { useAuth } from '../auth.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import ServiceIcon from '../components/ServiceIcon.jsx';
 import { StateDot, UptimeStrip } from '../components/Status.jsx';
-import { age, clock, secondsSince } from '../lib/format';
+import { age, ago, clock, secondsSince } from '../lib/format';
 import { STATE, shownState } from '../lib/state';
 import { usePoll } from '../lib/usePoll';
 
@@ -177,7 +177,7 @@ function PhoneTile({ a }) {
       </div>
       {latest && (
         <div className="text-xs text-[var(--color-text-muted)]">
-          {[latest.version_name, megabytes(latest.size), latest.published_at && `${age(secondsSince(latest.published_at))} ago`]
+          {[latest.version_name, megabytes(latest.size), ago(latest.published_at)]
             .filter(Boolean).join(' · ')}
           {a.installed && (
             <span className={behind ? 'text-[var(--color-accent)]' : undefined}>

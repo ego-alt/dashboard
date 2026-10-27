@@ -28,7 +28,7 @@ def test_requires_admin(client, make_user):
 
 
 def test_missing_file_is_not_an_error(client, make_user, monkeypatch, tmp_path):
-    monkeypatch.setattr("app.main._BACKUP_STATUS_FILE", str(tmp_path / "absent.json"))
+    monkeypatch.setattr("app.routes.backups._BACKUP_STATUS_FILE", str(tmp_path / "absent.json"))
     _admin(client, make_user)
     assert client.get("/backups/status").json() == {"available": False}
 
@@ -41,7 +41,7 @@ def test_fresh_run_is_healthy(client, make_user, monkeypatch, tmp_path):
         "snapshot_count": 5,
         "databases": [{"app": "calendar", "ok": True}],
     }))
-    monkeypatch.setattr("app.main._BACKUP_STATUS_FILE", str(p))
+    monkeypatch.setattr("app.routes.backups._BACKUP_STATUS_FILE", str(p))
     _admin(client, make_user)
     r = client.get("/backups/status").json()
     assert r["available"] is True
@@ -56,7 +56,7 @@ def test_old_run_is_stale(client, make_user, monkeypatch, tmp_path):
         "ok": True,
         "finished_at": _utc(datetime.now(timezone.utc) - timedelta(days=3)),
     }))
-    monkeypatch.setattr("app.main._BACKUP_STATUS_FILE", str(p))
+    monkeypatch.setattr("app.routes.backups._BACKUP_STATUS_FILE", str(p))
     _admin(client, make_user)
     r = client.get("/backups/status").json()
     assert r["available"] is True and r["stale"] is True

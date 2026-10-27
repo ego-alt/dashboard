@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../auth.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import Panel from '../components/Panel.jsx';
-import { age, clock, device, secondsSince } from '../lib/format';
+import { ago, clock, device } from '../lib/format';
 import {
   changePassword,
   createApiToken,
@@ -456,7 +456,7 @@ function SessionsSection() {
                 </div>
                 <div className="text-xs text-[var(--color-text-muted)]">
                   {s.ip || 'unknown address'} · signed in {clock(s.created_at)} · last seen{' '}
-                  {age(secondsSince(s.last_seen_at))} ago
+                  {ago(s.last_seen_at)}
                 </div>
               </div>
               {!s.current && (

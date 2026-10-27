@@ -113,7 +113,7 @@ def render(state_dir: pathlib.Path = STATE_DIR, stack_dir: pathlib.Path = STACK_
     """Write the generated files. True when nginx's routes changed."""
     out = state_dir / "generated"
     (out / "nginx").mkdir(parents=True, exist_ok=True)
-    # A phone app has no container; the dashboard lists it instead (app/phone_apps.py).
+    # A phone app has no container; the dashboard lists it instead (app/routes/phone_apps.py).
     ready = [(a, m) for a in enabled_apps(state_dir) if (m := manifest(a["name"], stack_dir)) and m["kind"] == "web"]
     wanted = {out / "nginx" / f"{a['name']}.locations": nginx_locations(a["name"], m) for a, m in ready}
     changed = False

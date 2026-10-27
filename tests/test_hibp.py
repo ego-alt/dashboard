@@ -61,7 +61,7 @@ def test_password_breach_count_handles_malformed_lines(monkeypatch):
 
 
 def test_cli_create_admin_refuses_pwned_password(monkeypatch, capsys):
-    monkeypatch.setattr(cli, "password_breach_count", lambda *_a, **_kw: 100)
+    monkeypatch.setattr("app.auth.password_breach_count", lambda *_a, **_kw: 100)
     monkeypatch.setattr(cli, "init_db", lambda: None)
 
     with pytest.raises(SystemExit) as exc:
@@ -73,7 +73,7 @@ def test_cli_create_admin_refuses_pwned_password(monkeypatch, capsys):
 
 
 def test_cli_create_admin_allows_pwned_with_flag(monkeypatch):
-    monkeypatch.setattr(cli, "password_breach_count", lambda *_a, **_kw: 100)
+    monkeypatch.setattr("app.auth.password_breach_count", lambda *_a, **_kw: 100)
     monkeypatch.setattr(cli, "init_db", lambda: None)
     called = {}
 
@@ -107,7 +107,7 @@ def test_cli_create_admin_allows_pwned_with_flag(monkeypatch):
 
 
 def test_cli_create_admin_accepts_clean_password(monkeypatch):
-    monkeypatch.setattr(cli, "password_breach_count", lambda *_a, **_kw: 0)
+    monkeypatch.setattr("app.auth.password_breach_count", lambda *_a, **_kw: 0)
     monkeypatch.setattr(cli, "init_db", lambda: None)
     called = {}
 

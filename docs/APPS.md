@@ -63,9 +63,9 @@ accent = "#7dd3fc"
 - **Services** offers Install, Update to 1.0.12, or Up to date. A web page can't see what a phone has installed, so the app says so itself when it checks for updates.
 - **The app checks for updates** with `GET /phone-apps/<name>/latest?installed=<versionCode>&installed_name=<versionName>` and downloads from `GET /phone-apps/<name>/download`. Both take the dashboard API token the app already holds (`Authorization: Bearer …`); a token reaches nothing else in the dashboard.
 
-The code is `app/phone_apps.py`.
+The code is `app/routes/phone_apps.py`.
 
 ## How it fits together
 
-- **The dashboard** (`app/deploy.py`) records enabled apps in `apps/<name>.json` and "deploy now" requests in `requests/<name>`, in the deploy state folder (`/var/lib/home-stack-deploy` on the Pi). It reads `status.json` and `logs/` from the same folder. It never builds or starts anything itself.
+- **The dashboard** (`app/routes/deploy.py`) records enabled apps in `apps/<name>.json` and "deploy now" requests in `requests/<name>`, in the deploy state folder (`/var/lib/home-stack-deploy` on the Pi). It reads `status.json` and `logs/` from the same folder. It never builds or starts anything itself.
 - **The deploy script** (`scripts/deploy.sh`, run by the timer, and at once when a request appears) does the cloning, building, health checks and rollbacks. `scripts/stack_render.py` writes the generated compose file and nginx routes into `generated/`.

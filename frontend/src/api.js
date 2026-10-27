@@ -243,7 +243,7 @@ export async function deployLog(name, tail = 300) {
   return apiJson(`/deploy/apps/${encodeURIComponent(name)}/log?tail=${tail}`);
 }
 
-// ---------- Phone apps (Services; see app/phone_apps.py) ----------
+// ---------- Phone apps (Services; see app/routes/phone_apps.py) ----------
 
 export async function phoneApps() {
   return apiJson('/phone-apps');

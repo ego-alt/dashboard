@@ -8,30 +8,21 @@ import argparse
 import getpass
 import sys
 
-from app.auth import hash_password, purge_expired_sessions
+from app.auth import hash_password, password_problem, purge_expired_sessions
 from app.db import init_db, session_scope
-from app.hibp import password_breach_count
 from app.models import User
 
 
-MIN_PASSWORD_LEN = 8
 
-
-def _check_against_hibp(password: str, *, allow_pwned: bool) -> None:
-    """Refuse known-breach passwords unless --allow-pwned was passed.
-
-    Fail-open on network error (password_breach_count returns 0 then).
-    """
-    if allow_pwned:
-        return
-    count = password_breach_count(password)
-    if count > 0:
-        print(
-            f"refusing: that password appears in {count:,} known breach(es). "
-            "Pick another, or pass --allow-pwned to override.",
-            file=sys.stderr,
-        )
+def _checked(password: str, *, allow_pwned: bool) -> str:
+    """The password if it meets the rule (app.auth.password_problem), else exit.
+    --allow-pwned skips only the breach check."""
+    problem = password_problem(password, check_breaches=not allow_pwned)
+    if problem:
+        hint = " (or pass --allow-pwned)" if "breach" in problem else ""
+        print(f"refusing: {problem}{hint}", file=sys.stderr)
         sys.exit(1)
+    return password
 
 
 def _read_new_password(*, allow_pwned: bool = False) -> str:
@@ -40,20 +31,12 @@ def _read_new_password(*, allow_pwned: bool = False) -> str:
     if pw1 != pw2:
         print("passwords do not match", file=sys.stderr)
         sys.exit(1)
-    if len(pw1) < MIN_PASSWORD_LEN:
-        print(f"password must be at least {MIN_PASSWORD_LEN} characters", file=sys.stderr)
-        sys.exit(1)
-    _check_against_hibp(pw1, allow_pwned=allow_pwned)
-    return pw1
+    return _checked(pw1, allow_pwned=allow_pwned)
 
 
 def _resolve_password(explicit: str | None, *, allow_pwned: bool = False) -> str:
     if explicit is not None:
-        if len(explicit) < MIN_PASSWORD_LEN:
-            print(f"password must be at least {MIN_PASSWORD_LEN} characters", file=sys.stderr)
-            sys.exit(1)
-        _check_against_hibp(explicit, allow_pwned=allow_pwned)
-        return explicit
+        return _checked(explicit, allow_pwned=allow_pwned)
     return _read_new_password(allow_pwned=allow_pwned)
 
 

@@ -10,7 +10,7 @@ from app.main import app
 
 @pytest.fixture(autouse=True)
 def _no_hibp(monkeypatch):
-    monkeypatch.setattr("app.main.password_breach_count", lambda pw: 0)
+    monkeypatch.setattr("app.auth.password_breach_count", lambda pw: 0)
 
 
 def _login(client, username="alice", password="hunter2-secret"):

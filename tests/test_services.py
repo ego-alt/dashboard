@@ -1,6 +1,7 @@
 """Label-based service discovery + the protected-container anti-lockout guard."""
 
-from app import main, services
+from app import services
+from app.routes import containers
 
 
 def _candidate(name, status="running", **labels):
@@ -160,7 +161,7 @@ def test_results_sorted_by_display_name(client, make_user, monkeypatch):
 def test_protected_container_refused_even_for_admin(client, make_user, monkeypatch):
     make_user(username="boss", password="hunter2-pass", is_admin=True)
     client.post("/login", data={"username": "boss", "password": "hunter2-pass"})
-    monkeypatch.setattr(main, "resolve_container_name", lambda _id: "home-nginx")
+    monkeypatch.setattr(containers, "resolve_container_name", lambda _id: "home-nginx")
     r = client.post("/containers/anyid/stop")
     assert r.status_code == 409
     assert "protected" in r.json()["detail"]
@@ -169,9 +170,9 @@ def test_protected_container_refused_even_for_admin(client, make_user, monkeypat
 def test_non_protected_container_allowed_for_admin(client, make_user, monkeypatch):
     make_user(username="boss", password="hunter2-pass", is_admin=True)
     client.post("/login", data={"username": "boss", "password": "hunter2-pass"})
-    monkeypatch.setattr(main, "resolve_container_name", lambda _id: "some-app")
+    monkeypatch.setattr(containers, "resolve_container_name", lambda _id: "some-app")
     monkeypatch.setattr(
-        main, "stop_container", lambda _id: {"status": "success", "message": "stopped"}
+        containers, "stop_container", lambda _id: {"status": "success", "message": "stopped"}
     )
     r = client.post("/containers/some-app/stop")
     assert r.status_code == 200

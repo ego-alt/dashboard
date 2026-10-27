@@ -7,7 +7,7 @@ the Pi's deploy script (scripts/deploy.sh, mounted here at DEPLOY_STATE_DIR):
   logs/<name>.log      written by the script: each repo's deploy log
   apps/<name>.json     written here: apps enabled in the Deploy tab
   phone-apps/<name>.*  written here: phone apps, which the script never sees
-                       (nothing to run; see app/phone_apps.py)
+                       (nothing to run; see app/routes/phone_apps.py)
   requests/<name>      written here: "deploy now"; a systemd path unit starts
                        the script at once, and the script deletes the file
 
@@ -17,17 +17,13 @@ must come up healthy, and a bad commit is rolled back.
 import json
 import os
 import pathlib
-import threading
-import time
-import urllib.error
-import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from app import github
 from app.auth import current_admin
 from app.models import User
 from app.stack_manifest import ICON_MAX_BYTES, ManifestError, app_name, name_problem, parse, required_files
@@ -35,8 +31,7 @@ from app.stack_manifest import ICON_MAX_BYTES, ManifestError, app_name, name_pro
 router = APIRouter(prefix="/deploy", tags=["deploy"])
 
 STATE_DIR = pathlib.Path(os.environ.get("DEPLOY_STATE_DIR", "/deploy"))
-OWNER = os.environ.get("GITHUB_OWNER", "ego-alt")
-TOKEN = os.environ.get("DEPLOY_GITHUB_TOKEN", "")
+OWNER = github.OWNER
 
 # The stack's own repos: deployed by the same script, listed first.
 CORE = [
@@ -49,70 +44,6 @@ CORE = [
      "title": "Calendar"},
     {"name": "tapes", "repo": f"{OWNER}/tapes", "branch": "main", "container": "music", "title": "Tapes"},
 ]
-
-_cache: dict[str, tuple[float, Any]] = {}
-_lock = threading.Lock()
-# Why GitHub last failed to answer, shown on the page ("" when it's fine).
-github_problem = ""
-
-
-def _cached(key: str, ttl: float, fetch):
-    """Cache a GitHub answer for `ttl` seconds; a failure (None) for 30."""
-    now = time.monotonic()
-    with _lock:
-        hit = _cache.get(key)
-        if hit and now - hit[0] < (ttl if hit[1] is not None else 30):
-            return hit[1]
-    value = fetch()
-    with _lock:
-        _cache[key] = (now, value)
-    return value
-
-
-def _get(url: str, *, api: bool = True, timeout: int = 10,
-         accept: str = "application/vnd.github+json") -> tuple[int, bytes]:
-    headers = {"User-Agent": "home-stack-dashboard"}
-    if api:
-        headers["Accept"] = accept
-        if TOKEN:
-            headers["Authorization"] = f"Bearer {TOKEN}"
-    try:
-        with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=timeout) as res:
-            return res.status, res.read()
-    except urllib.error.HTTPError as e:
-        return e.code, b""
-    except (urllib.error.URLError, TimeoutError, OSError):
-        return 0, b""
-
-
-def _api(path: str):
-    global github_problem
-    status, body = _get(f"https://api.github.com{path}")
-    if status in (403, 429):
-        github_problem = ("GitHub's rate limit is used up for now"
-                          + ("." if TOKEN else "; set DEPLOY_GITHUB_TOKEN on the Pi to raise it."))
-    elif status == 401:
-        github_problem = "GitHub refused DEPLOY_GITHUB_TOKEN; it may have expired."
-    elif status == 0:
-        github_problem = "GitHub isn't answering."
-    elif status == 200:
-        github_problem = ""
-    if status != 200:
-        return None
-    try:
-        return json.loads(body)
-    except ValueError:
-        return None
-
-
-def _raw(repo: str, branch: str, path: str) -> tuple[int, str]:
-    if TOKEN:   # through the API, so private repos work too
-        status, body = _get(f"https://api.github.com/repos/{repo}/contents/{path}?ref={branch}",
-                            accept="application/vnd.github.raw")
-    else:       # raw.githubusercontent.com doesn't count against the API's rate limit
-        status, body = _get(f"https://raw.githubusercontent.com/{repo}/{branch}/{path}", api=False)
-    return status, body.decode("utf-8", "replace") if status == 200 else ""
-
 
 # ---------- the shared folder ----------
 
@@ -144,56 +75,15 @@ def request_deploy(name: str):
     (folder / name).write_text(datetime.now(timezone.utc).isoformat())
 
 
-# ---------- GitHub ----------
-
-LATEST_TTL = 120
-
-
-def cached_latest(repo: str, branch: str) -> dict | None:
-    """The latest commit if it's already cached and fresh; never asks GitHub."""
-    hit = _cache.get(f"commit:{repo}:{branch}")
-    return hit[1] if hit and time.monotonic() - hit[0] < LATEST_TTL else None
-
-
-def latest_commit(repo: str, branch: str) -> dict | None:
-    def fetch():
-        commit = _api(f"/repos/{repo}/commits/{branch}")
-        if not commit:
-            return None
-        sha = commit["sha"]
-        runs = (_api(f"/repos/{repo}/actions/workflows/ci.yml/runs?head_sha={sha}&per_page=5") or {}).get(
-            "workflow_runs", [])
-        if not runs:
-            ci = "none"
-        elif any(r["status"] != "completed" for r in runs):
-            ci = "running"
-        else:
-            ci = "passed" if all(r["conclusion"] == "success" for r in runs) else "failed"
-        return {"sha": sha, "message": commit["commit"]["message"].splitlines()[0][:120],
-                "at": commit["commit"]["committer"]["date"], "ci": ci}
-    return _cached(f"commit:{repo}:{branch}", LATEST_TTL, fetch)
-
-
 def owner_repos() -> list[dict]:
-    def fetch():
-        # With a token, the owner's private repos too (those it's allowed to read).
-        repos = _api("/user/repos?affiliation=owner&per_page=100&sort=pushed" if TOKEN
-                     else f"/users/{OWNER}/repos?per_page=100&sort=pushed")
-        if repos is None:
-            return None
-        repos = [r for r in repos if r["full_name"].split("/")[0].lower() == OWNER.lower()]
-        return [{"repo": r["full_name"], "name": app_name(r["full_name"]), "description": r.get("description") or "",
-                 "branch": r.get("default_branch") or "main", "pushed_at": r.get("pushed_at"),
-                 "private": r.get("private", False)}
-                for r in repos if not r.get("fork") and not r.get("archived")]
-    repos = _cached(f"repos:{OWNER}", 300, fetch)
+    repos = github.owner_repos()
     if repos is None:
-        raise HTTPException(502, github_problem or "Couldn't list your GitHub repos.")
+        raise HTTPException(502, github.problem or "Couldn't list your GitHub repos.")
     return repos
 
 
 def phone_apps() -> list[dict]:
-    from app.phone_apps import registered
+    from app.routes.phone_apps import registered
     return registered()
 
 
@@ -202,7 +92,7 @@ def check_repo(repo: str, branch: str) -> dict:
     (kind = "android") needs no Dockerfile: it's listed, not served."""
     name = app_name(repo)
     taken = {a["name"] for a in CORE} | {a["name"] for a in enabled_apps()} | {a["name"] for a in phone_apps()}
-    status, text = _raw(repo, branch, "homestack.toml")
+    status, text = github.raw(repo, branch, "homestack.toml")
     manifest, detail = None, ""
     if status != 200:
         detail = "Add homestack.toml (title, port, health path); see the dashboard's docs/APPS.md."
@@ -212,7 +102,7 @@ def check_repo(repo: str, branch: str) -> dict:
         except ManifestError as e:
             detail = str(e)
     kind = manifest["kind"] if manifest else "web"
-    files = {path: _raw(repo, branch, path) for path in required_files(kind) if path != "homestack.toml"}
+    files = {path: github.raw(repo, branch, path) for path in required_files(kind) if path != "homestack.toml"}
     checks = []
     problem = name_problem(name)
     checks.append({"label": f"Served at /{name}/" if kind == "web" else f"Listed under Phone apps as {name}",
@@ -223,7 +113,7 @@ def check_repo(repo: str, branch: str) -> dict:
                        "detail": "" if files["Dockerfile"][0] == 200 else "Add a Dockerfile at the repo's root."})
     checks.append({"label": "homestack.toml", "ok": manifest is not None, "detail": detail})
     if manifest and manifest["icon"]:
-        status, text = _raw(repo, branch, manifest["icon"])
+        status, text = github.raw(repo, branch, manifest["icon"])
         ok = status == 200 and "<svg" in text and len(text.encode()) <= ICON_MAX_BYTES
         checks.append({"label": f"Icon ({manifest['icon']})", "ok": ok,
                        "detail": "" if ok else "homestack.toml names an icon that isn't an SVG in the repo (64 KB at most)."})
@@ -254,7 +144,7 @@ def _row(app: dict, status: dict, containers: dict, queued: set[str], kind: str)
         "name": app["name"], "kind": kind, "repo": app["repo"], "branch": app["branch"],
         "title": app.get("title") or app["name"], "part_of": app.get("part_of"),
         "deployed": deployed,
-        "latest": cached_latest(app["repo"], app["branch"]),
+        "latest": github.cached_latest(app["repo"], app["branch"]),
         "container": {"state": container["state"], "status": container.get("status")} if container else None,
         "queued": app.get("part_of", app["name"]) in queued,
     }
@@ -271,15 +161,15 @@ def list_apps(_: User = Depends(current_admin)):
     rows = [_row(a, status, containers, queued, "core") for a in CORE]
     for app in enabled_apps():
         rows.append(_row({**app, "container": app["name"]}, status, containers, queued, "app"))
-    from app.phone_apps import latest_release
+    from app.routes.phone_apps import latest_release
     for app in phone_apps():      # nothing deployed: what matters is the newest release
         release = latest_release(app)
         rows.append({"name": app["name"], "kind": "phone", "repo": app["repo"], "branch": app["branch"],
                      "title": app.get("title") or app["name"], "part_of": None, "deployed": None,
-                     "latest": cached_latest(app["repo"], app["branch"]), "container": None, "queued": False,
+                     "latest": github.cached_latest(app["repo"], app["branch"]), "container": None, "queued": False,
                      "release": {"version_code": release["version_code"], "version_name": release["version_name"],
                                  "published_at": release["published_at"]} if release else None})
-    return {"apps": rows, "owner": OWNER, "github_problem": github_problem}
+    return {"apps": rows, "owner": OWNER, "github_problem": github.problem}
 
 
 def _stack() -> list[dict]:
@@ -293,9 +183,9 @@ def list_latest(_: User = Depends(current_admin)):
     apps = _stack()
     repos = sorted({(a["repo"], a.get("branch", "main")) for a in apps})
     with ThreadPoolExecutor(max_workers=8) as pool:
-        found = dict(zip(repos, pool.map(lambda r: latest_commit(*r), repos), strict=True))
+        found = dict(zip(repos, pool.map(lambda r: github.latest_commit(*r), repos), strict=True))
     return {"latest": {a["name"]: found[(a["repo"], a.get("branch", "main"))] for a in apps},
-            "github_problem": github_problem}
+            "github_problem": github.problem}
 
 
 @router.get("/repos")
@@ -303,7 +193,7 @@ def list_repos(_: User = Depends(current_admin)):
     on_stack = {a["repo"].lower() for a in _stack()}
     repos = [r for r in owner_repos() if r["repo"].lower() not in on_stack]
     # Without a token GitHub lists only public repos.
-    return {"owner": OWNER, "repos": repos, "private_hidden": not TOKEN}
+    return {"owner": OWNER, "repos": repos, "private_hidden": not github.TOKEN}
 
 
 @router.get("/repos/{name}/check")
@@ -327,7 +217,7 @@ def add_app(body: AddApp, user: User = Depends(current_admin)):
     if not result["ok"]:
         raise HTTPException(400, "This repo isn't ready yet: " + "; ".join(
             c["detail"] or c["label"] for c in result["checks"] if not c["ok"]))
-    if repo["private"] and not TOKEN:
+    if repo["private"] and not github.TOKEN:
         raise HTTPException(400, "Private repos need DEPLOY_GITHUB_TOKEN in the dashboard's .env on the Pi.")
     manifest = result["manifest"]
     if manifest["kind"] == "android":
@@ -356,7 +246,7 @@ def _add_phone_app(result: dict, repo: dict, manifest: dict, user: User) -> dict
              "package": manifest["package"], "private": repo["private"],
              "added_by": user.username, "added_at": datetime.now(timezone.utc).isoformat()}
     if manifest["icon"]:
-        status, text = _raw(repo["repo"], repo["branch"], manifest["icon"])
+        status, text = github.raw(repo["repo"], repo["branch"], manifest["icon"])
         if status == 200 and "<svg" in text and len(text.encode()) <= ICON_MAX_BYTES:
             (folder / f"{result['name']}.svg").write_text(text)
     (folder / f"{result['name']}.json").write_text(json.dumps(entry, indent=2))
