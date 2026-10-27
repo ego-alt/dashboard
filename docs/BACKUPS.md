@@ -10,6 +10,7 @@ so the bucket never sees plaintext. A single snapshot contains:
 | App config | each app's `.env` | Secrets; safe because the repo is encrypted. |
 | Calendar attachments | `calendar/instance/attachments/` | Scanner uploads. |
 | Situation snapshots | `situation/instance/snapshots/` | The saved news your labels refer to. |
+| Phone app signing keys | `~/keys/` on the Pi | Each phone app's release key and its password. Lose one and phones refuse every update to that app. |
 | Books | `/mnt/backup/books` | EPUB library. |
 | Music | `/mnt/backup/tapes` | MP3s. |
 

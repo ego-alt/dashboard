@@ -154,6 +154,11 @@ if dir="$(resolve_app_dir situation)"; then
   [[ -d "$dir/instance/groundtruth" ]] && PATHS+=( "$dir/instance/groundtruth" )
 fi
 
+# The phone apps' signing keys (restic encrypts them): lose one and phones
+# refuse every update to that app, so it can only be reinstalled from scratch.
+KEYS_DIR="${SIGNING_KEYS_DIR:-$STACK_ROOT/../keys}"
+[[ -d "$KEYS_DIR" ]] && PATHS+=( "$KEYS_DIR" )
+
 # Bulk media.
 [[ -d "$BOOK_DIR"  ]] && PATHS+=( "$BOOK_DIR" )  || log "WARN  books dir $BOOK_DIR missing — skipping"
 [[ -d "$MUSIC_DIR" ]] && PATHS+=( "$MUSIC_DIR" ) || log "WARN  music dir $MUSIC_DIR missing — skipping"
