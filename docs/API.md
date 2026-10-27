@@ -32,6 +32,16 @@ Everything the dashboard serves, for the SPA, nginx, native apps and the MCP ser
 | `/stats/system` | GET | user | Host CPU, memory, disk, temperature |
 | `/stats/containers/{id}` | GET | user | One container's CPU, memory, network |
 | `/backups/status` | GET | admin | Last backup run (reads the status file the backup script writes) |
+| `/deploy/apps` | GET / POST | admin | The stack's apps with what the Pi runs / add an app from GitHub (`name`); a phone app is listed, not deployed |
+| `/deploy/apps/latest` | GET | admin | Each app's latest commit on GitHub with its CI result |
+| `/deploy/apps/{name}/deploy` | POST | admin | Deploy the latest commit now (it still has to pass CI) |
+| `/deploy/apps/{name}` | DELETE | admin | Take an added app off the stack |
+| `/deploy/apps/{name}/log` | GET | admin | The deploy script's log for it (`?tail=`) |
+| `/deploy/repos`, `/deploy/repos/{name}/check` | GET | admin | Your GitHub repos not on the stack / whether one can join, as a checklist |
+| `/phone-apps` | GET | user | Phone apps with their latest release, whether its APK is here, and the version you have |
+| `/phone-apps/{name}/latest` | GET | user or token | The app's update check (`installed`, `installed_name`): records the version you have, says whether to update |
+| `/phone-apps/{name}/download` | GET | user or token | The latest APK |
+| `/phone-apps/{name}/icon.svg` | GET | user | Its icon |
 
 `/auth/verify` is `internal` in nginx, so outside clients get a 404; only nginx's own subrequests reach it.
 
@@ -39,4 +49,4 @@ Everything the dashboard serves, for the SPA, nginx, native apps and the MCP ser
 
 Native clients (e.g. the document scanner uploading to the calendar) can't hold a session cookie, so they use a long-lived API token, made in **Settings → API tokens** (shown once; only its SHA-256 hash is stored). The client sends `Authorization: Bearer <token>`; nginx passes it on the `auth_request` to `/auth/verify`, which resolves it to its owner and returns `X-User`, so the token works for the proxied apps exactly like a browser session.
 
-A token reaches the apps **only**: the dashboard's own endpoints (`/containers`, `/me`, token management) stay cookie-only. Revoke it from the same screen.
+A token reaches the apps, plus the two endpoints a phone app needs to update itself (`/phone-apps/{name}/latest` and `/download`). Everything else in the dashboard (`/containers`, `/me`, token management) stays cookie-only. Revoke it from the same screen.

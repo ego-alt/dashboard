@@ -39,3 +39,7 @@ venv/
 .env
 .bootstrap-credentials
 tls/
+
+# Runtime data (the DB, APKs, deploy state): only the folder itself is tracked
+data/*
+!data/.gitkeep
