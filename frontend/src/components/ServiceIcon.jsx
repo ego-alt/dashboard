@@ -20,11 +20,11 @@ function resolveIconKey(icon) {
   return key && Object.hasOwn(ICONS, key) ? key : null;
 }
 
-function IconShell({ slug, textClass, accent, children }) {
+function IconShell({ slug, textClass, accent, large, children }) {
   const text = accentFor(slug);
   return (
     <span
-      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border"
+      className={`flex shrink-0 items-center justify-center border ${large ? 'h-12 w-12 rounded-xl' : 'h-10 w-10 rounded-lg'}`}
       style={{ background: 'var(--color-bg-inset)', borderColor: 'var(--color-border)' }}
     >
       <span className={accent ? undefined : (textClass ?? text)} style={accent ? { color: accent } : undefined}>{children}</span>
@@ -93,27 +93,29 @@ const ICONS = {
   music: MusicIcon,
 };
 
-function Monogram({ name, slug, accent }) {
+function Monogram({ name, slug, accent, large }) {
   const letter = (name || '?').trim().charAt(0).toUpperCase() || '?';
   const text = accent ? '' : accentFor(slug);
   return (
-    <IconShell slug={slug} accent={accent}>
-      <span className={`text-sm font-semibold tracking-tight ${text}`}>{letter}</span>
+    <IconShell slug={slug} accent={accent} large={large}>
+      <span className={`${large ? 'text-lg' : 'text-sm'} font-semibold tracking-tight ${text}`}>{letter}</span>
     </IconShell>
   );
 }
 
 // An added app's own SVG, used as a mask so it takes the tile's ink colour.
-function UrlIcon({ url }) {
+function UrlIcon({ url, large }) {
   const mask = `url("${url}") center / contain no-repeat`;
-  return <span className="block h-5 w-5 bg-current" style={{ mask, WebkitMask: mask }} aria-hidden />;
+  return <span className={`block bg-current ${large ? 'h-6 w-6' : 'h-5 w-5'}`} style={{ mask, WebkitMask: mask }} aria-hidden />;
 }
 
-export default function ServiceIcon({ icon, iconUrl, accent, name, slug }) {
+/** A tile's icon on its dark chip: the app's own SVG, a built-in icon, or its
+ * initial. `large` is the phone-app size (48px instead of 40). */
+export default function ServiceIcon({ icon, iconUrl, accent, name, slug, large = false }) {
   if (iconUrl) {
     return (
-      <IconShell slug={slug} accent={accent}>
-        <UrlIcon url={iconUrl} />
+      <IconShell slug={slug} accent={accent} large={large}>
+        <UrlIcon url={iconUrl} large={large} />
       </IconShell>
     );
   }
@@ -121,10 +123,10 @@ export default function ServiceIcon({ icon, iconUrl, accent, name, slug }) {
   const Icon = key ? ICONS[key] : null;
   if (Icon) {
     return (
-      <IconShell slug={slug} textClass={ICON_COLORS[key]} accent={accent}>
+      <IconShell slug={slug} textClass={ICON_COLORS[key]} accent={accent} large={large}>
         <Icon />
       </IconShell>
     );
   }
-  return <Monogram name={name} slug={slug} accent={accent} />;
+  return <Monogram name={name} slug={slug} accent={accent} large={large} />;
 }

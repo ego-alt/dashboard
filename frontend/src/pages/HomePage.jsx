@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiJson, backupStatus, containerAction, phoneApps, uptime } from '../api';
 import { useAuth } from '../auth.jsx';
@@ -72,7 +72,7 @@ function Tile({ s, uptime30, isAdmin, onStart, busy }) {
   const actions = isAdmin && problem && s.state !== 'unknown';
   return (
     <div
-      className={`bp-card bp-ticks relative flex h-full flex-col gap-5 px-5 py-5 ${down ? '' : 'bp-card-link'}`}
+      className={`bp-card bp-ticks relative flex h-full min-h-[var(--tile-h)] flex-col gap-5 px-5 py-5 ${down ? '' : 'bp-card-link'}`}
       title={down ? `${s.display_name} is down` : undefined}
     >
       {/* The whole tile opens the app in a new tab, unless the app is down. */}
@@ -140,76 +140,136 @@ function megabytes(bytes) {
   return bytes ? `${(bytes / 1048576).toFixed(1)}\u00a0MB` : '';
 }
 
-/** Install, Update or Up to date. The app reports what it has when it checks
- * for updates, so the dashboard knows which to offer. */
-function PhoneAction({ a }) {
-  const latest = a.latest;
-  if (!latest) return <span className="text-xs text-[var(--color-text-muted)]">No release yet</span>;
+/** Where a phone app stands for you. The app reports what it has when it
+ * checks for updates, so the dashboard knows which to offer. */
+function phoneState(a) {
+  if (!a.latest) return 'none';
   const have = a.installed?.version_code;
-  if (have != null && have >= latest.version_code)
-    return <span className="text-xs text-[var(--color-text-muted)]">Up to date ✓</span>;
-  if (!a.ready) return <span className="text-xs text-[var(--color-text-muted)]">Preparing…</span>;
+  if (have == null) return 'get';
+  return have >= a.latest.version_code ? 'current' : 'update';
+}
+
+/** The corner of the icon: a dot for an update, a tick when you're up to date. */
+function StateBadge({ state }) {
+  if (state === 'update')
+    return <span className="absolute -right-1 -top-1 h-3.5 w-3.5 rounded-full border-2 border-[var(--color-bg-elevated)] bg-[var(--color-accent)]" />;
+  if (state === 'current')
+    return (
+      <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-[var(--color-bg-elevated)] bg-green-400 text-[var(--color-bg-elevated)]">
+        <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" aria-hidden><path d="M2.5 6.2l2.2 2.2 4.8-4.9" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      </span>
+    );
+  return null;
+}
+
+const STATE_LABEL = { update: 'update available', current: 'up to date', get: 'not installed', none: 'no release yet' };
+
+/** A compact square: the icon, the name, and the latest version and size. Tap for the rest. */
+function PhoneTile({ a, onOpen }) {
+  const state = phoneState(a);
   return (
-    <a href={`/phone-apps/${encodeURIComponent(a.name)}/download`} download className="btn btn-primary text-sm">
-      {have != null ? `Update to ${latest.version_name}` : 'Install'}
+    <button
+      type="button"
+      onClick={() => onOpen(a)}
+      className="bp-card bp-ticks bp-card-link flex h-[var(--tile-h)] flex-col items-center justify-center gap-1.5 px-2 py-3 text-center"
+      aria-label={`${a.title}: ${STATE_LABEL[state]}`}
+    >
+      <span className="relative">
+        <ServiceIcon iconUrl={a.icon_url} accent={a.accent} name={a.title} slug={a.name} large />
+        <StateBadge state={state} />
+      </span>
+      <span className="w-full truncate text-sm font-medium text-[var(--color-text-primary)]">{a.title}</span>
+      <span className={`text-xs ${state === 'update' ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-muted)]'}`}>
+        {a.latest
+          ? state === 'update' ? `Update · ${a.latest.version_name}` : [a.latest.version_name, megabytes(a.latest.size)].filter(Boolean).join(' · ')
+          : 'No release yet'}
+      </span>
+    </button>
+  );
+}
+
+/** Install, Update or Up to date, full width at the foot of the sheet. */
+function PhoneAction({ a }) {
+  const state = phoneState(a);
+  const quiet = 'block w-full rounded border border-[var(--color-border)] py-2.5 text-center text-sm text-[var(--color-text-muted)]';
+  if (state === 'none') return <p className={quiet}>No release yet: its CI publishes them</p>;
+  if (state === 'current') return <p className={quiet}>Up to date ✓</p>;
+  if (!a.ready) return <p className={quiet}>Preparing… the Pi is fetching it</p>;
+  return (
+    <a href={`/phone-apps/${encodeURIComponent(a.name)}/download`} download className="btn btn-primary w-full justify-center py-2.5">
+      {state === 'update' ? `Update to ${a.latest.version_name}` : 'Install'}
     </a>
   );
 }
 
-function PhoneTile({ a }) {
+/** A phone app's details: a sheet from the bottom on phones, a panel in the
+ * middle on wider screens. Escape, × or a tap outside closes it. */
+function PhoneSheet({ a, onClose }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const dialog = ref.current;
+    dialog?.showModal();
+    return () => dialog?.close();
+  }, []);
   const latest = a.latest;
-  const behind = a.installed && latest && a.installed.version_code < latest.version_code;
+  const behind = phoneState(a) === 'update';
   return (
-    <div className="bp-card bp-ticks flex h-full flex-col gap-4 px-5 py-5">
-      <div className="flex items-start gap-3">
-        <ServiceIcon iconUrl={a.icon_url} accent={a.accent} name={a.title} slug={a.name} />
-        <div className="min-w-0 flex-1">
-          <div className="font-medium text-[var(--color-text-primary)]">{a.title}</div>
-          {a.description && (
-            <div className="mt-0.5 truncate text-sm text-[var(--color-text-muted)]" title={a.description}>
-              {a.description}
-            </div>
-          )}
+    <dialog
+      ref={ref}
+      className="app-sheet"
+      aria-labelledby="app-sheet-title"
+      onClose={onClose}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="flex flex-col gap-4 p-5">
+        <div className="flex items-start gap-4">
+          <ServiceIcon iconUrl={a.icon_url} accent={a.accent} name={a.title} slug={a.name} large />
+          <div className="min-w-0 flex-1">
+            <h2 id="app-sheet-title" className="text-base font-medium text-[var(--color-text-primary)]">{a.title}</h2>
+            {a.description && <p className="mt-0.5 text-sm text-[var(--color-text-secondary)]">{a.description}</p>}
+          </div>
+          <button type="button" className="btn btn-ghost -mr-2 -mt-2" onClick={onClose} aria-label="Close">×</button>
         </div>
-        <span className="shrink-0 self-start">
-          <PhoneAction a={a} />
-        </span>
+        {latest && (
+          <p className="text-xs text-[var(--color-text-muted)]">
+            {[latest.version_name, megabytes(latest.size), ago(latest.published_at)].filter(Boolean).join(' · ')}
+            {a.installed && (
+              <span className={behind ? 'text-[var(--color-accent)]' : undefined}>
+                {' · '}your phone has {a.installed.version_name || a.installed.version_code}
+              </span>
+            )}
+          </p>
+        )}
+        {latest?.notes && (
+          <div>
+            <h3 className="mb-1 text-xs font-medium text-[var(--color-text-secondary)]">What’s new</h3>
+            <p className="max-h-48 overflow-y-auto whitespace-pre-line text-sm text-[var(--color-text-secondary)]">{latest.notes}</p>
+          </div>
+        )}
+        <PhoneAction a={a} />
+        <p className="text-xs text-[var(--color-text-muted)]">
+          {isAndroid
+            ? 'The first install asks you to allow installs from this browser. After that the app offers its own updates.'
+            : 'Open this page on your Android phone to install. After that the app offers its own updates.'}
+        </p>
       </div>
-      {latest && (
-        <div className="text-xs text-[var(--color-text-muted)]">
-          {[latest.version_name, megabytes(latest.size), ago(latest.published_at)]
-            .filter(Boolean).join(' · ')}
-          {a.installed && (
-            <span className={behind ? 'text-[var(--color-accent)]' : undefined}>
-              {' · '}your phone has {a.installed.version_name || a.installed.version_code}
-            </span>
-          )}
-        </div>
-      )}
-      {latest?.notes && (
-        <details className="text-sm text-[var(--color-text-secondary)]">
-          <summary className="cursor-pointer text-xs text-[var(--color-text-muted)]">What’s new</summary>
-          <p className="mt-2 whitespace-pre-line">{latest.notes}</p>
-        </details>
-      )}
-    </div>
+    </dialog>
   );
 }
 
-/** Android apps from your repos: install them here, and they update themselves. */
+/** Android apps from your repos, as a shelf of small tiles: install them here,
+ * and they update themselves. */
 function PhoneApps({ apps }) {
+  const [open, setOpen] = useState(null);
   if (!apps?.length) return null;
+  const current = open && apps.find((a) => a.name === open);
   return (
     <section className="mt-10" aria-labelledby="phone-apps">
-      <h2 id="phone-apps" className="mb-1 text-sm font-medium text-[var(--color-text-secondary)]">Phone apps</h2>
-      <p className="mb-3 text-xs text-[var(--color-text-muted)]">
-        {isAndroid
-          ? 'The first install asks you to allow installs from this browser. After that the apps offer their own updates.'
-          : 'Open this page on your Android phone to install. After that the apps offer their own updates.'}
-      </p>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {apps.map((a) => <PhoneTile key={a.name} a={a} />)}
+      <h2 id="phone-apps" className="mb-3 text-sm font-medium text-[var(--color-text-secondary)]">Phone apps</h2>
+      <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+        {apps.map((a) => <PhoneTile key={a.name} a={a} onOpen={(x) => setOpen(x.name)} />)}
       </div>
+      {current && <PhoneSheet a={current} onClose={() => setOpen(null)} />}
     </section>
   );
 }

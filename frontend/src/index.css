@@ -36,6 +36,7 @@
   --space-5: 20px;
   --space-8: 40px;
   --radius-sm: 4px;
+  --tile-h: 7.75rem;                   /* every Services tile, web app or phone app: one row height */
   --radius-md: 8px;
   --radius-lg: 16px;
   --radius-pill: 9999px;
@@ -234,3 +235,26 @@ body {
 }
 .input:focus { outline: none; border-color: var(--color-accent); }
 .input::placeholder { color: var(--color-text-muted); }
+
+/* A phone app's details (HomePage.jsx): a sheet from the bottom on phones, a
+ * panel in the middle on wider screens. A <dialog>, so it sits above the
+ * bottom nav and Escape closes it. */
+.app-sheet {
+  margin: auto auto 0;
+  width: 100%;
+  max-width: 100%;
+  padding: 0 0 env(safe-area-inset-bottom);
+  border: 1px solid var(--color-border);
+  border-radius: 16px 16px 0 0;
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+}
+.app-sheet::backdrop { background: var(--color-bg-overlay); }
+@media (min-width: 640px) {
+  .app-sheet { margin: auto; max-width: 28rem; border-radius: var(--radius-sm); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .app-sheet[open] { animation: app-sheet-in 0.18s ease-out; }
+}
+@keyframes app-sheet-in { from { transform: translateY(12px); opacity: 0; } }
+
