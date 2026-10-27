@@ -346,7 +346,11 @@ def _add_phone_app(result: dict, repo: dict, manifest: dict, user: User) -> dict
     """A phone app is listed, not deployed: its details and icon go where
     Services reads them, and the deploy script never sees it."""
     folder = STATE_DIR / "phone-apps"
-    folder.mkdir(parents=True, exist_ok=True)
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+    except PermissionError:
+        raise HTTPException(500, "The dashboard can't write to phone-apps/ in the deploy folder; run "
+                            "scripts/install-deploy-timer.sh on the Pi again to set its permissions.") from None
     entry = {"name": result["name"], "repo": repo["repo"], "branch": repo["branch"], "kind": "android",
              "title": manifest["title"], "description": manifest["description"], "accent": manifest["accent"],
              "package": manifest["package"], "private": repo["private"],

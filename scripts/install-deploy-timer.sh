@@ -25,12 +25,13 @@ if ! id -nG "$RUN_AS" | grep -qw docker; then
 fi
 
 chmod +x "$SCRIPT"
-mkdir -p "$STATE_DIR"/{apps,requests,logs,generated/nginx}
+mkdir -p "$STATE_DIR"/{apps,phone-apps,requests,logs,generated/nginx}
 chown -R "$RUN_AS": "$STATE_DIR"
 # The dashboard container (uid 10001) writes which apps are enabled and
-# "deploy now" requests here; the deploy script reads and clears them.
-chown 10001 "$STATE_DIR/apps" "$STATE_DIR/requests"
-chmod 0777 "$STATE_DIR/apps" "$STATE_DIR/requests"
+# "deploy now" requests here; the deploy script reads and clears them. It
+# also keeps the phone apps it lists in phone-apps/ (the script never reads it).
+chown 10001 "$STATE_DIR/apps" "$STATE_DIR/phone-apps" "$STATE_DIR/requests"
+chmod 0777 "$STATE_DIR/apps" "$STATE_DIR/phone-apps" "$STATE_DIR/requests"
 
 cat >/etc/systemd/system/home-stack-deploy.service <<EOF
 [Unit]
