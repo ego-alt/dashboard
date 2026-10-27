@@ -86,6 +86,7 @@ Inside compose: `docker compose exec dashboard python -m app.cli <command>`.
 - [`docs/API.md`](docs/API.md): every endpoint, and how API tokens work.
 - [`docs/DEPLOY.md`](docs/DEPLOY.md): the Pi's pull-based auto-deploy.
 - [`docs/BACKUPS.md`](docs/BACKUPS.md): backups and restores.
-- [`docs/ui-spec.md`](docs/ui-spec.md): the design system the four apps share.
+- [`docs/design-guidelines.md`](docs/design-guidelines.md): the general design principles every app follows, and how design work is done.
+- [`docs/ui-spec.md`](docs/ui-spec.md): each app's theme and the products it learns from, and the rules every stylesheet follows.
 - [`mcp/README.md`](mcp/README.md): the MCP server.
 - [`docs/roadmap.md`](docs/roadmap.md): what's left to do.
