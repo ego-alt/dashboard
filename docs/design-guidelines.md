@@ -53,6 +53,7 @@ Pick one existing version as the model and match it; never build a second.
 ### 6. Remove before adding
 
 - Cut what isn't used: the Today button, full screen, logout, the sleep timer, keyboard shortcuts in a phone-first app.
+- Choose a good default instead of offering a setting nobody will change: Tapes always levels volume and keeps playing.
 - Remove the path that creates an awkward state rather than designing a screen to manage it. Nothing should produce a comic without a series, so "Needs a series" went.
 - No screens, settings or features that one part of an app has and its model doesn't.
 
