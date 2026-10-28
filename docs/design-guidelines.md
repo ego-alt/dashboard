@@ -31,6 +31,7 @@ Pick one existing version as the model and match it; never build a second.
 - The same kind of task looks and works the same way. Rip a link, follow a podcast, new tape and new show all use one sheet with a single field.
 - The same thing offers the same options everywhere: every container gets the same buttons.
 - Controls side by side share size, font and width; tiles in a row share a height.
+- Text keeps its size from one level to the next: going into a list doesn't make its title or rows bigger than where you came from.
 - One part of an app is the model for the rest: comics follow books, and a feature one lacks isn't added to the other.
 
 ### 4. Exact spacing and alignment
@@ -71,7 +72,8 @@ Pick one existing version as the model and match it; never build a second.
 ### 9. Progress, errors and attention
 
 - Once people have given what's needed, don't hold them up: progress shows where the result will appear.
-- Nothing pushes the page around. Panels that shove content down give way to overlays and rows that don't move what's already there.
+- Things open where they were asked for and never cover unrelated content: a menu opens under its row or bar, and the centrepiece stays in view.
+- Motion runs alongside a change, never as a wait before it.
 - Only real failures are reported: a slow job isn't announced as "stalled".
 - Return people to where they were, like the last tab, and mark stale data with a quiet notice, not an alarm.
 - Avoid demanding attention. Situation exists because notifications get swiped away.
