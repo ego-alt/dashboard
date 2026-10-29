@@ -28,7 +28,8 @@ Details are small and exact; nothing is added for effect.
 Pick one existing version as the model and match it; never build a second.
 
 - One component per job: one dropdown, one icon set, one button style, one dialog, with the same corners throughout.
-- The same kind of task looks and works the same way. Rip a link, follow a podcast, new tape and new show all use one sheet with a single field.
+- The same kind of task looks and works the same way. Rip a link, follow a podcast, new tape and new show all use one field.
+- Whatever opens something also closes it, so it needs no separate close button.
 - The same thing offers the same options everywhere: every container gets the same buttons.
 - Controls side by side share size, font and width; tiles in a row share a height.
 - Text keeps its size from one level to the next: going into a list doesn't make its title or rows bigger than where you came from.
@@ -49,6 +50,7 @@ Pick one existing version as the model and match it; never build a second.
 - Bars are thin and single-row.
 - Rows are compact enough to scan without feeling cramped; tiles are neither tall nor squashed.
 - Bars, menus and dialogs use the content's text sizes or smaller: a dialog's title matches the tabs, its buttons the menu items.
+- A row says only what its header doesn't: inside an album, songs don't repeat the album and artist.
 
 ### 6. Remove before adding
 
@@ -75,6 +77,8 @@ Pick one existing version as the model and match it; never build a second.
 - Once people have given what's needed, don't hold them up: progress shows where the result will appear.
 - Things open where they were asked for and never cover unrelated content: a menu opens under its row or bar, and the centrepiece stays in view.
 - Motion runs alongside a change, never as a wait before it.
+- Motion behaves like one mechanism: one drawer open at a time, nested ones shut inner first, and what sits below a closing part moves with it rather than being uncovered.
+- Long moves get more time than short ones, but less than in proportion (about the square root of the distance), so nothing races and nothing drags.
 - Only real failures are reported: a slow job isn't announced as "stalled".
 - Return people to where they were, like the last tab, and mark stale data with a quiet notice, not an alarm.
 - Avoid demanding attention. Situation exists because notifications get swiped away.
