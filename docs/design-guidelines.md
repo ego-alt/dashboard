@@ -22,6 +22,7 @@ Details are small and exact; nothing is added for effect.
 - Nothing is there only for show: the bookshelf view and the deck's speaker went.
 - Prefer the plain option: a plain font, a plain circle icon, a plain header.
 - A small touch is fine when it's quiet and fits, like placeholder covers for books without art.
+- Don't dim part of a text to steer the eye: the context matters as much as the point.
 
 ### 3. One way to do each thing
 
@@ -42,6 +43,7 @@ Pick one existing version as the model and match it; never build a second.
 - Align icons to the top line of the text beside them; close lists with a bottom line on the last row.
 - On phones, keep things flush with the edges.
 - Don't break lines early; let text fill its width.
+- Text wraps around a figure in the corner rather than leaving a gap beneath it, and columns side by side end level.
 
 ### 5. Space goes to content
 
@@ -63,6 +65,7 @@ Pick one existing version as the model and match it; never build a second.
 - Settings appear only when they apply: an English book shows no Chinese voice settings.
 - People see only what they can use, and a view hides controls that don't apply to it.
 - Few options at a time; details open on request.
+- Say each thing once on a page: a name or a count shown in one place isn't repeated in a label, a link and a header.
 
 ### 8. Design for how the app is used
 
