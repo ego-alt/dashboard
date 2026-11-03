@@ -19,6 +19,7 @@ from app.routes import (
     deploy,
     passkeys,
     phone_apps,
+    power,
     services,
     tokens,
     totp,
@@ -108,7 +109,8 @@ def ping():
 # ---------- everything else, by area (app/routes/) ----------
 
 for _router in (account.router, totp.router, passkeys.router, tokens.router, users.router,
-                services.router, containers.router, backups.router, deploy.router, phone_apps.router):
+                services.router, containers.router, backups.router, deploy.router, phone_apps.router,
+                power.router):
     app.include_router(_router)
 
 # The React SPA (built into app/static by Docker or `npm run build`) answers the rest.

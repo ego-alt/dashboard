@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { Routes, Route, Navigate, NavLink } from 'react-router-dom';
+import { apiJson } from './api.js';
 import { RequireAuth, useAuth } from './auth.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import HomePage from './pages/HomePage.jsx';
@@ -20,6 +22,54 @@ function DoorIcon() {
       />
       <circle cx="15" cy="12.5" r="1.1" fill="currentColor" />
     </svg>
+  );
+}
+
+// Power glyph, drawn like the door: shuts the Pi down (admins only).
+function PowerIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden>
+      <path
+        d="M12 3v8M6.6 6.6a8 8 0 1 0 10.8 0"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+// Asks first: once it's off, the Pi stays off until it's unplugged and plugged back in.
+function PowerButton() {
+  const [state, setState] = useState('idle'); // idle | asking | sent | failed
+  async function shutDown() {
+    if (!window.confirm('Shut down the Pi? Every app stops, and it stays off until you unplug it and plug it back in.')) return;
+    setState('asking');
+    try {
+      await apiJson('/system/shutdown', { method: 'POST' });
+      setState('sent');
+    } catch {
+      setState('failed');
+    }
+  }
+  const label = { idle: 'Shut down the Pi', asking: 'Asking the Pi…', sent: 'Shutting down…', failed: "Couldn't ask the Pi to shut down" }[state];
+  return (
+    <>
+      {(state === 'sent' || state === 'failed') && (
+        <span className="text-sm text-[var(--color-text-muted)]">{state === 'sent' ? 'Shutting down…' : "Couldn't shut down"}</span>
+      )}
+      <button
+        onClick={shutDown}
+        disabled={state === 'asking' || state === 'sent'}
+        className="btn btn-ghost"
+        style={{ padding: 6 }}
+        title={label}
+        aria-label={label}
+      >
+        <PowerIcon />
+      </button>
+    </>
   );
 }
 
@@ -54,6 +104,7 @@ function TopBar() {
           <span className="text-sm text-[var(--color-text-muted)]">
             {user?.display_name || user?.username}
           </span>
+          {user?.is_admin && <PowerButton />}
           <button
             onClick={logout}
             className="btn btn-ghost"

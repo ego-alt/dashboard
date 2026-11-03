@@ -38,6 +38,7 @@ Everything the dashboard serves, for the SPA, nginx, native apps and the MCP ser
 | `/deploy/apps/{name}` | DELETE | admin | Take an added app off the stack |
 | `/deploy/apps/{name}/log` | GET | admin | The deploy script's log for it (`?tail=`) |
 | `/deploy/repos`, `/deploy/repos/{name}/check` | GET | admin | Your GitHub repos not on the stack / whether one can join, as a checklist |
+| `/system/shutdown` | POST | admin | Power the Pi off (scripts/power.sh acts on it); it stays off until it's unplugged and plugged back in |
 | `/phone-apps` | GET | user | Phone apps with their latest release, whether its APK is here, and the version you have |
 | `/phone-apps/{name}/latest` | GET | user or token | The app's update check (`installed`, `installed_name`): records the version you have, says whether to update |
 | `/phone-apps/{name}/download` | GET | user or token | The latest APK |

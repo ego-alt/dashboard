@@ -25,13 +25,14 @@ if ! id -nG "$RUN_AS" | grep -qw docker; then
 fi
 
 chmod +x "$SCRIPT"
-mkdir -p "$STATE_DIR"/{apps,phone-apps,requests,logs,generated/nginx}
+mkdir -p "$STATE_DIR"/{apps,phone-apps,requests,power,logs,generated/nginx}
 chown -R "$RUN_AS": "$STATE_DIR"
 # The dashboard container (uid 10001) writes which apps are enabled and
 # "deploy now" requests here; the deploy script reads and clears them. It
-# also keeps the phone apps it lists in phone-apps/ (the script never reads it).
-chown 10001 "$STATE_DIR/apps" "$STATE_DIR/phone-apps" "$STATE_DIR/requests"
-chmod 0777 "$STATE_DIR/apps" "$STATE_DIR/phone-apps" "$STATE_DIR/requests"
+# also keeps the phone apps it lists in phone-apps/ (the script never reads it),
+# and leaves a shutdown request in power/ (scripts/power.sh acts on it).
+chown 10001 "$STATE_DIR/apps" "$STATE_DIR/phone-apps" "$STATE_DIR/requests" "$STATE_DIR/power"
+chmod 0777 "$STATE_DIR/apps" "$STATE_DIR/phone-apps" "$STATE_DIR/requests" "$STATE_DIR/power"
 
 cat >/etc/systemd/system/home-stack-deploy.service <<EOF
 [Unit]
@@ -76,8 +77,33 @@ Unit=home-stack-deploy.service
 WantedBy=paths.target
 EOF
 
+# The power icon in the dashboard leaves power/shutdown: power off (as root).
+POWER="$(dirname "$SCRIPT")/power.sh"
+chmod +x "$POWER"
+cat >/etc/systemd/system/home-stack-power.service <<EOF
+[Unit]
+Description=Power the Pi off when the dashboard asks
+
+[Service]
+Type=oneshot
+Environment=DEPLOY_STATE_DIR=$STATE_DIR
+ExecStart=$POWER
+EOF
+
+cat >/etc/systemd/system/home-stack-power.path <<EOF
+[Unit]
+Description=Watch for a shutdown request from the dashboard
+
+[Path]
+PathExists=$STATE_DIR/power/shutdown
+Unit=home-stack-power.service
+
+[Install]
+WantedBy=paths.target
+EOF
+
 systemctl daemon-reload
-systemctl enable --now home-stack-deploy.timer home-stack-deploy.path
+systemctl enable --now home-stack-deploy.timer home-stack-deploy.path home-stack-power.path
 echo "Installed. Deploys run as $RUN_AS from $SCRIPT every 5 minutes, and at once on a Deploy tab request."
 echo "Add to the dashboard's .env so compose and the dashboard find the deploy state:"
 echo "  DEPLOY_STATE_HOST_DIR=$STATE_DIR"

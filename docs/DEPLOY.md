@@ -21,7 +21,7 @@ From the dashboard folder:
 sudo scripts/install-deploy-timer.sh
 ```
 
-It runs deploys as the user who owns the repos (who must be in the `docker` group), and prints two lines to add to the dashboard's `.env` (`DEPLOY_STATE_HOST_DIR`, `STACK_APPS_COMPOSE`) so compose and the Deploy tab find the deploy state. Optionally add `DEPLOY_GITHUB_TOKEN` there too: a read-only token lifts the limit of 60 API requests an hour, which the Deploy tab can otherwise use up, and lets it see private repos. Make it a fine-grained token for your account with read-only **Contents**, **Actions** and **Metadata**, on all repos or just the ones you'll deploy. It sits in a web-facing container, so don't reuse a broad token. Then:
+It also installs `home-stack-power.path`, which powers the Pi off when an admin taps the power icon in the dashboard (`scripts/power.sh`; `journalctl -u home-stack-power` shows who asked). Re-run it after pulling a version that adds a unit. It runs deploys as the user who owns the repos (who must be in the `docker` group), and prints two lines to add to the dashboard's `.env` (`DEPLOY_STATE_HOST_DIR`, `STACK_APPS_COMPOSE`) so compose and the Deploy tab find the deploy state. Optionally add `DEPLOY_GITHUB_TOKEN` there too: a read-only token lifts the limit of 60 API requests an hour, which the Deploy tab can otherwise use up, and lets it see private repos. Make it a fine-grained token for your account with read-only **Contents**, **Actions** and **Metadata**, on all repos or just the ones you'll deploy. It sits in a web-facing container, so don't reuse a broad token. Then:
 
 ```sh
 journalctl -u home-stack-deploy -f              # watch deploys
