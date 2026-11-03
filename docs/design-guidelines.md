@@ -67,6 +67,13 @@ Pick one existing version as the model and match it; never build a second.
 - Few options at a time; details open on request.
 - Say each thing once on a page: a name or a count shown in one place isn't repeated in a label, a link and a header.
 - Keep the reader in the app. Tapping content opens it in place; links out to another site sit inside the opened item, labelled with where they go and an ↗, never on the headline that also opens it.
+- Say what a tap will do: something that opens shows a quiet sign of it (a chevron that turns over), and once open only its heading or a Close at its foot shuts it, so a tap while reading doesn't.
+- Put the next step where the reader finishes, not only at the top: a long page ends with the way on (the previous and next edition), within thumb reach.
+- Leave people where they were: Back, Forward and switching tabs and returning return to the same place and scroll position.
+- Reserve an image's space before it loads, so nothing below it jumps.
+- On touch screens, hover styles only under `@media (hover: hover)` (they stick after a tap), and small links keep their look but get a 44px tap area from a `::after`.
+- Muted text still reaches 4.5:1 against the page it sits on.
+- A figure worth reading opens on its own over the page, to zoom in place, and Back closes it.
 
 ### 8. Design for how the app is used
 
