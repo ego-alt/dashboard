@@ -67,7 +67,7 @@ Pick one existing version as the model and match it; never build a second.
 - Few options at a time; details open on request.
 - Say each thing once on a page: a name or a count shown in one place isn't repeated in a label, a link and a header.
 - Keep the reader in the app. Tapping content opens it in place; links out to another site sit inside the opened item, labelled with where they go and an ↗, never on the headline that also opens it.
-- Say what a tap will do: something that opens shows a quiet sign of it (a chevron that turns over), and once open only its heading or a Close at its foot shuts it, so a tap while reading doesn't.
+- Say what a tap will do: something that opens shows a quiet sign of it (a chevron that turns over). A tap anywhere on it shuts it again, with no separate Close; links and figures inside it do their own thing.
 - Put the next step where the reader finishes, not only at the top: a long page ends with the way on (the previous and next edition), within thumb reach.
 - Leave people where they were: Back, Forward and switching tabs and returning return to the same place and scroll position.
 - Reserve an image's space before it loads, so nothing below it jumps.
