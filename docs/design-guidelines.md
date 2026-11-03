@@ -66,6 +66,7 @@ Pick one existing version as the model and match it; never build a second.
 - People see only what they can use, and a view hides controls that don't apply to it.
 - Few options at a time; details open on request.
 - Say each thing once on a page: a name or a count shown in one place isn't repeated in a label, a link and a header.
+- Keep the reader in the app. Tapping content opens it in place; links out to another site sit inside the opened item, labelled with where they go and an ↗, never on the headline that also opens it.
 
 ### 8. Design for how the app is used
 
