@@ -66,6 +66,8 @@ Pick one existing version as the model and match it; never build a second.
 - People see only what they can use, and a view hides controls that don't apply to it.
 - Few options at a time; details open on request.
 - Say each thing once on a page: a name or a count shown in one place isn't repeated in a label, a link and a header.
+- Check the parts the browser draws, not only our CSS: date pickers, dropdown lists, a search field's ×, scrollbars, autofill, selection and the default focus ring all come out light (or near-black) on a dark page until the app says otherwise.
+- A control that looks like the app's voice beats a native one when the native one speaks differently: the calendar's times are `hh:mm` text fields because the browser's time picker shows its own clock, AM/PM included.
 - Keep the reader in the app. Tapping content opens it in place; links out to another site sit inside the opened item, labelled with where they go and an ↗, never on the headline that also opens it.
 - Say what a tap will do: something that opens shows a quiet sign of it (a chevron that turns over). A tap anywhere on it shuts it again, with no separate Close; links and figures inside it do their own thing.
 - Put the next step where the reader finishes, not only at the top: a long page ends with the way on (the previous and next edition), within thumb reach.

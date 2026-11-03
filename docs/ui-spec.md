@@ -17,7 +17,7 @@ The apps don't share a stylesheet. Each has its own type, sizes, corners and pal
 | Situation | the world map | phosphor green; amber for FLASH, cyan for PRIORITY | Flightradar24, the FT's and Reuters' live maps |
 
 - **Tapes**: Gruvbox with an orange accent. The cassette's label is printed in a fixed retro palette (red, orange, mustard, brown on cream), and its handwriting scales with the cassette. The library borrows the cassette's construction: each bar's edge is a seam; search, +, menus and forms open as recessed slots; going into a list, a slot opens under the row and the row rises into the bar. Each level in is a step darker. The slots work as one mechanism: one open at a time, nested ones shut inner first, rows below a closing slot ride up with it, and a tall slot takes longer to close than a small one (about the square root of its height). The control that opens a slot also closes it, so there are no × buttons. Inside an album, songs don't repeat the album and artist.
-- **Calendar**: a terminal logbook. Buttons and inputs are 14px monospace with square corners (except the mood tiles), with a tmux-style bottom bar and logbook text marks in the drawers.
+- **Calendar**: a terminal logbook. Buttons, inputs and status lines are 14px monospace with square corners (except the mood tiles), with a tmux-style bottom bar and logbook text marks in the drawers. Times are typed as the logbook writes them, a 24-hour `hh:mm` field rather than the browser's time picker; dates keep the native picker. One 2px aqua focus ring for everything.
 - **Library**: a gallery wall in warm light, with a glow, paper grain and frosted panels by day and night. Covers hang with square corners. Buttons are outlines, never filled, with small corners like the reader's settings; search and status are hairlines and underlines. The reader drops the light for a flat, plain page.
 - **Dashboard**: an engineering blueprint in slate. Every page opens with `PageHeader.jsx`, cards share `Panel.jsx` and `.bp-panel*`, and row actions use `.btn-link`. Beside Sign out, admins get a quiet power icon that asks first, then shuts the Pi down. Status colours are still Tailwind's green, amber and red rather than tokens.
 - **Situation**: an operations-room wall: near-black glass, a phosphor-green map, facts in Plex Mono and headlines in Inter. Buttons are small bordered mono chips. Its Papers tab is a weekly front page in the same glass and type: a spaced mono nameplate (the subject), a folio between rules, then the lead with a rail and rows of modules whose shape changes row to row. Wide slots float the figure top-left so text wraps around and under it; each row's text runs to the row's foot, cut at a whole line with the last line faded, and a click opens the whole story in place; only an opened story links out (paper, free copy, commentary). No pull quotes, no broadsheet columns. On a phone it's a list: the lead with its figure, then each story with its figure as a 72px thumbnail beside the title and two lines of abstract (the commentary's summary instead, when it has one); the rest of a long week stays titles only. Tapping a figure opens it full screen to zoom. The edition steps repeat at the foot, under a single rule, above the footer's double one.
@@ -34,7 +34,7 @@ Each Flask app (calendar, library, situation, tapes) has:
 
 The dashboard (React with Tailwind) keeps the same colour role names in its global CSS.
 
-1. **No raw sizes or colours outside `tokens.css`.**
+1. **No raw sizes or colours outside `tokens.css`.** `tokens.css` also sets `color-scheme` to the theme's (dark or light), so what the browser draws itself (date pickers, open dropdowns, scrollbars, autofill, a search field's ×) matches.
    - Stylesheets use `var(--text-*)`, `var(--space-*)` and `var(--color-*)`.
    - Relative sizes (`em`, `%`) are fine for things sized to the text around them.
    - Each app's `tests/test_style_tokens.py` fails on a raw font size outside `tokens.css`.
@@ -46,9 +46,9 @@ The dashboard (React with Tailwind) keeps the same colour role names in its glob
 5. **Shared colour role names** (below), so the same word means the same job everywhere. Values are each app's own, and apps may add roles of their own.
 6. **One mobile breakpoint, 640px**: `@media (max-width: 640px)` (CSS can't read a `var()` there).
 7. **Accessible everywhere:**
-   - a visible focus ring on everything focusable;
+   - a visible focus ring on everything focusable, from one `:focus-visible` rule in `controls.css` (the browser's default ring is near-black on a dark page);
    - touch targets of at least 44px on phones;
-   - motion off under `prefers-reduced-motion`;
+   - motion off under `prefers-reduced-motion`: transitions use the `--dur-*` tokens, which that query sets to 0;
    - text contrast of at least 4.5:1.
 
 ### Colour role names
