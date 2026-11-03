@@ -167,8 +167,19 @@ body {
 }
 
 /* Top bar + nav. */
+/* A border with no colour of its own takes the hairline colour rather than the
+   text's (Tailwind 4's default), so none comes out white. */
+@layer base {
+  *, ::before, ::after, ::backdrop { border-color: var(--color-border); }
+}
+
 .bp-topbar {
   border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-chrome);
+}
+/* Phones: the page nav along the bottom, parted from the page by the same hairline. */
+.bp-bottombar {
+  border-top: 1px solid var(--color-border);
   background: var(--color-bg-chrome);
 }
 .bp-brand {

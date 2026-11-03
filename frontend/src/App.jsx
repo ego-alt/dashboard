@@ -125,7 +125,7 @@ function BottomNav() {
   const { user } = useAuth();
   return (
     <nav
-      className="bp-topbar fixed inset-x-0 bottom-0 z-30 flex border-t border-b-0 sm:hidden"
+      className="bp-bottombar fixed inset-x-0 bottom-0 z-30 flex sm:hidden"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       {navItems(user).map((n) => (
