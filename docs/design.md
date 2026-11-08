@@ -13,6 +13,7 @@ The apps don't share a stylesheet. Each has its own type, sizes, corners and pal
 Everything else serves it (see [each app](#each-app)).
 
 - Context sits beside it in drawers and side panes and never replaces it.
+- Controls stay off it: the ways to reach other views and drawers live in the app's bars, not on the centrepiece.
 - Each app has its own accent, set as a hex value.
 - Judge an app against its own intent, not generic conventions.
 
