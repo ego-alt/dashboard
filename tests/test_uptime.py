@@ -52,7 +52,7 @@ def test_samples_add_up_per_hour(TestSession):
     rows = {r.name: r for r in db.query(UptimeHour)}
     assert (rows["music"].up, rows["music"].degraded, rows["music"].down) == (3, 1, 0)
     assert rows["library"].down == 3
-    assert rows["music"].hour == datetime(2026, 10, 16, 12)
+    assert rows["music"].hour == datetime(2026, 10, 16, 12, tzinfo=timezone.utc)
 
 
 def _hours(db, name, start, states):
@@ -63,8 +63,8 @@ def _hours(db, name, start, states):
 
 def test_last_24_hours(TestSession):
     db = TestSession()
-    _hours(db, "music", datetime(2026, 10, 16, 11), [(60, 0, 0), (20, 0, 10)])
-    _hours(db, "music", datetime(2026, 10, 15, 12), [(60, 0, 0)])  # just outside
+    _hours(db, "music", datetime(2026, 10, 16, 11, tzinfo=timezone.utc), [(60, 0, 0), (20, 0, 10)])
+    _hours(db, "music", datetime(2026, 10, 15, 12, tzinfo=timezone.utc), [(60, 0, 0)])  # just outside
     s = uptime_summary(db, days=1, now=NOW)
     assert s["bucket"] == "hour"
     assert s["start"] == "2026-10-15T13:00:00+00:00"
@@ -76,7 +76,7 @@ def test_last_24_hours(TestSession):
 def test_days_break_at_the_viewers_midnight(TestSession):
     db = TestSession()
     # 22:00 and 23:00 UTC on the 15th are already the 16th at UTC+2.
-    _hours(db, "music", datetime(2026, 10, 15, 21), [(60, 0, 0), (0, 0, 60), (0, 60, 0)])
+    _hours(db, "music", datetime(2026, 10, 15, 21, tzinfo=timezone.utc), [(60, 0, 0), (0, 0, 60), (0, 60, 0)])
     utc = uptime_summary(db, days=2, now=NOW)["services"]["music"]["buckets"]
     assert utc == [[60, 60, 60], None]
     east = uptime_summary(db, days=2, tz_offset_min=120, now=NOW)
@@ -86,8 +86,8 @@ def test_days_break_at_the_viewers_midnight(TestSession):
 
 def test_prune_keeps_90_days(TestSession):
     db = TestSession()
-    _hours(db, "music", datetime(2026, 7, 1), [(60, 0, 0)])
-    _hours(db, "music", datetime(2026, 10, 1), [(60, 0, 0)])
+    _hours(db, "music", datetime(2026, 7, 1, tzinfo=timezone.utc), [(60, 0, 0)])
+    _hours(db, "music", datetime(2026, 10, 1, tzinfo=timezone.utc), [(60, 0, 0)])
     prune(db, NOW)
     assert [r.hour.month for r in db.query(UptimeHour)] == [10]
 

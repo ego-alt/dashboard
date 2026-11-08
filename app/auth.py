@@ -142,19 +142,14 @@ def lookup_session(db: DbSession, token: str) -> Optional[UserSession]:
     if sess is None or sess.is_expired():
         return None
     now = datetime.now(timezone.utc)
-    exp = sess.expires_at
-    if exp.tzinfo is None:
-        exp = exp.replace(tzinfo=timezone.utc)
     # Sliding extension only for fully-authenticated sessions; pending-2FA
     # sessions keep their short fixed TTL so a stolen first-factor cookie
     # can't be kept alive without ever completing the second factor.
     dirty = False
-    if not sess.mfa_pending and exp - now < SESSION_TTL / 2:
+    if not sess.mfa_pending and sess.expires_at - now < SESSION_TTL / 2:
         sess.expires_at = now + SESSION_TTL
         dirty = True
     seen = sess.last_seen_at
-    if seen is not None and seen.tzinfo is None:
-        seen = seen.replace(tzinfo=timezone.utc)
     if seen is None or now - seen >= SESSION_SEEN_INTERVAL:
         sess.last_seen_at = now
         dirty = True
@@ -244,8 +239,6 @@ def lookup_api_token(db: DbSession, raw: str) -> Optional[User]:
         return None
     now = datetime.now(timezone.utc)
     last = tok.last_used_at
-    if last is not None and last.tzinfo is None:
-        last = last.replace(tzinfo=timezone.utc)  # SQLite hands back naive datetimes
     if last is None or now - last >= API_TOKEN_TOUCH_INTERVAL:
         tok.last_used_at = now
         try:

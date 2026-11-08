@@ -25,15 +25,10 @@ RETAIN_DAYS = 90
 STATES = ("up", "degraded", "down")
 
 
-def _utc_naive(now: datetime) -> datetime:
-    # SQLite hands back naive datetimes, so store naive UTC throughout.
-    return now.astimezone(timezone.utc).replace(tzinfo=None) if now.tzinfo else now
-
-
 def record_sample(db: DbSession, rows: List[Dict[str, Any]], now: datetime) -> None:
     """Count one minute for each container (``rows`` as from
     ``list_service_candidates``)."""
-    hour = _utc_naive(now).replace(minute=0, second=0, microsecond=0)
+    hour = now.astimezone(timezone.utc).replace(minute=0, second=0, microsecond=0)
     for r in rows:
         state = r.get("state")
         if state not in STATES:
@@ -47,7 +42,7 @@ def record_sample(db: DbSession, rows: List[Dict[str, Any]], now: datetime) -> N
 
 
 def prune(db: DbSession, now: datetime) -> None:
-    cutoff = _utc_naive(now) - timedelta(days=RETAIN_DAYS)
+    cutoff = now - timedelta(days=RETAIN_DAYS)
     db.execute(delete(UptimeHour).where(UptimeHour.hour < cutoff))
     db.commit()
 
@@ -63,7 +58,7 @@ def uptime_summary(
     ``tz_offset_min`` is the viewer's offset from UTC in minutes (east
     positive), so days break at the viewer's midnight.
     """
-    now = _utc_naive(now or datetime.now(timezone.utc))
+    now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     offset = timedelta(minutes=tz_offset_min)
     if days <= 1:
         size = timedelta(hours=1)
@@ -88,7 +83,7 @@ def uptime_summary(
         sampled = sum(totals)
         entry["pct"] = round(100 * totals[0] / sampled, 2) if sampled else None
     return {
-        "start": start.replace(tzinfo=timezone.utc).isoformat(),
+        "start": start.isoformat(),
         "bucket": "hour" if days <= 1 else "day",
         "services": out,
     }

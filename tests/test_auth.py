@@ -259,7 +259,7 @@ def test_session_slides_when_past_half_life(client, make_user, TestSession):
         sess = db.query(UserSession).one()
         # Move expiry to ~1/4 of TTL away — well past the half-life threshold.
         sess.expires_at = datetime.now(timezone.utc) + (SESSION_TTL / 4)
-        old_expiry = sess.expires_at.replace(tzinfo=timezone.utc) if sess.expires_at.tzinfo is None else sess.expires_at
+        old_expiry = sess.expires_at
         db.commit()
     finally:
         db.close()
@@ -270,7 +270,7 @@ def test_session_slides_when_past_half_life(client, make_user, TestSession):
     db = TestSession()
     try:
         sess = db.query(UserSession).one()
-        new_expiry = sess.expires_at.replace(tzinfo=timezone.utc) if sess.expires_at.tzinfo is None else sess.expires_at
+        new_expiry = sess.expires_at
         assert new_expiry > old_expiry
     finally:
         db.close()

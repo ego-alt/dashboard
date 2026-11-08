@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../auth.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import Panel from '../components/Panel.jsx';
-import { ago, clock, device } from '../lib/format';
+import { ago, clock, day, device } from '../lib/format';
 import {
   changePassword,
   createApiToken,
@@ -611,9 +611,9 @@ function ApiTokensSection() {
                   </span>
                 </div>
                 <div className="text-xs text-[var(--color-text-muted)]">
-                  added {new Date(t.created_at).toLocaleDateString()}
+                  added {day(t.created_at)}
                   {t.last_used_at ? (
-                    <> · last used {new Date(t.last_used_at).toLocaleDateString()}</>
+                    <> · last used {day(t.last_used_at)}</>
                   ) : (
                     <> · never used</>
                   )}
@@ -726,11 +726,11 @@ function PasskeysSection() {
               <div>
                 <div className="font-medium text-[var(--color-text-primary)]">{k.name}</div>
                 <div className="text-xs text-[var(--color-text-muted)]">
-                  added {new Date(k.created_at).toLocaleDateString()}
+                  added {day(k.created_at)}
                   {k.last_used_at && (
                     <>
                       {' '}
-                      · last used {new Date(k.last_used_at).toLocaleDateString()}
+                      · last used {day(k.last_used_at)}
                     </>
                   )}
                 </div>

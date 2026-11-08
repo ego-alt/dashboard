@@ -27,15 +27,40 @@ export function ago(iso, now = Date.now()) {
   return s < MIN ? 'just now' : `${age(s)} ago`;
 }
 
+// Every date and time on the dashboard is shown through these helpers, in the
+// viewing device's time zone. The API sends times with their zone (+00:00).
+
+function toDate(t) {
+  if (!t) return null;
+  const d = new Date(t);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** "02:14" ("02:14:05" with seconds). */
+export function time(t, { seconds = false } = {}) {
+  const d = toDate(t);
+  return d ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', ...(seconds && { second: '2-digit' }) }) : '';
+}
+
+/** "14 Oct" ("Tue 14 Oct" with weekday), with the year when it isn't this year's. */
+export function day(t, { weekday = false } = {}, now = new Date()) {
+  const d = toDate(t);
+  if (!d) return '';
+  return d.toLocaleDateString([], {
+    ...(weekday && { weekday: 'short' }),
+    day: 'numeric',
+    month: 'short',
+    ...(d.getFullYear() !== now.getFullYear() && { year: 'numeric' }),
+  });
+}
+
 /** "02:14" today, "Wed 02:14" within a week, "14 Oct" otherwise. */
-export function clock(iso, now = new Date()) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  if (d.toDateString() === now.toDateString()) return time;
-  if (now - d < 6 * DAY * 1000) return `${d.toLocaleDateString([], { weekday: 'short' })} ${time}`;
-  return d.toLocaleDateString([], { day: 'numeric', month: 'short' });
+export function clock(t, now = new Date()) {
+  const d = toDate(t);
+  if (!d) return '';
+  if (d.toDateString() === now.toDateString()) return time(d);
+  if (now - d < 6 * DAY * 1000) return `${d.toLocaleDateString([], { weekday: 'short' })} ${time(d)}`;
+  return day(d, {}, now);
 }
 
 export function pct(p) {

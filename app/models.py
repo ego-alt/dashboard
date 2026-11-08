@@ -1,10 +1,10 @@
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from .db import Base
+from .db import Base, UtcDateTime
 
 
 class User(Base):
@@ -20,12 +20,12 @@ class User(Base):
         Boolean, nullable=False, default=False, server_default="0"
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        UtcDateTime,
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
     last_login_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UtcDateTime, nullable=True
     )
 
     # TOTP 2FA. ``totp_secret`` may be set (from /auth/totp/setup) before
@@ -50,12 +50,12 @@ class UserSession(Base):
         Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        UtcDateTime,
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
     expires_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True
+        UtcDateTime, nullable=False, index=True
     )
     ip: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     user_agent: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -67,17 +67,13 @@ class UserSession(Base):
     # Refreshed at most every few minutes (see lookup_session), for the
     # sessions list in Settings.
     last_seen_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UtcDateTime, nullable=True
     )
 
     user: Mapped["User"] = relationship(back_populates="sessions")
 
     def is_expired(self) -> bool:
-        # SQLite stores naive UTC; normalize before comparing to aware now().
-        exp = self.expires_at
-        if exp.tzinfo is None:
-            exp = exp.replace(tzinfo=timezone.utc)
-        return exp <= datetime.now(timezone.utc)
+        return self.expires_at <= datetime.now(timezone.utc)
 
 
 class ApiToken(Base):
@@ -101,12 +97,12 @@ class ApiToken(Base):
     prefix: Mapped[str] = mapped_column(String(16), nullable=False)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        UtcDateTime,
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
     last_used_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UtcDateTime, nullable=True
     )
 
     user: Mapped["User"] = relationship()
@@ -134,12 +130,12 @@ class WebauthnCredential(Base):
     transports: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        UtcDateTime,
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
     last_used_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UtcDateTime, nullable=True
     )
 
     user: Mapped["User"] = relationship()
@@ -165,7 +161,7 @@ class LoginEvent(Base):
     ip: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     user_agent: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        UtcDateTime,
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
         index=True,
@@ -180,7 +176,7 @@ class UptimeHour(Base):
     __tablename__ = "uptime_hours"
 
     name: Mapped[str] = mapped_column(String(128), primary_key=True)
-    hour: Mapped[datetime] = mapped_column(DateTime, primary_key=True, index=True)
+    hour: Mapped[datetime] = mapped_column(UtcDateTime, primary_key=True, index=True)
     up: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     degraded: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     down: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -207,5 +203,5 @@ class InstalledApp(Base):
     version_code: Mapped[int] = mapped_column(Integer, nullable=False)
     version_name: Mapped[str] = mapped_column(String(40), nullable=False, default="")
     seen_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+        UtcDateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )

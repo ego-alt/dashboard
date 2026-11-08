@@ -1,9 +1,11 @@
 import os
 from contextlib import contextmanager
-from typing import Iterator
+from datetime import datetime, timezone
+from typing import Iterator, Optional
 
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import DateTime, create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.types import TypeDecorator
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./data/dashboard.db")
 
@@ -17,6 +19,30 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 class Base(DeclarativeBase):
     pass
+
+
+class UtcDateTime(TypeDecorator):
+    """A timestamp stored as naive UTC and always read back as aware UTC.
+
+    SQLite drops the zone, and a time sent without one is read by browsers as
+    local time (8 hours early in Hong Kong). Every DateTime column uses this,
+    so code only ever sees aware UTC and ``isoformat()`` always ends in +00:00.
+    """
+
+    impl = DateTime
+    cache_ok = True
+
+    def process_bind_param(self, value: Optional[datetime], dialect) -> Optional[datetime]:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            raise ValueError("UtcDateTime needs an aware datetime, not a naive one")
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+    def process_result_value(self, value: Optional[datetime], dialect) -> Optional[datetime]:
+        if value is None:
+            return None
+        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
 
 
 # Additive column migrations run at boot. Cheap stand-in for Alembic — fine

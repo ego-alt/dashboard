@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { containerLogs } from '../api';
+import { time } from '../lib/format';
 import { usePoll } from '../lib/usePoll';
 
 const TAIL = 200;
@@ -24,9 +25,8 @@ function parse(text) {
     .map((raw) => {
       const m = raw.match(TS);
       if (!m) return { time: '', text: raw };
-      const d = new Date(`${m[1]}${m[3] && m[3] !== 'Z' ? m[3] : 'Z'}`);
       return {
-        time: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        time: time(`${m[1]}${m[3] || 'Z'}`, { seconds: true }),
         text: raw.slice(m[0].length),
       };
     });

@@ -162,20 +162,17 @@ def list_own_sessions(
         .all()
     )
 
-    def iso(d):
-        return d.replace(tzinfo=d.tzinfo or timezone.utc).isoformat() if d else None
-
     out = [
         {
             "id": session_public_id(s.token),
             "current": s.token == mine,
-            "created_at": iso(s.created_at),
-            "last_seen_at": iso(s.last_seen_at or s.created_at),
+            "created_at": s.created_at.isoformat(),
+            "last_seen_at": (s.last_seen_at or s.created_at).isoformat(),
             "ip": s.ip,
             "user_agent": s.user_agent,
         }
         for s in rows
-        if s.expires_at.replace(tzinfo=s.expires_at.tzinfo or timezone.utc) > now
+        if s.expires_at > now
     ]
     return sorted(out, key=lambda s: (s["current"], s["last_seen_at"] or ""), reverse=True)
 
@@ -219,7 +216,7 @@ def own_login_events(
     )
     return [
         {
-            "at": e.at.replace(tzinfo=e.at.tzinfo or timezone.utc).isoformat(),
+            "at": e.at.isoformat(),
             "success": e.success,
             "reason": e.reason,
             "ip": e.ip,

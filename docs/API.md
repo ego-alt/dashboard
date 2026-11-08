@@ -2,6 +2,8 @@
 
 Everything the dashboard serves, for the SPA, nginx, native apps and the MCP server. "user" means any signed-in session cookie; "admin" an admin's.
 
+Every time is ISO 8601 with its zone (`2026-11-08T03:59:44+00:00`); clients show it in the viewer's zone. Timestamp columns use `UtcDateTime` (`app/db.py`), which stores UTC and reads it back with the zone, and a test fails if a column uses plain `DateTime`.
+
 | Route | Method | Auth | Purpose |
 |---|---|---|---|
 | `/ping` | GET | public | Healthcheck (Docker `HEALTHCHECK` target) |

@@ -1,4 +1,4 @@
-import { pct } from '../lib/format';
+import { day, pct, time } from '../lib/format';
 import { STATE } from '../lib/state';
 
 export function StateDot({ state, className = '' }) {
@@ -25,9 +25,7 @@ function bucketTitle(b, label) {
 
 function bucketLabel(start, kind, i) {
   const t = new Date(Date.parse(start) + i * (kind === 'hour' ? 3600e3 : 86400e3));
-  return kind === 'hour'
-    ? t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : t.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+  return kind === 'hour' ? time(t) : day(t, { weekday: true });
 }
 
 /**
