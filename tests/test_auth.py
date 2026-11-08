@@ -109,14 +109,12 @@ def test_non_admin_cannot_start_container(client, make_user):
     assert client.post("/containers/abc/start").status_code == 403
 
 
-def test_non_admin_can_read_containers_endpoint(client, make_user, monkeypatch):
+def test_non_admins_see_no_containers_logs_or_stats(client, make_user):
+    """They get the app tiles (/services, /uptime); the machinery is for admins."""
     make_user(username="alice", password="hunter2-pass", is_admin=False)
     client.post("/login", data={"username": "alice", "password": "hunter2-pass"})
-    from app.routes import containers
-    monkeypatch.setattr(containers, "get_containers", lambda **_kw: [])
-    r = client.get("/containers")
-    assert r.status_code == 200
-    assert r.json() == []
+    for path in ("/containers", "/containers/abc/logs", "/stats/system", "/stats/containers/abc"):
+        assert client.get(path).status_code == 403, path
 
 
 # ---------- cookie attributes ----------

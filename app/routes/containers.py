@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.auth import current_admin, current_user
+from app.auth import current_admin
 from app.docker_control import (
     get_container_logs,
     get_container_stats,
@@ -48,7 +48,7 @@ def _unwrap(result: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @router.get("/containers", response_model=List[Dict[str, Any]])
-def list_containers(stats: bool = False, _: User = Depends(current_user)):
+def list_containers(stats: bool = False, _: User = Depends(current_admin)):
     try:
         return get_containers(include_stats=stats)
     except Exception:
@@ -77,16 +77,16 @@ def restart_container_endpoint(container_id: str, _: User = Depends(current_admi
 def get_logs_endpoint(
     container_id: str,
     tail: Optional[int] = 50,
-    _: User = Depends(current_user),
+    _: User = Depends(current_admin),
 ):
     return _unwrap(get_container_logs(container_id, tail))
 
 
 @router.get("/stats/system", response_model=Dict[str, Any])
-def system_stats_endpoint(_: User = Depends(current_user)):
+def system_stats_endpoint(_: User = Depends(current_admin)):
     return get_system_stats()
 
 
 @router.get("/stats/containers/{container_id}", response_model=Dict[str, Any])
-def container_stats_endpoint(container_id: str, _: User = Depends(current_user)):
+def container_stats_endpoint(container_id: str, _: User = Depends(current_admin)):
     return _unwrap(get_container_stats(container_id))
