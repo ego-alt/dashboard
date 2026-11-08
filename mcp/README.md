@@ -8,8 +8,8 @@ local model in LM Studio, Goose or Open WebUI.
 > "Log dinner with Sam on Friday at 7:30", "how was my mood in March?",
 > "download this album and put it on Road trip", "do I own *Piranesi*?"
 
-The design is in [`../docs/mcp-plan.md`](../docs/mcp-plan.md). Known gaps and
-follow-ups are in [`AUDIT.md`](AUDIT.md).
+It speaks the open Model Context Protocol, so nothing in it is tied to one
+vendor. Open items are in the dashboard's [roadmap](../docs/roadmap.md).
 
 ## Two ways to connect
 
@@ -78,7 +78,12 @@ Two caveats:
   `NODE_EXTRA_CA_CERTS=/path/to/home.crt`. Others need a trusted cert (e.g.
   Tailscale's) or stdio.
 - **Cloud clients** (claude.ai connectors, ChatGPT) connect from the vendor's
-  servers, so they can't reach `home.local`. See AUDIT.md §1 for the options.
+  servers, so they can't reach `home.local`. Decided (October 2026): the stack
+  stays on the LAN and Tailscale, and desktop or local clients are used. Over
+  Tailscale, set `MCP_PUBLIC_URL` to the Pi's MagicDNS name so the OAuth issuer
+  matches the address clients use. Exposing only the OAuth and `/mcp` paths
+  through a tunnel would make cloud clients work; keep the dashboard and apps
+  off it.
 
 ## Tools (32)
 
@@ -124,6 +129,48 @@ The aim is to work across models, including weak local tool-callers:
 - **App errors pass through verbatim** ("The end is before the start."), so the
   model can fix its call.
 
+## How it works
+
+**Who it acts as.** Every request resolves to one dashboard user. In the
+container, the server calls the apps directly on the compose network with
+`X-Forwarded-User: <username>`, as nginx does after its sign-in check. It never
+forwards the client's token to the apps (the MCP spec forbids "token
+passthrough"), and a token minted for the MCP server is only accepted by it.
+Over stdio it can't reach the compose network, so it calls the apps through
+nginx with your own API token, which `/auth/verify` accepts.
+
+**Remote sign-in** is the standard MCP authorization flow:
+- `/mcp` answers `401` pointing to `/.well-known/oauth-protected-resource/mcp`
+  and `/.well-known/oauth-authorization-server`.
+- The `mcp` container is the authorization server (`/register`, `/authorize`,
+  `/token`, `/revoke`), PKCE S256 only. Plain `http` redirect URIs are allowed
+  only to localhost; app schemes (`cursor://`) are fine.
+- The dashboard stays the identity source. `/authorize` sends the browser to
+  `/oauth/consent`, which asks the dashboard who is signed in (and sends you
+  through the normal login, TOTP or passkey, if needed). Arriving from another
+  site, the browser withholds the `SameSite=strict` cookie, so the page reloads
+  itself once, same-site. It shows the client's name and where it will
+  redirect, has a CSRF token and can't be framed. Only approve connections you
+  started yourself: anyone on the network can register a client called
+  "Claude".
+- Codes are single-use and live 5 minutes; access tokens live 1 hour; refresh
+  tokens 30 days, and rotate. All are stored as SHA-256 hashes. Unused
+  registrations are pruned after 7 days. nginx limits the OAuth endpoints to 20
+  requests a minute per IP.
+- A dashboard API token is also accepted as the bearer, checked with
+  `/auth/verify` and cached for 60 seconds.
+
+**Activity.** Every tool call is logged in the container's SQLite (user,
+client, tool, trimmed arguments, success or error) and kept 90 days.
+`/oauth/connections` shows your connected apps, when each was last used, and
+recent activity, with **Disconnect** to end a grant.
+
+**What reaches the model.** Notes, people and places go to whichever model the
+client uses. So does text you didn't write: podcast titles from RSS feeds,
+track titles from YouTube, book metadata from EPUBs. An instruction planted
+there can't delete anything (there are no delete tools), and the activity log
+shows what ran.
+
 ## Configuration
 
 | Variable | Mode | Default |
@@ -132,7 +179,7 @@ The aim is to work across models, including weak local tool-callers:
 | `MCP_PUBLIC_URL` | http | (required) How clients reach nginx; sets the OAuth issuer. |
 | `DASHBOARD_URL` | http | `http://dashboard:8000` |
 | `CALENDAR_URL`, `TAPES_URL`, `LIBRARY_URL` | http | the compose service names |
-| `INTERNAL_AUTH_SECRET` | http | (none) Sent as `X-Internal-Auth`. See AUDIT.md §3.1. |
+| `INTERNAL_AUTH_SECRET` | http | (none) Sent as `X-Internal-Auth`; the apps don't check it yet (see the roadmap). |
 | `MCP_DB` | http | `/data/mcp.db` (OAuth grants + activity log) |
 | `TZ` | both | `Europe/London`. Calendar times are local. |
 

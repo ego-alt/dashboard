@@ -202,7 +202,7 @@ function AddApp({ onAdded, onClose }) {
       )}
       {privateHidden && (
         <p className="mt-3 text-xs text-[var(--color-text-muted)]">
-          Private repos show here once the dashboard has a <span className="font-mono">DEPLOY_GITHUB_TOKEN</span> (see docs/DEPLOY.md).
+          Private repos show here once the dashboard has a <span className="font-mono">DEPLOY_GITHUB_TOKEN</span> (see docs/APPS.md).
         </p>
       )}
     </Panel>

@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* Home-stack dashboard — "blueprint" skin (slate-blue drafting field). Role names
- * match the shared spec (../../docs/ui-spec.md); the .btn / .input primitives and
+ * match the shared rules (../../docs/design.md); the .btn / .input primitives and
  * the React pages source from these tokens, so the whole skin lives in this file. */
 :root {
   color-scheme: dark;

@@ -1,6 +1,8 @@
-# Design guidelines
+# Design
 
-The general principles every home-stack app follows, and how design work is done. Each app's own theme, references and stylesheet rules are in [ui-spec.md](ui-spec.md).
+How every home-stack app is designed: the principles they share, how design work is done, each app's own theme, and the stylesheet rules every app follows.
+
+The apps don't share a stylesheet. Each has its own type, sizes, corners and palette to match its theme; what they share is the principles and the rules here. Only rules that hold across apps belong in this file: how one app does a detail is written beside the code that does it.
 
 ---
 
@@ -8,7 +10,7 @@ The general principles every home-stack app follows, and how design work is done
 
 ### 1. Each app is built around one thing
 
-Everything else serves it (see [each app](ui-spec.md#each-app)).
+Everything else serves it (see [each app](#each-app)).
 
 - Context sits beside it in drawers and side panes and never replaces it.
 - Each app has its own accent, set as a hex value.
@@ -108,7 +110,110 @@ Pick one existing version as the model and match it; never build a second.
 - Base options on how well-researched products solve the same problem, rather than on taste. Look at several:
   - design systems: Apple's Human Interface Guidelines, Google's Material Design, Microsoft Fluent, IBM Carbon, Atlassian, Shopify Polaris, and GOV.UK (for forms and wording);
   - research: Nielsen Norman Group, Baymard Institute (for forms and checkout), Laws of UX;
-  - the best apps in the same field (each app's list is in [ui-spec.md](ui-spec.md#each-app)).
+  - the best apps in the same field (each app's list is under [each app](#each-app)).
 - Show options to compare, side by side or in separate tabs, and let the owner pick. A "make it nicer" request starts with two or three small mock-ups, never a restyle.
 - Send screenshots on desktop and phone before pushing.
 - If a change misses, revert it cleanly rather than stacking fixes on top.
+
+---
+
+## Each app
+
+| App | Centrepiece | Accent | Best in the field, to learn from |
+|---|---|---|---|
+| Tapes | the cassette deck | orange | Spotify, Apple Music, Pocket Casts, Overcast |
+| Calendar | the month grid | green | Fantastical, Google Calendar, Things |
+| Library | the covers, lit in warm light | slate by day, gold by night | Apple Books, Kindle, Libby |
+| Dashboard | the service tiles | slate blue | Linear, Vercel, Grafana |
+| Situation | the world map | graphite; amber for FLASH, blue for PRIORITY | Flightradar24, the FT's and Reuters' live maps |
+
+- **Tapes**: Gruvbox with an orange accent. The cassette's label is printed in a fixed retro palette (red, orange, mustard, brown on cream). The library borrows the cassette's construction: bars meet at seams, and lists, search and forms open as recessed slots, each level in a step darker.
+- **Calendar**: a terminal logbook in Inter and IBM Plex Mono. Square corners, a tmux-style bottom bar, and messages printed as grey monospace log lines (`!` a problem, `›` news), with no colour and no boxes. Red is only for buttons that destroy something.
+- **Library**: a gallery wall in warm light, with a glow, paper grain and frosted panels by day and night. Covers hang with square corners; buttons are outlines, never filled. The reader drops the light for a flat, plain page.
+- **Dashboard**: an engineering blueprint in slate. Every page opens with `PageHeader.jsx`, cards share `Panel.jsx`, and row actions use `.btn-link`. Status colours are still Tailwind's green, amber and red rather than tokens.
+- **Situation**: a newsroom wall: graphite glass, a frameless world map in the Patterson projection filling its panel, facts in Plex Mono and headlines in Inter. Countries in the news are tinted in their tier's colour, with no pins. Papers is a weekly front page in the same glass and type.
+
+---
+
+## Stylesheet rules
+
+Each Flask app (calendar, library, situation, tapes) has:
+
+- **`tokens.css`**: every size and colour it uses (spacing, corners, type, fonts, motion, colours), with its own values;
+- **`controls.css`**: its one definition of buttons and inputs;
+- its own CSS for everything else, written only in its tokens.
+
+The dashboard (React with Tailwind) keeps the same colour role names in its global CSS.
+
+1. **No raw sizes or colours outside `tokens.css`.** `tokens.css` also sets `color-scheme` to the theme's (dark or light), so what the browser draws itself (date pickers, open dropdowns, scrollbars, autofill, a search field's ×) matches.
+   - Stylesheets use `var(--text-*)`, `var(--space-*)` and `var(--color-*)`.
+   - Relative sizes (`em`, `%`) are fine for things sized to the text around them.
+   - Each app's `tests/test_style_tokens.py` fails on a raw font size outside `tokens.css`.
+2. **At most five type sizes and two typefaces.**
+   - Sizes are tokens named `--text-xs`, `-sm`, `-base`, `-lg` and `-xl`, with the app's own values, no two a pixel apart. The test fails above five.
+   - Text an app doesn't own (a book's own styles in the reader) keeps its sizes.
+3. **One spacing scale and one set of corners** per app, as tokens.
+4. **One button definition per app**, in `controls.css`: a main action, a quiet one and bare words. Nothing else restyles them; a component may only place or size one.
+5. **Shared colour role names** (below), so the same word means the same job everywhere. Values are each app's own, and apps may add roles of their own.
+6. **One mobile breakpoint, 640px**: `@media (max-width: 640px)` (CSS can't read a `var()` there).
+7. **Accessible everywhere:**
+   - a visible focus ring on everything focusable, from one `:focus-visible` rule in `controls.css` (the browser's default ring is near-black on a dark page);
+   - touch targets of at least 44px on phones;
+   - motion off under `prefers-reduced-motion`: transitions use the `--dur-*` tokens, which that query sets to 0;
+   - text contrast of at least 4.5:1.
+
+### Colour role names
+
+```css
+:root {
+    /* Surfaces */
+    --color-bg-base;        /* page background */
+    --color-bg-elevated;    /* sidebars, modals, raised cards */
+    --color-bg-inset;       /* nested panels, form-field surface */
+    --color-bg-overlay;     /* modal backdrop / dimming layer */
+
+    /* Borders */
+    --color-border;         /* form/card borders */
+
+    /* Text — three levels */
+    --color-text-primary;   /* default body text */
+    --color-text-secondary; /* slightly de-emphasised */
+    --color-text-muted;     /* metadata, captions, placeholders */
+
+    /* Accent */
+    --color-accent;         /* main action, focus ring */
+    --color-accent-hover;
+
+    /* Status */
+    --color-danger;         /* destructive actions, error text */
+    --color-danger-hover;
+
+    /* Decoration */
+    --color-shadow;         /* box-shadow tint */
+    --color-highlight-soft; /* hover background, subtle separators */
+}
+```
+
+Apps' own roles:
+- calendar: `--color-bg-chrome`, `--color-bg-pane`, `--color-syn-*`;
+- library: `--color-success`, `--color-scrim`, `--wood`;
+- tapes: `--color-bg-pane`;
+- situation: the tiers (`--color-flash*`, `--color-priority*`) and the map (`--color-sea`, `--color-land*`, `--color-region*`).
+
+### Reference values
+
+| Role | Calendar | Library (day) | Library (night) | Tapes | Situation | Dashboard |
+|---|---|---|---|---|---|---|
+| `--color-bg-base` | `#1d2021` | `#f6f4ef` | `#141210` | `#282828` | `#070a0b` | `#182230` |
+| `--color-text-primary` | `#ebdbb2` | `#1f1d1a` | `#eadfca` | `#ebdbb2` | `#d3dedb` | `#d4dde8` |
+| `--color-accent` | `#689d6a` | `#535f5f` | `#d4b36a` | `#fe8019` | `#5fd3a6` | `#6f9bc4` |
+| `--color-danger` | `#cc241d` | `#a6352b` | `#e46b5f` | `#cc241d` | (FLASH `#ffb020`) | `#e0697d` |
+
+### Type scales (px)
+
+| | xs | sm | base | lg | xl |
+|---|---|---|---|---|---|
+| Calendar | 11 | 14 | 16 | 20 | 32 |
+| Library | 12 | 14 | 16 | 20 | 24 |
+| Tapes | 12 | 14 | 16 | 20 | 24 |
+| Situation | 11 | 13 | 15 | 17 | 24 |

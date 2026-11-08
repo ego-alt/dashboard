@@ -50,7 +50,7 @@ Tests: `uv run pytest`. Lint: `uvx ruff check .` and `npm run lint` in `frontend
 - **Data**: the dashboard's database is `./data/dashboard.db`. The container runs as uid 10001, so after using the CLI on the host run `sudo chown -R 10001:10001 data/`.
 - **Users**: apps create a user's account on their first visit. To create them up front, run `uv run python scripts/sync_household_users.py` after adding someone.
 - **Docker access**: set `DOCKER_GID` to the GID of `/var/run/docker.sock` (Pi/Debian: usually 999).
-- **Deploys**: commits to `master` that pass CI deploy to the Pi on their own; see [`docs/DEPLOY.md`](docs/DEPLOY.md).
+- **Deploys**: commits to `master` that pass CI deploy to the Pi on their own; see [`docs/APPS.md`](docs/APPS.md#how-deploys-work).
 - **Away from home**: the Pi is on Tailscale, so any device on the tailnet reaches the stack at the Pi's Tailscale IP or MagicDNS name. Every address gets the self-signed `home.local` certificate, so browsers warn unless the device trusts it.
 - **Backups**: a nightly restic backup of every app to Google Cloud Storage; the Monitor shows its last run. Setup and restores: [`docs/BACKUPS.md`](docs/BACKUPS.md).
 
@@ -83,10 +83,9 @@ Inside compose: `docker compose exec dashboard python -m app.cli <command>`.
 
 ## More
 
+- [`docs/APPS.md`](docs/APPS.md): how an app joins the stack, what the stack and the app owe each other, and how the Pi deploys it.
 - [`docs/API.md`](docs/API.md): every endpoint, and how API tokens work.
-- [`docs/DEPLOY.md`](docs/DEPLOY.md): the Pi's pull-based auto-deploy.
 - [`docs/BACKUPS.md`](docs/BACKUPS.md): backups and restores.
-- [`docs/design-guidelines.md`](docs/design-guidelines.md): the general design principles every app follows, and how design work is done.
-- [`docs/ui-spec.md`](docs/ui-spec.md): each app's theme and the products it learns from, and the rules every stylesheet follows.
+- [`docs/design.md`](docs/design.md): the design principles and stylesheet rules every app follows, and each app's theme.
 - [`mcp/README.md`](mcp/README.md): the MCP server.
-- [`docs/roadmap.md`](docs/roadmap.md): what's left to do.
+- [`docs/roadmap.md`](docs/roadmap.md): what's left to do, for the dashboard, the stack and the MCP server.
