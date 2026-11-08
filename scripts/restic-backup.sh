@@ -96,6 +96,22 @@ rm -rf "$DB_STAGE"
 mkdir -p "$DB_STAGE"
 trap 'write_status; rm -rf "$DB_STAGE"' EXIT
 
+# While a run is going the file says so, keeping the last run's results, and
+# the write on exit replaces it. One still marked running hours later was cut
+# off (a power cut, or the process killed) before it could write.
+python3 - "$STATUS_FILE" "$STARTED" <<'EOF' || true
+import json, os, sys
+path, started = sys.argv[1:]
+try:
+    data = json.load(open(path))
+except (OSError, ValueError):
+    data = {}
+data["running_since"] = started
+os.makedirs(os.path.dirname(path), exist_ok=True)
+json.dump(data, open(path, "w"), indent=2)
+os.chmod(path, 0o644)
+EOF
+
 # --- 1. consistent SQLite snapshots -----------------------------------------
 # app:relative-db-path — the online-backup API is safe while the apps run.
 DB_SPECS=(

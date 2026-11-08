@@ -8,11 +8,13 @@ from app.auth import complete_pending_session, current_user, mfa_pending_session
 from app.db import get_db
 from app.models import User, UserSession
 from app.totp import (
-    generate_recovery_codes,
-    generate_secret,
-    hash_recovery_codes,
+    new_recovery_codes,
     provisioning_uri,
     render_qr_svg,
+    start_setup,
+    totp_state,
+    turn_off,
+    turn_on,
     verify_totp_code,
     verify_totp_or_recovery,
 )
@@ -23,12 +25,11 @@ router = APIRouter(prefix="/auth/totp", tags=["totp"])
 @router.post("/setup")
 def totp_setup(user: User = Depends(current_user), db: DbSession = Depends(get_db)):
     """Generate a new TOTP secret for the current user and return enrollment
-    materials. The secret is stored immediately but ``totp_enabled`` only flips
-    once /enable receives a valid code, so an abandoned setup is harmless."""
-    if user.totp_enabled:
+    materials. 2FA only turns on once /enable receives a valid code, so an
+    abandoned setup is harmless (see app/totp.py)."""
+    if totp_state(user) == "on":
         raise HTTPException(status_code=409, detail="2FA already enabled")
-    secret = generate_secret()
-    user.totp_secret = secret
+    secret = start_setup(user)
     db.commit()
     uri = provisioning_uri(secret, user.username)
     return {"secret": secret, "uri": uri, "qr_svg": render_qr_svg(uri)}
@@ -40,13 +41,12 @@ def totp_enable(
     user: User = Depends(current_user),
     db: DbSession = Depends(get_db),
 ):
-    if user.totp_enabled:
+    state = totp_state(user)
+    if state == "on":
         raise HTTPException(status_code=409, detail="2FA already enabled")
-    if not user.totp_secret or not verify_totp_code(user.totp_secret, code):
+    if state != "setting-up" or not verify_totp_code(user.totp_secret, code):
         raise HTTPException(status_code=400, detail="bad code")
-    recovery = generate_recovery_codes()
-    user.totp_recovery_codes = hash_recovery_codes(recovery)
-    user.totp_enabled = True
+    recovery = turn_on(user)
     db.commit()
     # One-time display — these are not stored in plaintext on the server.
     return {"ok": True, "recovery_codes": recovery}
@@ -58,14 +58,12 @@ def totp_disable(
     user: User = Depends(current_user),
     db: DbSession = Depends(get_db),
 ):
-    if not user.totp_enabled:
+    if totp_state(user) != "on":
         raise HTTPException(status_code=409, detail="2FA not enabled")
     ok, _mode = verify_totp_or_recovery(user, code)
     if not ok:
         raise HTTPException(status_code=400, detail="bad code")
-    user.totp_enabled = False
-    user.totp_secret = None
-    user.totp_recovery_codes = None
+    turn_off(user)
     db.commit()
     return {"ok": True}
 
@@ -78,12 +76,11 @@ def totp_regenerate_recovery(
 ):
     """Replace the recovery codes (the old ones stop working). Needs a current
     authenticator code, so a borrowed session can't mint fresh ones."""
-    if not user.totp_enabled or not user.totp_secret:
+    if totp_state(user) != "on":
         raise HTTPException(status_code=409, detail="2FA not enabled")
     if not verify_totp_code(user.totp_secret, code):
         raise HTTPException(status_code=400, detail="bad code")
-    recovery = generate_recovery_codes()
-    user.totp_recovery_codes = hash_recovery_codes(recovery)
+    recovery = new_recovery_codes(user)
     db.commit()
     return {"ok": True, "recovery_codes": recovery}
 

@@ -8,10 +8,4 @@ export const STATE = {
   unknown: { dot: 'bg-slate-400', text: 'text-[var(--color-text-muted)]', label: 'unknown' },
 };
 
-/** The state to show: a container whose healthcheck hasn't passed yet (just
- * started or restarted) reads "starting" rather than "degraded". */
-export function shownState(x) {
-  return x.state === 'degraded' && x.health === 'starting' ? 'starting' : x.state;
-}
-
-export const PROBLEM_RANK = { down: 0, degraded: 1, unknown: 2, up: 3 };
+export const PROBLEM_RANK = { down: 0, degraded: 1, starting: 2, unknown: 2, up: 3 };

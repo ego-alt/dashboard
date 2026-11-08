@@ -16,6 +16,7 @@ from app.auth import (
 )
 from app.db import get_db
 from app.models import ApiToken, LoginEvent, User, UserSession, WebauthnCredential
+from app.totp import totp_state, turn_off
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -26,7 +27,7 @@ def _user_dto(u: User) -> Dict[str, Any]:
         "username": u.username,
         "display_name": u.display_name,
         "is_admin": u.is_admin,
-        "totp_enabled": u.totp_enabled,
+        "totp_enabled": totp_state(u) == "on",
         "created_at": u.created_at.isoformat(),
         "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
     }
@@ -129,9 +130,7 @@ def reset_user_2fa_endpoint(
     """Clear a user's TOTP enrollment so a locked-out user (lost authenticator)
     can sign in with their password alone and re-enroll."""
     user = _require_user(db, user_id)
-    user.totp_secret = None
-    user.totp_enabled = False
-    user.totp_recovery_codes = None
+    turn_off(user)
     db.commit()
     return {"ok": True}
 

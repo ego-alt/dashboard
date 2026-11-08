@@ -13,6 +13,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
+from app.ci import result as ci_result
 from app.stack_manifest import app_name
 
 OWNER = os.environ.get("GITHUB_OWNER", "ego-alt")
@@ -99,12 +100,7 @@ def latest_commit(repo: str, branch: str) -> dict | None:
         sha = commit["sha"]
         runs = (api(f"/repos/{repo}/actions/workflows/ci.yml/runs?head_sha={sha}&per_page=5") or {}).get(
             "workflow_runs", [])
-        if not runs:
-            ci = "none"
-        elif any(r["status"] != "completed" for r in runs):
-            ci = "running"
-        else:
-            ci = "passed" if all(r["conclusion"] == "success" for r in runs) else "failed"
+        ci = ci_result(runs)
         return {"sha": sha, "message": commit["commit"]["message"].splitlines()[0][:120],
                 "at": commit["commit"]["committer"]["date"], "ci": ci}
     return cached(f"commit:{repo}:{branch}", LATEST_TTL, fetch)

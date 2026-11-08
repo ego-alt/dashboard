@@ -16,6 +16,28 @@ _BACKUP_STATUS_FILE = os.environ.get(
     "BACKUP_STATUS_FILE", "/var/lib/home-stack-backup/status.json"
 )
 _BACKUP_STALE_HOURS = float(os.environ.get("BACKUP_STALE_AFTER_HOURS", "36"))
+# A run marked running for longer than this was cut off before it could write.
+_BACKUP_INTERRUPTED_HOURS = 6
+
+
+def _seconds_since(stamp) -> float | None:
+    try:
+        return (datetime.now(timezone.utc) - datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))).total_seconds()
+    except ValueError:
+        return None
+
+
+def backup_state(data: dict, age_seconds: float | None) -> str:
+    """running | interrupted | failed | stale | healthy: the one reading of the
+    status file, which the Services line and the Monitor card both show."""
+    if data.get("running_since"):
+        running = _seconds_since(data["running_since"])
+        return "running" if running is not None and running < _BACKUP_INTERRUPTED_HOURS * 3600 else "interrupted"
+    if not data.get("ok"):
+        return "failed"
+    if age_seconds is None or age_seconds > _BACKUP_STALE_HOURS * 3600:
+        return "stale"
+    return "healthy"
 
 
 @router.get("/backups/status")
@@ -30,14 +52,5 @@ def backup_status_endpoint(_: User = Depends(current_admin)):
             data = json.load(f)
     except (OSError, ValueError):
         raise HTTPException(status_code=500, detail="backup status file unreadable")
-    age_seconds = None
-    stale = True
-    finished = data.get("finished_at")
-    if finished:
-        try:
-            ts = datetime.fromisoformat(str(finished).replace("Z", "+00:00"))
-            age_seconds = (datetime.now(timezone.utc) - ts).total_seconds()
-            stale = age_seconds > _BACKUP_STALE_HOURS * 3600
-        except ValueError:
-            pass
-    return {"available": True, "age_seconds": age_seconds, "stale": stale, **data}
+    age_seconds = _seconds_since(data["finished_at"]) if data.get("finished_at") else None
+    return {"available": True, "state": backup_state(data, age_seconds), "age_seconds": age_seconds, **data}

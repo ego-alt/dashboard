@@ -8,37 +8,52 @@ import { usePoll } from '../lib/usePoll';
 
 const short = (sha) => (sha ? sha.slice(0, 7) : '');
 
-const RESULT = {
-  deployed: { text: 'Deployed', tone: 'text-[var(--color-text-secondary)]' },
-  'rolled-back': { text: 'Rolled back', tone: 'text-amber-300' },
-  'ci-failed': { text: 'CI failed', tone: 'text-[var(--color-danger)]' },
-  failed: { text: 'Didn’t start', tone: 'text-[var(--color-danger)]' },
-  'rollback-failed': { text: 'Rollback failed', tone: 'text-[var(--color-danger)]' },
+const TONE = {
+  quiet: 'text-[var(--color-text-muted)]',
+  info: 'text-[var(--color-text-secondary)]',
+  busy: 'text-[var(--color-accent)]',
+  warn: 'text-amber-300',
+  bad: 'text-[var(--color-danger)]',
 };
 
-/** One line saying where an app stands: what the Pi runs against what's on GitHub. */
+// The deploy script's recorded states (see record in scripts/deploy.sh), for
+// the commit each one names.
+const PI = {
+  'waiting-for-ci': { text: 'New commit: CI running', tone: TONE.info },
+  'no-ci': { text: 'New commit has no CI run, so it won’t deploy', tone: TONE.warn },
+  'ci-failed': { text: 'New commit failed CI', tone: TONE.bad },
+  deploying: { text: 'Deploying', tone: TONE.busy },
+  failed: { text: 'Didn’t start: fix and push again', tone: TONE.bad },
+  'rolled-back': { text: 'Rolled back: the new commit didn’t start', tone: TONE.warn },
+  'rollback-failed': { text: 'Rollback failed too: the Pi tries again every 30 min', tone: TONE.bad },
+};
+
+// GitHub's view of a commit the Pi hasn't looked at yet (it checks every 5 minutes).
+const GITHUB = {
+  running: { text: 'New commit: CI running', tone: TONE.info },
+  failed: { text: 'New commit failed CI', tone: TONE.bad },
+  passed: { text: 'New commit: deploying within 5 min', tone: TONE.busy },
+  none: { text: 'New commit has no CI run, so it won’t deploy', tone: TONE.warn },
+};
+
+/** One line saying where an app stands: the Pi's recorded state while it's
+ * about GitHub's newest commit, else what GitHub says about that commit. */
 function standing(a, checking) {
   if (a.kind === 'phone') {
     return a.release
-      ? { text: `Phone app: release ${a.release.version_name}`, tone: 'text-[var(--color-text-muted)]' }
-      : { text: 'Phone app: no release yet (its CI publishes them)', tone: 'text-amber-300' };
+      ? { text: `Phone app: release ${a.release.version_name}`, tone: TONE.quiet }
+      : { text: 'Phone app: no release yet (its CI publishes them)', tone: TONE.warn };
   }
-  if (a.queued) return { text: 'Queued: the Pi is on it', tone: 'text-[var(--color-accent)]' };
-  const deployed = a.deployed?.sha;
+  if (a.queued) return { text: 'Queued: the Pi is on it', tone: TONE.busy };
+  const pi = PI[a.pi?.state] && a.pi;
+  // These hold whatever GitHub says: the Pi is busy, or what runs is broken.
+  if (pi && (pi.state === 'deploying' || pi.state === 'rollback-failed')) return PI[pi.state];
+  if (!a.container && a.kind === 'app') return { text: 'Waiting for its first deploy', tone: TONE.busy };
   const latest = a.latest?.sha;
-  if (!a.latest) {
-    return { text: checking ? 'Checking GitHub…' : 'GitHub not reachable', tone: 'text-[var(--color-text-muted)]' };
-  }
-  if (!a.container && a.kind === 'app') return { text: 'Waiting for its first deploy', tone: 'text-[var(--color-accent)]' };
-  if (latest && deployed && latest !== deployed) {
-    if (a.latest.ci === 'running') return { text: 'New commit: CI running', tone: 'text-[var(--color-text-secondary)]' };
-    if (a.latest.ci === 'failed') return { text: 'New commit failed CI', tone: 'text-[var(--color-danger)]' };
-    if (a.latest.ci === 'passed') return { text: 'New commit: deploying within 5 min', tone: 'text-[var(--color-accent)]' };
-    return { text: 'New commit: no CI run', tone: 'text-amber-300' };
-  }
-  const r = RESULT[a.deployed?.result];
-  if (r && a.deployed.result !== 'deployed') return r;
-  return { text: 'Up to date', tone: 'text-[var(--color-text-muted)]' };
+  if (pi && (!latest || pi.sha === latest)) return PI[pi.state];
+  if (!a.latest) return { text: checking ? 'Checking GitHub…' : 'GitHub not reachable', tone: TONE.quiet };
+  if (latest !== a.running) return GITHUB[a.latest.ci] || GITHUB.none;
+  return { text: 'Up to date', tone: TONE.quiet };
 }
 
 function CommitCell({ commit, ci }) {
@@ -70,7 +85,7 @@ function Actions({ a, busy, onDeploy, onLog, onRemove }) {
       <button className="btn-link text-xs" disabled={busy || a.queued || phone} onClick={() => onDeploy(a)}
         title={phone ? 'A phone app ships when its CI publishes a release'
           : a.part_of
-            ? `Deploys ${a.part_of}, which ${a.name} ships with (it still has to pass CI)`
+            ? `Start it again on ${a.part_of}'s commit`
             : 'Deploy the latest commit now (it still has to pass CI)'}>
         Deploy now
       </button>
@@ -238,7 +253,7 @@ export default function DeployPage() {
     load();
   }, [load]);
   // Faster while something is on its way out.
-  const active = (apps || []).some((a) => a.queued || (a.kind === 'app' && !a.container));
+  const active = (apps || []).some((a) => a.queued || a.pi?.state === 'deploying' || (a.kind === 'app' && !a.container));
   usePoll(load, active ? 5000 : 30000);
 
   async function run(a, fn, message) {
@@ -320,7 +335,7 @@ export default function DeployPage() {
                         {a.part_of && <span className="text-xs text-[var(--color-text-muted)]">with {a.part_of}</span>}
                       </span>
                     </td>
-                    <td className="px-3 py-2"><CommitCell commit={a.deployed ? { sha: a.deployed.sha, at: a.deployed.at } : null} /></td>
+                    <td className="px-3 py-2"><CommitCell commit={a.running ? { sha: a.running, at: a.pi?.sha === a.running ? a.pi.at : null } : null} /></td>
                     <td className="px-3 py-2" title={a.latest?.message}><CommitCell commit={a.latest} ci={a.latest?.ci} /></td>
                     <td className={`px-3 py-2 text-xs ${s.tone}`}>{s.text}</td>
                     <td className="whitespace-nowrap px-4 py-2 text-right"><Actions {...props} /></td>
@@ -336,7 +351,7 @@ export default function DeployPage() {
                     <span className={`ml-auto text-xs ${s.tone}`}>{s.text}</span>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-[var(--color-text-muted)]">
-                    <span>running <span className="font-mono">{short(a.deployed?.sha) || '—'}</span></span>
+                    <span>running <span className="font-mono">{short(a.running) || '—'}</span></span>
                     <span>latest <span className="font-mono">{short(a.latest?.sha) || '—'}</span></span>
                     <span className="ml-auto"><Actions {...props} /></span>
                   </div>

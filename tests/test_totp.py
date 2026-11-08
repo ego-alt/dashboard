@@ -180,6 +180,25 @@ def test_totp_verify_without_pending_session_is_401(client):
     assert r.status_code == 401
 
 
+def test_expired_pending_session_says_so(client, make_user, TestSession):
+    """After 5 minutes the right code still fails, and the sign-in page needs
+    to tell that apart from a wrong code to send you back to the password."""
+    from datetime import datetime, timedelta, timezone
+
+    secret = _enrolled_user(client, make_user, TestSession)
+    _login_first_factor(client)
+    db = TestSession()
+    try:
+        db.query(UserSession).one().expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+        db.commit()
+    finally:
+        db.close()
+    r = client.post("/auth/totp/verify", data={"code": _current_code(secret)})
+    assert r.status_code == 401 and r.json()["detail"] == "no pending session"
+    r = client.post("/auth/totp/verify", data={"code": "000000"})
+    assert r.json()["detail"] == "no pending session"
+
+
 def test_full_session_cannot_be_used_for_totp_verify(client, make_user):
     """A user without 2FA enrolled still has a full session — /verify rejects it."""
     make_user(username="alice", password="hunter2-pass")
@@ -270,3 +289,36 @@ def test_me_includes_totp_enabled_flag(client, make_user, TestSession):
     # valid; the gate is at /login).
     r = client.get("/me")
     assert r.json()["totp_enabled"] is True
+
+
+# ---------- one state, one owner ----------
+
+
+def test_only_app_totp_writes_the_columns():
+    import pathlib
+    import re
+
+    writes = re.compile(r"\.(totp_secret|totp_enabled|totp_recovery_codes)\s*=[^=]")
+    app_dir = pathlib.Path(__file__).resolve().parent.parent / "app"
+    offenders = [
+        f"{p.relative_to(app_dir)}:{n}"
+        for p in app_dir.rglob("*.py")
+        if p.name != "totp.py" or p.parent != app_dir
+        for n, line in enumerate(p.read_text().splitlines(), 1)
+        if writes.search(line)
+    ]
+    assert offenders == []
+
+
+def test_enabled_without_a_secret_counts_as_off(client, make_user, TestSession):
+    """It can't verify a code, so it mustn't ask for one and lock the account."""
+    make_user(username="alice", password="hunter2-pass")
+    db = TestSession()
+    try:
+        db.query(User).one().totp_enabled = True
+        db.commit()
+    finally:
+        db.close()
+    r = _login_first_factor(client)
+    assert r.json() == {"ok": True, "username": "alice"}
+    assert client.get("/me").json()["totp_enabled"] is False

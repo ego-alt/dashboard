@@ -26,17 +26,17 @@ Every time is ISO 8601 with its zone (`2026-11-08T03:59:44+00:00`); clients show
 | `/users` | GET / POST | admin | List / create users (a browser visit redirects to the page) |
 | `/users/{id}/{password,admin,reset-2fa}` | POST | admin | Set a password (ends that user's sessions), toggle admin, clear 2FA |
 | `/users/{id}` | DELETE | admin | Delete a user (purges their sessions, tokens, passkeys) |
-| `/services` | GET | user | Hub tiles from `homehub.*` Docker labels, with state (up/degraded/down) and since when; 503 with the last known tiles when Docker is unreachable |
+| `/services` | GET | user | Hub tiles from `homehub.*` Docker labels, with state (up/starting/degraded/down, from `container_state`) and since when; 503 with the last known tiles when Docker is unreachable |
 | `/containers` | GET | user | Containers with state, health, start time and restart count (`?stats=1` adds CPU, memory, network) |
 | `/containers/{id}/start\|stop\|restart` | POST | admin | Container lifecycle (refuses the protected gateway containers with 409) |
 | `/containers/{id}/logs` | GET | user | Recent log lines (`?tail=`) |
 | `/uptime` | GET | user | Uptime strips: `days=1` → 24 hourly buckets, else daily; `tz` = the viewer's UTC offset in minutes |
 | `/stats/system` | GET | user | Host CPU, memory, disk, temperature |
 | `/stats/containers/{id}` | GET | user | One container's CPU, memory, network |
-| `/backups/status` | GET | admin | Last backup run (reads the status file the backup script writes) |
-| `/deploy/apps` | GET / POST | admin | The stack's apps with what the Pi runs / add an app from GitHub (`name`); a phone app is listed, not deployed |
+| `/backups/status` | GET | admin | Last backup run (reads the status file the backup script writes), with its `state`: running, interrupted, failed, stale or healthy |
+| `/deploy/apps` | GET / POST | admin | The stack's apps with the commit the Pi has checked out (`running`) and the deploy script's recorded state (`pi`: state, sha, at) / add an app from GitHub (`name`); a phone app is listed, not deployed |
 | `/deploy/apps/latest` | GET | admin | Each app's latest commit on GitHub with its CI result |
-| `/deploy/apps/{name}/deploy` | POST | admin | Deploy the latest commit now (it still has to pass CI) |
+| `/deploy/apps/{name}/deploy` | POST | admin | Deploy the latest commit now (it still has to pass CI); for `mcp`, start it again on the dashboard's commit |
 | `/deploy/apps/{name}` | DELETE | admin | Take an added app off the stack |
 | `/deploy/apps/{name}/log` | GET | admin | The deploy script's log for it (`?tail=`) |
 | `/deploy/repos`, `/deploy/repos/{name}/check` | GET | admin | Your GitHub repos not on the stack / whether one can join, as a checklist |

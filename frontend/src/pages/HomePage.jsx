@@ -6,7 +6,7 @@ import PageHeader from '../components/PageHeader.jsx';
 import ServiceIcon from '../components/ServiceIcon.jsx';
 import { StateDot, UptimeStrip } from '../components/Status.jsx';
 import { age, ago, clock, secondsSince } from '../lib/format';
-import { STATE, shownState } from '../lib/state';
+import { STATE } from '../lib/state';
 import { usePoll } from '../lib/usePoll';
 
 const SERVICES_POLL_MS = 30_000;
@@ -14,7 +14,7 @@ const UPTIME_POLL_MS = 5 * 60_000;
 const UPTIME_DAYS = 30;
 
 function sinceText(s) {
-  const label = STATE[shownState(s)]?.label ?? s.state;
+  const label = STATE[s.state]?.label ?? s.state;
   if (!s.since) return label;
   if (s.state === 'up') return `up ${age(secondsSince(s.since))}`;
   return `${label} since ${clock(s.since)}`;
@@ -31,17 +31,20 @@ function StatusLine({ services, dockerDown, host, backup }) {
   else if (problems.length === 0) parts.push(`all ${services.length} services up`);
   else
     for (const s of problems)
-      parts.push(`${s.display_name} ${shownState(s)}${s.since ? ` since ${clock(s.since)}` : ''}`);
+      parts.push(`${s.display_name} ${s.state}${s.since ? ` since ${clock(s.since)}` : ''}`);
 
   if (backup) {
-    if (!backup.available) parts.push('no backup yet');
-    else if (!backup.ok) {
-      parts.push('last backup failed');
-      bad = true;
-    } else if (backup.stale) {
-      parts.push(`backup stale (${age(backup.age_seconds)} ago)`);
-      bad = true;
-    } else parts.push(`backup ${age(backup.age_seconds)} ago`);
+    const line = !backup.available
+      ? 'no backup yet'
+      : {
+          running: 'backup running',
+          interrupted: 'last backup was cut off',
+          failed: 'last backup failed',
+          stale: `backup stale (${age(backup.age_seconds)} ago)`,
+          healthy: `backup ${age(backup.age_seconds)} ago`,
+        }[backup.state];
+    parts.push(line);
+    if (['interrupted', 'failed', 'stale'].includes(backup.state)) bad = true;
   }
   if (host) {
     const disks = [host.disk_percent, host.data_disk_percent].filter((p) => p != null);
@@ -66,7 +69,7 @@ function StatusLine({ services, dockerDown, host, backup }) {
 }
 
 function Tile({ s, uptime30, isAdmin, onStart, busy }) {
-  const st = STATE[shownState(s)] || STATE.unknown;
+  const st = STATE[s.state] || STATE.unknown;
   const down = s.state === 'down';
   const problem = down || s.state === 'degraded';
   const actions = isAdmin && problem && s.state !== 'unknown';

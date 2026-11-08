@@ -5,7 +5,8 @@ from app.routes import containers
 
 
 def _candidate(name, status="running", **labels):
-    return {"name": name, "status": status, "labels": labels}
+    # As list_service_candidates returns them: container_state always sets state.
+    return {"name": name, "status": status, "labels": labels, "state": "up" if status == "running" else "down"}
 
 
 # ---------- discovery from Docker labels ----------

@@ -20,7 +20,7 @@ def state(tmp_path, monkeypatch):
     monkeypatch.setattr(deploy, "STATE_DIR", tmp_path)
     monkeypatch.setattr(github, "_cache", {})
     (tmp_path / "status.json").write_text(json.dumps(
-        {"dashboard": {"sha": "abc1234", "result": "deployed", "at": "2026-10-19T04:22:11+0100"}}))
+        {"dashboard": {"state": "live", "sha": "abc1234", "at": "2026-10-19T03:22:11+00:00"}}))
     repos = [
         {"repo": "ego-alt/situation", "name": "situation", "description": "World news", "branch": "main",
          "pushed_at": "2026-10-19T10:00:00Z", "private": False},
@@ -66,7 +66,7 @@ def test_lists_the_stack_without_waiting_for_github(client, make_user, state, mo
     apps = _admin(client, make_user).get("/deploy/apps").json()["apps"]
     assert [a["name"] for a in apps] == ["dashboard", "mcp", "library", "calendar", "tapes"]
     dash = apps[0]
-    assert dash["deployed"]["sha"] == "abc1234" and dash["latest"] is None
+    assert dash["pi"]["sha"] == "abc1234" and dash["latest"] is None
     assert dash["container"]["state"] == "up" and dash["queued"] is False
 
 
@@ -127,7 +127,7 @@ def test_add_deploy_and_remove(client, make_user, state):
 
     (state / "requests" / "situation").unlink()
     assert c.post("/deploy/apps/mcp/deploy").status_code == 202
-    assert (state / "requests" / "dashboard").exists()                             # mcp ships with the dashboard
+    assert (state / "requests" / "mcp").exists()                                   # mcp is started again on its own
 
     assert c.delete("/deploy/apps/library").status_code == 404                     # core apps stay
     assert c.delete("/deploy/apps/situation").status_code == 200
@@ -214,9 +214,20 @@ def test_running_is_what_the_pi_has_checked_out(client, make_user, state):
     data["_heads"] = {"dashboard": "abc1234", "library": "0ff1ce0"}
     (state / "status.json").write_text(json.dumps(data))
     apps = {a["name"]: a for a in _admin(client, make_user).get("/deploy/apps").json()["apps"]}
-    assert apps["dashboard"]["deployed"]["result"] == "deployed"           # head matches the last deploy
-    assert apps["library"]["deployed"] == {"sha": "0ff1ce0", "result": None, "at": None}
-    assert apps["mcp"]["deployed"]["sha"] == "abc1234"                      # mcp runs the dashboard's commit
+    assert apps["dashboard"]["running"] == "abc1234" and apps["dashboard"]["pi"]["state"] == "live"
+    assert apps["library"]["running"] == "0ff1ce0" and apps["library"]["pi"] is None
+    assert apps["mcp"]["running"] == "abc1234"                              # mcp runs the dashboard's commit
+
+
+def test_the_pis_state_comes_through_as_it_is(client, make_user, state):
+    """A rollback records the bad commit while the good one stays checked out:
+    the row must still say rolled back, not "new commit on its way"."""
+    (state / "status.json").write_text(json.dumps({
+        "library": {"state": "rolled-back", "sha": "bad0000", "at": "2026-11-08T04:00:00+00:00"},
+        "_heads": {"library": "good000"}}))
+    lib = next(a for a in _admin(client, make_user).get("/deploy/apps").json()["apps"] if a["name"] == "library")
+    assert lib["running"] == "good000"
+    assert lib["pi"] == {"state": "rolled-back", "sha": "bad0000", "at": "2026-11-08T04:00:00+00:00"}
 
 
 def test_an_added_app_brings_its_own_icon(client, make_user, state, monkeypatch):
@@ -225,7 +236,7 @@ def test_an_added_app_brings_its_own_icon(client, make_user, state, monkeypatch)
     (state / "icons").mkdir()
     (state / "icons" / "situation.svg").write_text('<svg viewBox="0 0 24 24"></svg>')
     monkeypatch.setattr(services, "list_service_candidates", lambda: [
-        {"name": n, "status": "running", "labels": {"homehub.enable": "true", "homehub.route": f"/{n}/"}}
+        {"name": n, "status": "running", "state": "up", "labels": {"homehub.enable": "true", "homehub.route": f"/{n}/"}}
         for n in ("situation", "library")])
     c = _admin(client, make_user)
     tiles = {s["slug"]: s for s in c.get("/services").json()}

@@ -124,10 +124,14 @@ restic check --read-data-subset=5%   # also re-reads a sample of actual data
 
 ### Status in the dashboard
 
-Each run writes a JSON status file (outcome, time, duration, per-DB integrity,
-snapshot count, repo size). The dashboard's **Monitor → Backups** card reads it
-read-only and flags a run that failed or is older than ~36h — so a silent
-failure surfaces in the UI. The dashboard never gets restic creds.
+Each run marks the JSON status file as running when it starts, and writes it
+in full when it exits (outcome, time, duration, per-DB integrity, snapshot
+count, repo size). The dashboard reads it read-only and gives it one state
+(`app/routes/backups.py`): running, interrupted (still marked running after 6
+hours: cut off before it could write), failed, stale (older than ~36h) or
+healthy. The **Monitor → Backups** card and the Services status line both show
+that state, so a silent failure surfaces in the UI. The dashboard never gets
+restic creds.
 
 No config needed: the script writes to `/var/lib/home-stack-backup-status/` by
 default (a **dedicated** dir, not the staging dir — so the read-only mount can't

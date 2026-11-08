@@ -100,9 +100,8 @@ def list_services() -> List[Dict[str, Any]]:
                 "accent": a if (a := _label(labels, "accent")) and _HEX.match(a) else None,
                 "container_name": c["name"],
                 "status": "running" if c.get("status") == "running" else "stopped",
-                # up / degraded (running but unhealthy) / down — see container_state.
                 "health": c.get("health"),
-                "state": c.get("state") or ("up" if c.get("status") == "running" else "down"),
+                "state": c["state"],  # see container_state
                 "since": c.get("started_at") if c.get("status") == "running" else c.get("finished_at"),
             }
         )

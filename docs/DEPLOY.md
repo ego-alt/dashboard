@@ -5,9 +5,11 @@ All the repos (dashboard, library, calendar, tapes, and any app added in the Dep
 The Pi **pulls** its deploys; nothing pushes to it. A systemd timer runs `scripts/deploy.sh` every 5 minutes. For each repo it:
 
 1. fetches the deploy branch (`main` for tapes, `master` for the rest);
-2. stops unless there's a new commit **and** that commit's CI run passed;
-3. fast-forwards, pulls the image CI published for that commit (tagged as the service's local `<service>:dev`) and restarts only that service; a repo with no image for the commit is built on the Pi instead, as it used to be. The last two pulled images of each repo are kept, for a rollback. A dashboard change also re-applies `docker-compose.yml` to the other services, reloads nginx (waiting for it if recreating its dependencies restarted it), and rebuilds the `mcp` container. Every run ends by starting nginx if it's found stopped, since it's the way in to everything. That last step is best-effort: a broken `mcp` shows as `"mcp": "failed"` in the status file and never rolls the dashboard back;
-4. waits for the container's health check. If it doesn't come up healthy, it rolls back to the previous commit (pulling that commit's image), and won't retry the bad commit until a newer one lands.
+2. stops unless there's a new commit **and** that commit's CI run passed (`app/ci.py` decides, the same rule the Deploy tab uses: a run cancelled by a newer push doesn't count). A repo that matches GitHub but whose container runs another commit's image (after a reset by hand) is redeployed;
+3. fast-forwards, pulls the image CI published for that commit (tagged as the service's local `<service>:dev`) and restarts only that service; a repo with no image for the commit is built on the Pi instead, as it used to be. The last two pulled images of each repo are kept, for a rollback. A dashboard change also re-applies `docker-compose.yml` to the other services, reloads nginx (waiting for it if recreating its dependencies restarted it), and rebuilds the `mcp` container. Every run ends by starting nginx if it's found stopped, since it's the way in to everything. That last step is best-effort: a broken `mcp` shows as failed and never rolls the dashboard back, and "Deploy now" on its row starts just it again;
+4. waits for the container's health check. If it doesn't come up healthy, it rolls back to the previous commit (pulling that commit's image), and won't retry the bad commit until a newer one lands. If the rollback doesn't come up either, it tries the rollback again every 30 minutes.
+
+Each repo's place in this is written to `status.json` as one explicit state, with the commit it's about: `waiting-for-ci`, `no-ci`, `ci-failed`, `deploying`, `live`, `failed` (a first deploy that didn't start), `rolled-back` or `rollback-failed` (the list is at `record` in `scripts/deploy.sh`). The Deploy tab shows that state as it is while it's about GitHub's newest commit, and otherwise what GitHub says about the newer commit the Pi hasn't looked at yet.
 
 The **Deploy** tab in the dashboard shows each repo's running and latest commit, CI result and deploy log, with "Deploy now" and "Remove" (added apps only) on every row. Apps added there are cloned, given a compose service and an nginx route, and deployed once their CI passes; a dashboard deploy never restarts them (see [`APPS.md`](APPS.md)). "Deploy now" starts a run at once (a systemd path unit watches for the request).
 
@@ -25,7 +27,7 @@ It also installs `home-stack-power.path`, which powers the Pi off when an admin 
 
 ```sh
 journalctl -u home-stack-deploy -f              # watch deploys
-cat /var/lib/home-stack-deploy/status.json      # last outcome per repo
+cat /var/lib/home-stack-deploy/status.json      # each repo's state
 sudo systemctl start home-stack-deploy          # check right now
 systemctl list-timers home-stack-deploy.timer   # next run
 ```

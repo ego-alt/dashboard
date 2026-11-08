@@ -92,11 +92,14 @@ def _ts(raw: Any) -> str | None:
 
 
 def container_state(container) -> Dict[str, Any]:
-    """Up/degraded/down plus uptime facts, from the inspect data docker-py
-    already fetched for ``containers.list`` (no extra daemon call).
+    """up | starting | degraded | down, plus uptime facts, from the inspect
+    data docker-py already fetched for ``containers.list`` (no extra daemon
+    call). This is the one place a container's state is decided.
 
-    ``degraded`` = running but its healthcheck says unhealthy (or is still
-    starting): the container is there, the app inside isn't answering.
+    ``starting`` = running, and its healthcheck hasn't passed yet (just started
+    or restarted; Docker turns it unhealthy if it never does). ``degraded`` =
+    running but its healthcheck says unhealthy: the container is there, the app
+    inside isn't answering.
     """
     attrs = container.attrs or {}
     st = attrs.get("State") or {}
@@ -104,7 +107,9 @@ def container_state(container) -> Dict[str, Any]:
     running = container.status == "running"
     if not running:
         state = "down"
-    elif health in ("unhealthy", "starting"):
+    elif health == "starting":
+        state = "starting"
+    elif health == "unhealthy":
         state = "degraded"
     else:
         state = "up"

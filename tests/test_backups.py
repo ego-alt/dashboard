@@ -1,5 +1,5 @@
 """Backup status endpoint: admin-gated, tolerates a missing file, and computes
-freshness (stale vs healthy) from the status file's finished_at timestamp."""
+its state (running, interrupted, failed, stale or healthy) from the status file."""
 
 import json
 from datetime import datetime, timedelta, timezone
@@ -45,7 +45,7 @@ def test_fresh_run_is_healthy(client, make_user, monkeypatch, tmp_path):
     _admin(client, make_user)
     r = client.get("/backups/status").json()
     assert r["available"] is True
-    assert r["stale"] is False
+    assert r["state"] == "healthy"
     assert r["snapshot_count"] == 5
     assert r["age_seconds"] is not None
 
@@ -59,4 +59,29 @@ def test_old_run_is_stale(client, make_user, monkeypatch, tmp_path):
     monkeypatch.setattr("app.routes.backups._BACKUP_STATUS_FILE", str(p))
     _admin(client, make_user)
     r = client.get("/backups/status").json()
-    assert r["available"] is True and r["stale"] is True
+    assert r["available"] is True and r["state"] == "stale"
+
+
+def _state(client, make_user, monkeypatch, tmp_path, data):
+    p = tmp_path / "status.json"
+    p.write_text(json.dumps(data))
+    monkeypatch.setattr("app.routes.backups._BACKUP_STATUS_FILE", str(p))
+    _admin(client, make_user)
+    return client.get("/backups/status").json()["state"]
+
+
+def test_failed_run(client, make_user, monkeypatch, tmp_path):
+    data = {"ok": False, "finished_at": _utc(datetime.now(timezone.utc)), "error": "failed during: pruning"}
+    assert _state(client, make_user, monkeypatch, tmp_path, data) == "failed"
+
+
+def test_a_run_going_now_is_running(client, make_user, monkeypatch, tmp_path):
+    now = datetime.now(timezone.utc)
+    data = {"ok": False, "finished_at": _utc(now - timedelta(days=1)), "running_since": _utc(now - timedelta(minutes=2))}
+    assert _state(client, make_user, monkeypatch, tmp_path, data) == "running"
+
+
+def test_a_run_that_never_finished_is_interrupted(client, make_user, monkeypatch, tmp_path):
+    now = datetime.now(timezone.utc)
+    data = {"ok": True, "finished_at": _utc(now - timedelta(days=1)), "running_since": _utc(now - timedelta(hours=7))}
+    assert _state(client, make_user, monkeypatch, tmp_path, data) == "interrupted"

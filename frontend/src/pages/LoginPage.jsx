@@ -94,13 +94,25 @@ export default function LoginPage() {
       await verifyTotp(code);
       await refresh(); // sets `user`; the effect above moves on
     } catch (err) {
-      setError(
-        err.status === 401
-          ? 'Wrong code. Try again, or use a recovery code.'
-          : 'Something went wrong. Try again.',
-      );
+      if (err.status === 401 && err.body?.detail === 'no pending session') {
+        // The password step only holds for 5 minutes (MFA_PENDING_TTL).
+        backToCredentials('That took more than 5 minutes. Sign in again.');
+      } else {
+        setError(
+          err.status === 401
+            ? 'Wrong code. Try again, or use a recovery code.'
+            : 'Something went wrong. Try again.',
+        );
+      }
       setBusy(false);
     }
+  }
+
+  function backToCredentials(message = '') {
+    setStage('credentials');
+    setPassword('');
+    setCode('');
+    setError(message);
   }
 
   return (
@@ -193,11 +205,7 @@ export default function LoginPage() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                setStage('credentials');
-                setCode('');
-                setError('');
-              }}
+              onClick={() => backToCredentials()}
               className="btn btn-secondary w-full text-sm"
             >
               Use a different account

@@ -1,7 +1,6 @@
 """Signing in and out, and your own account: who you are, your password, where
 you're signed in, your recent sign-ins. Also /auth/verify, which nginx asks
 before serving any app (a session cookie or an API token)."""
-import json
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -28,6 +27,7 @@ from app.auth import (
 from app.db import get_db
 from app.models import LoginEvent, User, UserSession
 from app.ratelimit import LOGIN_RATE_LIMIT, limiter
+from app.totp import recovery_left, totp_state
 
 router = APIRouter(tags=["account"])
 
@@ -68,7 +68,7 @@ def login(
             user_agent=user_agent,
         )
         raise HTTPException(status_code=401, detail="bad credentials")
-    if user.totp_enabled:
+    if totp_state(user) == "on":
         # First factor passed; gate the rest of the app behind /auth/totp/verify.
         token = mint_pending_session(db, user, ip=ip, user_agent=user_agent)
         set_session_cookie(request, response, token)
@@ -112,18 +112,9 @@ def me(user: User = Depends(current_user)):
         "username": user.username,
         "display_name": user.display_name,
         "is_admin": bool(user.is_admin),
-        "totp_enabled": bool(user.totp_enabled),
-        "totp_recovery_left": _recovery_left(user),
+        "totp_enabled": totp_state(user) == "on",
+        "totp_recovery_left": recovery_left(user),
     }
-
-
-def _recovery_left(user: User) -> Optional[int]:
-    if not user.totp_enabled or not user.totp_recovery_codes:
-        return None
-    try:
-        return len(json.loads(user.totp_recovery_codes))
-    except ValueError:
-        return None
 
 
 @router.post("/me/password")

@@ -128,25 +128,21 @@ def check_repo(repo: str, branch: str) -> dict:
 # ---------- endpoints ----------
 
 def _row(app: dict, status: dict, containers: dict, queued: set[str], kind: str) -> dict:
-    """An app as the Pi sees it. "Latest on GitHub" only if it's already cached:
-    asking GitHub takes seconds, so the page gets it from /deploy/apps/latest."""
-    # What the Pi has checked out (written every run), with the last deploy's
-    # outcome when it was for that same commit.
-    head = status.get("_heads", {}).get(app.get("part_of") or app["name"])
-    last = status.get(app["name"])
-    if head:
-        deployed = {"sha": head, "result": last["result"], "at": last["at"]} if last and last.get("sha") == head \
-            else {"sha": head, "result": None, "at": None}
-    else:
-        deployed = last
+    """An app as the Pi sees it: the commit it has checked out (written every
+    run) and the deploy script's last recorded state, passed on as it is (see
+    record in scripts/deploy.sh). "Latest on GitHub" only if it's already
+    cached: asking GitHub takes seconds, so the page gets it from
+    /deploy/apps/latest."""
+    entry = status.get(app["name"])
     container = containers.get(app.get("container") or app["name"])
     return {
         "name": app["name"], "kind": kind, "repo": app["repo"], "branch": app["branch"],
         "title": app.get("title") or app["name"], "part_of": app.get("part_of"),
-        "deployed": deployed,
+        "running": status.get("_heads", {}).get(app.get("part_of") or app["name"]),
+        "pi": {k: entry.get(k) for k in ("state", "sha", "at")} if isinstance(entry, dict) and entry.get("state") else None,
         "latest": github.cached_latest(app["repo"], app["branch"]),
         "container": {"state": container["state"], "status": container.get("status")} if container else None,
-        "queued": app.get("part_of", app["name"]) in queued,
+        "queued": app["name"] in queued,
     }
 
 
@@ -165,7 +161,7 @@ def list_apps(_: User = Depends(current_admin)):
     for app in phone_apps():      # nothing deployed: what matters is the newest release
         release = latest_release(app)
         rows.append({"name": app["name"], "kind": "phone", "repo": app["repo"], "branch": app["branch"],
-                     "title": app.get("title") or app["name"], "part_of": None, "deployed": None,
+                     "title": app.get("title") or app["name"], "part_of": None, "running": None, "pi": None,
                      "latest": github.cached_latest(app["repo"], app["branch"]), "container": None, "queued": False,
                      "release": {"version_code": release["version_code"], "version_name": release["version_name"],
                                  "published_at": release["published_at"]} if release else None})
@@ -260,7 +256,8 @@ def deploy_now(name: str, _: User = Depends(current_admin)):
     if app is None:
         raise HTTPException(404, "No such app." if name not in {a["name"] for a in phone_apps()}
                             else "A phone app ships when its CI publishes a release.")
-    request_deploy(app.get("part_of") or name)
+    # mcp on its own: the script starts it again on the dashboard's commit.
+    request_deploy(name)
     return {"queued": True}
 
 

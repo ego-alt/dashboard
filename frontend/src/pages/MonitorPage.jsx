@@ -6,7 +6,7 @@ import LogsDrawer from '../components/LogsDrawer.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import Panel from '../components/Panel.jsx';
 import { StateDot, UptimeStrip } from '../components/Status.jsx';
-import { PROBLEM_RANK, STATE, shownState } from '../lib/state';
+import { PROBLEM_RANK, STATE } from '../lib/state';
 import { age, secondsSince, sentence } from '../lib/format';
 import { useNow, usePoll } from '../lib/usePoll';
 
@@ -202,9 +202,16 @@ function BackupsSection() {
   if (!s.available)
     return card(<p className="text-sm text-[var(--color-text-muted)]">No backup has run yet.</p>);
 
-  const healthy = s.ok && !s.stale;
-  const label = !s.ok ? 'failed' : s.stale ? 'stale' : 'healthy';
-  const pill = healthy ? 'bg-green-500/15 text-green-300' : 'bg-red-500/15 text-red-300';
+  const problem = {
+    interrupted: 'The last run stopped before it finished (a power cut, or it was killed).',
+    failed: s.error || 'The last run failed.',
+    stale: 'Last backup is stale — check the timer on the Pi.',
+  }[s.state];
+  const pill = s.state === 'healthy'
+    ? 'bg-green-500/15 text-green-300'
+    : s.state === 'running'
+      ? 'bg-[var(--color-bg-inset)] text-[var(--color-text-secondary)]'
+      : 'bg-red-500/15 text-red-300';
 
   return (
     card(
@@ -243,13 +250,9 @@ function BackupsSection() {
             <dd className="text-[var(--color-text-primary)]">{fmtBytes(s.repo_bytes)}</dd>
           </div>
         </dl>
-        {!healthy && (
-          <p className="mt-3 text-sm text-[var(--color-danger)]">
-            {s.error || 'Last backup is stale — check the timer on the Pi.'}
-          </p>
-        )}
+        {problem && <p className="mt-3 text-sm text-[var(--color-danger)]">{problem}</p>}
       </>,
-      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${pill}`}>{label}</span>,
+      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${pill}`}>{s.state}</span>,
     )
   );
 }
@@ -298,7 +301,7 @@ function netText(c) {
 function StateCell({ c, pending }) {
   if (pending)
     return <span className="text-xs text-[var(--color-text-secondary)]">{VERBS[pending].pending}</span>;
-  const s = STATE[shownState(c)] || STATE.unknown;
+  const s = STATE[c.state] || STATE.unknown;
   return (
     <span className={`flex items-center gap-1.5 text-xs ${s.text}`} title={c.health ? `health: ${c.health} · docker: ${c.status}` : `docker: ${c.status}`}>
       <StateDot state={c.state} />

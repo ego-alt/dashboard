@@ -22,6 +22,8 @@ log = logging.getLogger("dashboard.uptime")
 
 SAMPLE_SECONDS = 60
 RETAIN_DAYS = 90
+# Minutes a container spends starting (a deploy or restart) count as neither:
+# they're left out of the uptime figure, like minutes with no sample.
 STATES = ("up", "degraded", "down")
 
 

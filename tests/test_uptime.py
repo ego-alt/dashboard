@@ -26,7 +26,7 @@ def test_container_state():
     }
     assert docker_control.container_state(_c(health="healthy"))["state"] == "up"
     assert docker_control.container_state(_c(health="unhealthy"))["state"] == "degraded"
-    assert docker_control.container_state(_c(health="starting"))["state"] == "degraded"
+    assert docker_control.container_state(_c(health="starting"))["state"] == "starting"
     down = docker_control.container_state(_c("exited", FinishedAt="2026-10-16T02:14:00Z"))
     assert down["state"] == "down"
     assert down["started_at"] is None and down["finished_at"] == "2026-10-16T02:14:00Z"
@@ -48,6 +48,7 @@ def test_samples_add_up_per_hour(TestSession):
             NOW + timedelta(minutes=minute),
         )
     record_sample(db, [{"name": "music", "state": "degraded"}], NOW)
+    record_sample(db, [{"name": "music", "state": "starting"}], NOW)  # left out
     record_sample(db, [{"name": "music", "state": "nonsense"}], NOW)
     rows = {r.name: r for r in db.query(UptimeHour)}
     assert (rows["music"].up, rows["music"].degraded, rows["music"].down) == (3, 1, 0)

@@ -12,6 +12,9 @@
 #   4. wait for its health check; if it fails, roll back to the previous
 #      commit and rebuild that, and don't retry the bad commit
 #
+# Each step's outcome is recorded per repo as an explicit state (see record),
+# which the Deploy tab shows as it is.
+#
 # It never touches a repo with local changes or a diverged branch. Its only
 # inputs are public CI results and, from the Deploy tab (admins only), which
 # apps are enabled ($STATE_DIR/apps/*.json) and "deploy now" requests
@@ -65,6 +68,24 @@ fi
 
 log() { echo "$(date '+%F %T') [$1] ${*:2}"; }
 
+# status.json from before the explicit states (see record) held a "result";
+# give those entries their state once.
+python3 - "$STATE_DIR/status.json" <<'EOF' 2>/dev/null || true
+import json, sys
+from datetime import datetime
+path = sys.argv[1]
+data = json.load(open(path))
+changed = False
+for name, entry in data.items():
+    if name != "_heads" and isinstance(entry, dict) and "result" in entry and "state" not in entry:
+        result = entry.pop("result")
+        entry["state"] = "live" if result == "deployed" else result
+        entry["at"] = datetime.strptime(entry["at"], "%Y-%m-%dT%H:%M:%S%z").isoformat()
+        changed = True
+if changed:
+    json.dump(data, open(path, "w"), indent=2)
+EOF
+
 compose() { (cd "$COMPOSE_DIR" && docker compose "$@"); }
 
 # owner/name from the origin URL (https or ssh form).
@@ -80,7 +101,8 @@ git_token() {
     | sed -n 's/^password=//p'
 }
 
-# Prints the CI workflow's result for a commit: success | failure | pending | none
+# Prints the CI workflow's result for a commit: passed | failed | running | none,
+# or unknown when GitHub can't be asked
 ci_result() {
   local slug=$1 sha=$2 json code header="" token=${DEPLOY_GITHUB_TOKEN:-}
   [[ -z $token ]] && token=$(git_token || true)
@@ -88,27 +110,16 @@ ci_result() {
   # The header comes in on stdin, so the token never shows up in ps.
   json=$(curl -sS --max-time 20 -w '\n%{http_code}' -H @- <<<"$header" \
     "https://api.github.com/repos/$slug/actions/workflows/ci.yml/runs?head_sha=$sha&per_page=5" \
-    2>/dev/null) || { echo pending; return; }   # API unreachable: try next tick
+    2>/dev/null) || { echo unknown; return; }   # API unreachable: try next tick
   code=${json##*$'\n'}
   json=${json%$'\n'*}
   case $code in
     200) ;;
     404) echo none; return ;;      # no ci.yml workflow in this repo
-    *)   echo pending; return ;;   # rate limited (403/429) or a GitHub hiccup
+    *)   echo unknown; return ;;   # rate limited (403/429) or a GitHub hiccup
   esac
-  python3 -c '
-import json, sys
-runs = json.load(sys.stdin).get("workflow_runs", [])
-if not runs:
-    print("none")
-elif any(r["status"] != "completed" for r in runs):
-    print("pending")
-else:
-    # A push can start two runs and the concurrency rule cancels one; only
-    # the runs that finished count.
-    finished = [r for r in runs if r["conclusion"] not in ("cancelled", "skipped")]
-    print("success" if finished and all(r["conclusion"] == "success" for r in finished) else "failure")
-' <<<"$json"
+  # The same rule the Deploy tab uses.
+  python3 -I "$COMPOSE_DIR/app/ci.py" <<<"$json" || echo unknown
 }
 
 # Wait for the container's healthcheck. Containers without one count as
@@ -217,28 +228,53 @@ restart_service() {
 # The MCP server lives in the dashboard repo but is its own container. Best
 # effort: a broken mcp build is logged and recorded, never a reason to roll
 # the dashboard back (nginx resolves mcp per request, so nothing else needs it).
+# "Deploy now" on its row in the Deploy tab retries just this.
 restart_mcp() {
   local sha
   sha=$(git -C "$STACK_DIR/dashboard" rev-parse HEAD)
+  record mcp "$sha" deploying
   if get_image mcp "$STACK_DIR/dashboard" mcp -mcp && compose up -d --no-build mcp && wait_healthy mcp; then
-    record mcp "$sha" "deployed"
+    record mcp "$sha" live
   else
     log mcp "${sha:0:7}: mcp didn't build or start healthy; the rest of the stack is unaffected"
-    record mcp "$sha" "failed"
+    record mcp "$sha" failed
   fi
 }
 
-record() {  # name sha result
+# Each repo's place in the deploy, in status.json as {state, sha, at}: sha is
+# the commit the state is about. The Deploy tab shows these as they are.
+#   waiting-for-ci   the newest commit's CI is still running
+#   no-ci            the newest commit has no CI run, so it won't deploy
+#   ci-failed        the newest commit failed CI, so it won't deploy
+#   deploying        starting the newest commit
+#   live             running the newest commit
+#   failed           a first deploy that didn't start healthy
+#   rolled-back      sha didn't start healthy; the commit before it runs again
+#   rollback-failed  and the commit before it didn't start either
+# A commit that ended ci-failed, failed, rolled-back or rollback-failed isn't
+# tried again (its <name>.bad file) until a newer one lands or "Deploy now" asks.
+record() {  # name sha state
   python3 - "$STATE_DIR/status.json" "$1" "$2" "$3" <<'EOF'
-import json, sys, time
-path, name, sha, result = sys.argv[1:]
+import json, sys
+from datetime import datetime, timezone
+path, name, sha, state = sys.argv[1:]
 try:
     data = json.load(open(path))
 except (OSError, ValueError):
     data = {}
-data[name] = {"sha": sha, "result": result,
-              "at": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
+data[name] = {"state": state, "sha": sha, "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
 json.dump(data, open(path, "w"), indent=2)
+EOF
+}
+
+# "<state> <seconds since>" of a repo's last record, or nothing.
+recorded() {  # name
+  python3 - "$STATE_DIR/status.json" "$1" <<'EOF' 2>/dev/null || true
+import json, sys
+from datetime import datetime, timezone
+entry = json.load(open(sys.argv[1])).get(sys.argv[2]) or {}
+if entry.get("state"):
+    print(entry["state"], int((datetime.now(timezone.utc) - datetime.fromisoformat(entry["at"])).total_seconds()))
 EOF
 }
 
@@ -248,9 +284,27 @@ is_app() {
   return 1
 }
 
+# Whether a container runs the image CI built for the commit checked out. A
+# repo reset by hand to match GitHub looks up to date while the container
+# still runs what it ran before; comparing image ids catches that, and two
+# commits with the same contents (a reworded history) share one image. Without
+# a CI image for the commit there's nothing to compare, so it counts as a match.
+runs_checked_out() {  # repo-folder container [suffix]
+  local dir=$1 container=$2 suffix=${3:-} ref want
+  ref="ghcr.io/$(github_slug "$dir" | tr '[:upper:]' '[:lower:]')$suffix:$(git -C "$dir" rev-parse HEAD)"
+  want=$(docker image inspect -f '{{.Id}}' "$ref" 2>/dev/null) \
+    || { docker pull -q "$ref" >/dev/null 2>&1 && want=$(docker image inspect -f '{{.Id}}' "$ref" 2>/dev/null); } \
+    || return 0
+  [[ $(docker inspect -f '{{.Image}}' "$container" 2>/dev/null) == "$want" ]]
+}
+
+# A rollback that didn't come up healthy is tried again, at most every 30
+# minutes, until the commit before the bad one runs.
+ROLLBACK_RETRY=1800
+
 deploy_repo() {
   local name=$1 branch=$2 service=$3 container=$4 force=${5:-0}
-  local dir="$STACK_DIR/$name" current target result
+  local dir="$STACK_DIR/$name" current target ci last age
   local bad_file="$STATE_DIR/$name.bad"
 
   local first=0
@@ -259,18 +313,34 @@ deploy_repo() {
   current=$(git -C "$dir" rev-parse HEAD)
   target=$(git -C "$dir" rev-parse "origin/$branch")
   if [[ $current == "$target" ]]; then
-    # Up to date, unless it was just cloned and has never run, or the Deploy
-    # tab asked for a fresh build.
+    # Up to date, unless it was just cloned and has never run, the Deploy tab
+    # asked for a fresh build, or the container runs another commit's image.
     if docker inspect "$container" >/dev/null 2>&1; then
+      if (( ! force )) && ! runs_checked_out "$dir" "$container"; then
+        log "$name" "the container isn't running ${target:0:7}'s image; redeploying it"
+        force=1
+      fi
       (( force )) || return 0
       rm -f "$bad_file"
     fi
     first=1
   fi
 
-  if [[ -f $bad_file && $(cat "$bad_file") == "$target" ]]; then
-    return   # already failed and rolled back; wait for a newer commit
+  if [[ -f $bad_file && $(cat "$bad_file") == "$target" ]] && (( ! force )); then
+    read -r last age <<<"$(recorded "$name")"
+    if [[ $last == rollback-failed ]]; then
+      (( ${age:-0} >= ROLLBACK_RETRY )) || return
+      log "$name" "trying the rollback to ${current:0:7} again"
+      if restart_service "$name" "$service" && wait_healthy "$container"; then
+        log "$name" "${current:0:7} is running again"
+        record "$name" "$target" rolled-back
+      else
+        record "$name" "$target" rollback-failed
+      fi
+    fi
+    return   # wait for a newer commit
   fi
+  (( force )) && rm -f "$bad_file"
   if [[ $(git -C "$dir" rev-parse --abbrev-ref HEAD) != "$branch" ]]; then
     log "$name" "not on $branch; skipping"; return
   fi
@@ -282,44 +352,47 @@ deploy_repo() {
   fi
 
   if [[ $REQUIRE_CI == 1 ]]; then
-    result=$(ci_result "$(github_slug "$dir")" "$target")
-    case $result in
-      success) ;;
-      pending) log "$name" "${target:0:7}: CI still running; will check again"; return ;;
-      none)    log "$name" "${target:0:7}: no CI run for this commit; not deploying"; return ;;
+    ci=$(ci_result "$(github_slug "$dir")" "$target")
+    case $ci in
+      passed) ;;
+      running) log "$name" "${target:0:7}: CI still running; will check again"
+               record "$name" "$target" waiting-for-ci; return ;;
+      none)    log "$name" "${target:0:7}: no CI run for this commit; not deploying"
+               record "$name" "$target" no-ci; return ;;
+      unknown) log "$name" "${target:0:7}: couldn't ask GitHub about CI; will check again"; return ;;
       *)       log "$name" "${target:0:7}: CI failed; not deploying"
-               echo "$target" >"$bad_file"; record "$name" "$target" "ci-failed"; return ;;
+               echo "$target" >"$bad_file"; record "$name" "$target" ci-failed; return ;;
     esac
   fi
 
+  record "$name" "$target" deploying
   if (( first )); then
     log "$name" "building and starting ${target:0:7}"
   else
     log "$name" "deploying ${current:0:7} -> ${target:0:7}"
     # Checked explicitly: set -e is off inside a function called with ||.
-    git -C "$dir" merge -q --ff-only "$target" || { log "$name" "fast-forward failed"; return; }
+    git -C "$dir" merge -q --ff-only "$target" || { log "$name" "fast-forward failed"; record "$name" "$target" failed; return; }
   fi
   if restart_service "$name" "$service" && wait_healthy "$container"; then
     log "$name" "${target:0:7} is live"
     rm -f "$bad_file"
-    record "$name" "$target" "deployed"
+    record "$name" "$target" live
     return
   fi
+  echo "$target" >"$bad_file"
   if (( first )); then
     log "$name" "${target:0:7} didn't start healthy; fix and push again"
-    echo "$target" >"$bad_file"
-    record "$name" "$target" "failed"
+    record "$name" "$target" failed
     return
   fi
 
   log "$name" "${target:0:7} failed to start healthy; rolling back to ${current:0:7}"
-  echo "$target" >"$bad_file"
   git -C "$dir" reset -q --hard "$current"
   if restart_service "$name" "$service" && wait_healthy "$container"; then
-    record "$name" "$target" "rolled-back"
+    record "$name" "$target" rolled-back
   else
-    log "$name" "rollback to ${current:0:7} is not healthy either; needs a look"
-    record "$name" "$target" "rollback-failed"
+    log "$name" "rollback to ${current:0:7} is not healthy either; will try it again in 30 minutes"
+    record "$name" "$target" rollback-failed
   fi
 }
 
@@ -370,6 +443,15 @@ for entry in "${REPOS[@]}" ${APPS[@]+"${APPS[@]}"}; do
     tail -n 2000 "$LOG_DIR/$name.log" >"$LOG_DIR/$name.log.tmp" && mv "$LOG_DIR/$name.log.tmp" "$LOG_DIR/$name.log"
   fi
 done
+
+# The MCP server, when "Deploy now" asked for it alone or its container runs
+# another commit's image (a dashboard deploy above restarts it as well).
+if [[ -n ${FORCE[mcp]:-} ]] || { docker inspect mcp >/dev/null 2>&1 && ! runs_checked_out "$STACK_DIR/dashboard" mcp -mcp; }; then
+  {
+    log mcp "starting it on $(git -C "$STACK_DIR/dashboard" rev-parse --short HEAD)"
+    restart_mcp || log mcp "deploy step errored"
+  } 2>&1 | tee -a "$LOG_DIR/dashboard.log"
+fi
 
 # Whatever happened above, nginx is the front door to everything: never
 # leave it stopped.

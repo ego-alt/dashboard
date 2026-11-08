@@ -5,6 +5,14 @@ argon2id-hashed recovery codes (one-time use). Verification accepts both
 TOTP codes and unused recovery codes — successful recovery removes the hash
 so it cannot be reused.
 
+Those three columns make one state, and only this module writes them:
+
+  off          no secret                      start_setup →  setting-up
+  setting-up   a secret, not yet confirmed     turn_on     →  on
+  on           secret, enabled, codes          turn_off    →  off (from any state)
+
+``totp_state`` is the one reading of them; nothing else looks at the columns.
+
 The QR code is rendered server-side as SVG to avoid pulling a JS QR library
 into the frontend bundle.
 """
@@ -97,6 +105,55 @@ def consume_recovery_code(user: User, code: str) -> bool:
             user.totp_recovery_codes = json.dumps(hashes)
             return True
     return False
+
+
+def totp_state(user: User) -> str:
+    """off | setting-up | on. Enabled without a secret can't verify a code, so
+    it counts as off rather than locking the account."""
+    if not user.totp_secret:
+        return "off"
+    return "on" if user.totp_enabled else "setting-up"
+
+
+def recovery_left(user: User) -> Optional[int]:
+    if totp_state(user) != "on" or not user.totp_recovery_codes:
+        return None
+    try:
+        return len(json.loads(user.totp_recovery_codes))
+    except ValueError:
+        return None
+
+
+def start_setup(user: User) -> str:
+    """off or setting-up → setting-up with a fresh secret, which is returned.
+    Harmless if abandoned: nothing asks for a code until ``turn_on``."""
+    user.totp_secret = generate_secret()
+    user.totp_enabled = False
+    user.totp_recovery_codes = None
+    return user.totp_secret
+
+
+def turn_on(user: User) -> list[str]:
+    """setting-up → on. The caller has checked a code against the secret.
+    Returns the plaintext recovery codes, shown once."""
+    codes = generate_recovery_codes()
+    user.totp_recovery_codes = hash_recovery_codes(codes)
+    user.totp_enabled = True
+    return codes
+
+
+def new_recovery_codes(user: User) -> list[str]:
+    """on → on, with codes that replace the old ones."""
+    codes = generate_recovery_codes()
+    user.totp_recovery_codes = hash_recovery_codes(codes)
+    return codes
+
+
+def turn_off(user: User) -> None:
+    """Any state → off: turned off by its owner, or reset by an admin."""
+    user.totp_secret = None
+    user.totp_enabled = False
+    user.totp_recovery_codes = None
 
 
 def verify_totp_or_recovery(user: User, code: str) -> Tuple[bool, Optional[str]]:
