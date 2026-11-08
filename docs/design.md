@@ -14,6 +14,7 @@ Everything else serves it (see [each app](#each-app)).
 
 - Context sits beside it in drawers and side panes and never replaces it.
 - Controls stay off it: the ways to reach other views and drawers live in the app's bars, not on the centrepiece.
+- A bar tells places from drawers: a view is a tab, and a drawer that belongs to a view is a toggle beside it that never looks like a tab, so only one place is ever lit.
 - Each app has its own accent, set as a hex value.
 - Judge an app against its own intent, not generic conventions.
 
