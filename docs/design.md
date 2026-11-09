@@ -133,7 +133,7 @@ Pick one existing version as the model and match it; never build a second.
 - **Calendar**: a terminal logbook in Inter and IBM Plex Mono. Square corners, a tmux-style bottom bar, and messages printed as grey monospace log lines (`!` a problem, `›` news), with no colour and no boxes. Red is only for buttons that destroy something.
 - **Library**: a gallery wall in warm light, with a glow, paper grain and frosted panels by day and night. Covers hang with square corners; buttons are outlines, never filled. The reader drops the light for a flat, plain page.
 - **Dashboard**: an engineering blueprint in slate. Every page opens with `PageHeader.jsx`, cards share `Panel.jsx`, and row actions use `.btn-link`. Status colours are still Tailwind's green, amber and red rather than tokens.
-- **Situation**: a newsroom wall: graphite glass, a frameless world map in the Patterson projection filling its panel, facts in Plex Mono and headlines in Inter. Countries in the news are tinted in their tier's colour, with no pins. Papers is a weekly front page in the same glass and type.
+- **Situation**: a newsroom wall: graphite glass, a frameless world map in the Patterson projection filling its panel, facts in Plex Mono and headlines in Inter. Countries in the news are tinted in their tier's colour, with no pins. Dispatch is a weekly issue in the same glass and type, set as a front page of sections.
 
 ---
 
