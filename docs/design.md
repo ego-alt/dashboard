@@ -147,7 +147,7 @@ Each Flask app (calendar, library, situation, tapes) has:
 
 The dashboard (React with Tailwind) keeps the same colour role names in its global CSS.
 
-1. **No raw sizes or colours outside `tokens.css`.** `tokens.css` also sets `color-scheme` to the theme's (dark or light), so what the browser draws itself (date pickers, open dropdowns, scrollbars, autofill, a search field's ×) matches.
+1. **No raw sizes or colours outside `tokens.css`.** That includes letter-spacing, line heights and the finger-target size: a short scale of each, so values a hair apart (0.08em beside 0.1em) can't creep in, and one rule for a small control's larger tap area rather than one per control. `tokens.css` also sets `color-scheme` to the theme's (dark or light), so what the browser draws itself (date pickers, open dropdowns, scrollbars, autofill, a search field's ×) matches.
    - Stylesheets use `var(--text-*)`, `var(--space-*)` and `var(--color-*)`.
    - Relative sizes (`em`, `%`) are fine for things sized to the text around them.
    - Each app's `tests/test_style_tokens.py` fails on a raw font size outside `tokens.css`.
